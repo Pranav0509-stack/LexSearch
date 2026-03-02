@@ -1,0 +1,42 @@
+# BharatLLM Forge - Dependencies
+# Install: pip install -r requirements.txt
+
+# Core ML
+torch>=2.1.0
+transformers>=4.40.0
+accelerate>=0.28.0
+peft>=0.10.0           # LoRA / QLoRA
+bitsandbytes>=0.43.0   # 4-bit quantization
+trl>=0.8.0             # SFT + RLHF training
+
+# Data
+datasets>=2.18.0
+huggingface_hub>=0.22.0
+sentencepiece>=0.2.0   # Tokenizer
+tokenizers>=0.19.0
+
+# Dataset Processing
+fasttext-wheel>=0.9.2  # Language detection
+datasketch>=1.6.4      # MinHash LSH deduplication
+unicodedata2>=15.1.0   # Unicode normalization
+indic-nlp-library>=0.92  # Indic text processing
+langdetect>=1.0.9
+
+# Numerics
+numpy>=1.26.0
+scipy>=1.12.0          # SLERP math
+einops>=0.7.0
+
+# Utilities
+tqdm>=4.66.0
+pyyaml>=6.0
+loguru>=0.7.2
+rich>=13.7.0           # Beautiful terminal output
+typer>=0.12.0          # CLI
+
+# Evaluation
+lm-eval>=0.4.2         # EleutherAI eval harness
+sacrebleu>=2.4.0       # Translation eval
+
+# Optional: monitoring
+wandb>=0.17.0          # Experiment tracking
