@@ -1,0 +1,17 @@
+# Dependencies
+node_modules/
+
+# Environment — NEVER commit real keys
+.env
+
+# Build & cache
+.DS_Store
+*.log
+eval-report.json
+
+# Claude internal
+.claude/
+
+# Test audio files
+*.wav
+*.mp3

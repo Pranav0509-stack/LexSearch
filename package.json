@@ -1,0 +1,16 @@
+{
+    "name": "nyayasathi",
+    "version": "9.0.0",
+    "description": "NyayaSathi v9 — India's Advanced AI Legal Agent powered by Sarvam AI",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "eval": "node eval-engine.js",
+        "dev": "node --watch server.js"
+    },
+    "dependencies": {
+        "express": "^4.21.0",
+        "dotenv": "^16.4.5",
+        "multer": "^2.0.0"
+    }
+}

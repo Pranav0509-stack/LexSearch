@@ -1,0 +1,1857 @@
+<!DOCTYPE html>
+<html lang="hi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+    <meta name="description"
+        content="NyayaSathi - India's free AI legal helpline. Get instant legal advice on FIR, property, rent, salary, divorce, consumer complaints, and more.">
+    <meta name="theme-color" content="#0a0e17">
+    <title>NyayaSathi — India's AI Legal Helpline</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        :root {
+            --bg: #0a0e17;
+            --surface: #111827;
+            --surface2: #1e293b;
+            --border: #1e293b;
+            --border2: #334155;
+            --primary: #f97316;
+            --primary-glow: rgba(249, 115, 22, .15);
+            --primary-ring: rgba(249, 115, 22, .3);
+            --green: #22c55e;
+            --green-glow: rgba(34, 197, 94, .12);
+            --green-ring: rgba(34, 197, 94, .3);
+            --blue: #3b82f6;
+            --cyan: #06b6d4;
+            --red: #ef4444;
+            --amber: #f59e0b;
+            --purple: #a78bfa;
+            --text: #f1f5f9;
+            --text2: #94a3b8;
+            --text3: #64748b;
+            --text4: #475569;
+            --radius: 12px;
+            --radius-lg: 16px;
+            --radius-xl: 24px;
+            --shadow: 0 4px 24px rgba(0, 0, 0, .4);
+            --shadow-lg: 0 8px 40px rgba(0, 0, 0, .5);
+        }
+
+        html,
+        body {
+            height: 100%;
+            overflow: hidden
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            display: flex;
+            flex-direction: column;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-font-smoothing: antialiased
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            font-family: inherit;
+            -webkit-tap-highlight-color: transparent;
+            outline: none
+        }
+
+        input {
+            font-family: inherit;
+            outline: none
+        }
+
+        ::-webkit-scrollbar {
+            width: 4px
+        }
+
+        ::-webkit-scrollbar-track {
+            background: transparent
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border2);
+            border-radius: 4px
+        }
+
+        /* ═══ PAGES ═══ */
+        .page {
+            flex: 1;
+            display: none;
+            flex-direction: column;
+            height: 100%
+        }
+
+        .page.active {
+            display: flex
+        }
+
+        /* ═══ HOME PAGE ═══ */
+        .home {
+            position: relative;
+            overflow: hidden
+        }
+
+        .home-bg {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            overflow: hidden
+        }
+
+        .home-bg .orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: .35;
+            animation: orbFloat 12s ease-in-out infinite
+        }
+
+        .home-bg .orb1 {
+            width: 400px;
+            height: 400px;
+            background: var(--primary);
+            top: -120px;
+            right: -100px;
+            animation-delay: 0s
+        }
+
+        .home-bg .orb2 {
+            width: 300px;
+            height: 300px;
+            background: var(--blue);
+            bottom: -80px;
+            left: -60px;
+            animation-delay: -4s
+        }
+
+        .home-bg .orb3 {
+            width: 200px;
+            height: 200px;
+            background: var(--purple);
+            top: 40%;
+            left: 60%;
+            animation-delay: -8s
+        }
+
+        @keyframes orbFloat {
+
+            0%,
+            100% {
+                transform: translate(0, 0) scale(1)
+            }
+
+            33% {
+                transform: translate(20px, -30px) scale(1.05)
+            }
+
+            66% {
+                transform: translate(-15px, 20px) scale(.95)
+            }
+        }
+
+        .home-content {
+            position: relative;
+            z-index: 1;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            overflow-y: auto;
+            padding: 24px 20px 20px
+        }
+
+        /* Nav bar */
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            max-width: 480px;
+            margin-bottom: 20px
+        }
+
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .nav-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--primary), #ea580c);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px
+        }
+
+        .nav-name {
+            font-size: 15px;
+            font-weight: 800;
+            color: var(--text)
+        }
+
+        .nav-badge {
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: var(--primary-glow);
+            border: 1px solid var(--primary-ring);
+            font-size: 9px;
+            font-weight: 700;
+            color: var(--primary);
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 24px;
+            max-width: 480px
+        }
+
+        .hero-eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            border-radius: 20px;
+            background: var(--green-glow);
+            border: 1px solid var(--green-ring);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--green);
+            margin-bottom: 16px
+        }
+
+        .hero-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--green);
+            animation: blink 1.5s ease infinite
+        }
+
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 900;
+            line-height: 1.15;
+            margin-bottom: 8px
+        }
+
+        .hero h1 .gradient {
+            background: linear-gradient(135deg, var(--primary), var(--amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text
+        }
+
+        .hero p {
+            font-size: 14px;
+            color: var(--text2);
+            line-height: 1.5
+        }
+
+        /* Stats row */
+        .stats {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            width: 100%;
+            max-width: 480px;
+            justify-content: center
+        }
+
+        .stat {
+            flex: 1;
+            max-width: 140px;
+            padding: 12px;
+            border-radius: var(--radius);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            text-align: center
+        }
+
+        .stat-val {
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--primary)
+        }
+
+        .stat-label {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 2px;
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        /* Call CTA */
+        .cta-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 24px
+        }
+
+        .call-btn {
+            width: 88px;
+            height: 88px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--green), #16a34a);
+            color: #fff;
+            font-size: 36px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 0 0 var(--green-ring);
+            animation: ctaPulse 2.5s ease infinite;
+            transition: transform .15s, box-shadow .15s
+        }
+
+        .call-btn:hover {
+            transform: scale(1.05)
+        }
+
+        .call-btn:active {
+            transform: scale(.92)
+        }
+
+        @keyframes ctaPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 var(--green-ring)
+            }
+
+            50% {
+                box-shadow: 0 0 0 18px rgba(34, 197, 94, 0)
+            }
+        }
+
+        .cta-label {
+            font-size: 14px;
+            font-weight: 700;
+            color: var(--green)
+        }
+
+        .cta-sub {
+            font-size: 11px;
+            color: var(--text3)
+        }
+
+        /* Topic grid */
+        .topics-title {
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--text3);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+            text-align: center
+        }
+
+        .topics {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 480px;
+            margin-bottom: 20px
+        }
+
+        .topic {
+            padding: 14px 8px;
+            border-radius: var(--radius);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            text-align: center;
+            transition: all .2s;
+            cursor: pointer
+        }
+
+        .topic:hover {
+            border-color: var(--primary-ring);
+            background: var(--primary-glow);
+            transform: translateY(-2px)
+        }
+
+        .topic:active {
+            transform: translateY(0)
+        }
+
+        .topic-icon {
+            font-size: 22px;
+            margin-bottom: 4px
+        }
+
+        .topic-name {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text2)
+        }
+
+        /* Helplines */
+        .helplines {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: center;
+            max-width: 480px;
+            margin-bottom: 12px
+        }
+
+        .hl {
+            padding: 6px 10px;
+            border-radius: 8px;
+            background: rgba(34, 197, 94, .06);
+            border: 1px solid rgba(34, 197, 94, .12);
+            font-size: 10px;
+            color: var(--green);
+            font-weight: 600;
+            white-space: nowrap
+        }
+
+        /* Architecture flow */
+        .arch-flow {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            width: 100%;
+            max-width: 480px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            padding: 16px 12px;
+            border-radius: var(--radius-lg);
+            background: var(--surface);
+            border: 1px solid var(--border)
+        }
+
+        .arch-step {
+            text-align: center;
+            padding: 8px 10px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            background: var(--surface2);
+            min-width: 70px
+        }
+
+        .arch-step.arch-brain {
+            border-color: var(--green-ring);
+            background: var(--green-glow)
+        }
+
+        .arch-icon {
+            font-size: 20px;
+            margin-bottom: 2px
+        }
+
+        .arch-name {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text)
+        }
+
+        .arch-detail {
+            font-size: 8px;
+            color: var(--text3);
+            margin-top: 1px
+        }
+
+        .arch-arrow {
+            color: var(--text3);
+            font-size: 16px;
+            font-weight: 700
+        }
+
+        /* Built with */
+        .built-with {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: center;
+            margin-bottom: 8px;
+            max-width: 480px
+        }
+
+        .bw-chip {
+            padding: 5px 12px;
+            border-radius: 8px;
+            font-size: 10px;
+            font-weight: 700;
+            border: 1px solid var(--border)
+        }
+
+        .bw-sarvam {
+            background: rgba(59, 130, 246, .1);
+            border-color: rgba(59, 130, 246, .2);
+            color: var(--blue)
+        }
+
+        .bw-gemini {
+            background: rgba(249, 115, 22, .1);
+            border-color: rgba(249, 115, 22, .2);
+            color: var(--primary)
+        }
+
+        .bw-node {
+            background: rgba(34, 197, 94, .1);
+            border-color: rgba(34, 197, 94, .2);
+            color: var(--green)
+        }
+
+        .bw-oss {
+            background: var(--surface);
+            color: var(--text3)
+        }
+
+        .footer-note {
+            font-size: 10px;
+            color: var(--text4);
+            text-align: center;
+            padding: 4px 0
+        }
+
+        /* ═══ LANGUAGE SELECT — Phone Keypad Style ═══ */
+        .lang-page {
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            gap: 0;
+            background: radial-gradient(ellipse at 50% 30%, rgba(249,115,22,.08) 0%, transparent 60%)
+        }
+
+        .lang-head {
+            text-align: center;
+            margin-bottom: 12px
+        }
+
+        .lang-head h2 {
+            font-size: 20px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--primary), var(--amber));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text
+        }
+
+        .lang-head p {
+            font-size: 11px;
+            color: var(--text3);
+            margin-top: 4px
+        }
+
+        .lang-status {
+            font-size: 13px;
+            color: var(--green);
+            min-height: 20px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            text-align: center
+        }
+
+        .lang-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            width: 100%;
+            max-width: 340px;
+            padding: 0 4px
+        }
+
+        .lang-key {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 14px 6px 10px;
+            border-radius: 16px;
+            background: var(--surface);
+            border: 2px solid var(--border);
+            cursor: pointer;
+            transition: all .15s;
+            min-height: 72px;
+            position: relative;
+            overflow: hidden
+        }
+
+        .lang-key::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: 14px;
+            background: linear-gradient(180deg, rgba(255,255,255,.03) 0%, transparent 50%);
+            pointer-events: none
+        }
+
+        .lang-key:hover {
+            border-color: var(--primary-ring);
+            background: var(--surface2);
+            transform: scale(1.04)
+        }
+
+        .lang-key:active {
+            transform: scale(.94);
+            background: var(--primary-glow)
+        }
+
+        .lang-key.sel {
+            border-color: var(--green) !important;
+            background: var(--green-glow) !important;
+            box-shadow: 0 0 20px rgba(34,197,94,.15)
+        }
+
+        .lang-key .key-num {
+            font-size: 20px;
+            font-weight: 900;
+            color: var(--primary);
+            line-height: 1;
+            margin-bottom: 2px
+        }
+
+        .lang-key.sel .key-num {
+            color: var(--green)
+        }
+
+        .lang-key .key-native {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--text);
+            line-height: 1.1
+        }
+
+        .lang-key .key-en {
+            font-size: 8px;
+            color: var(--text3);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .5px
+        }
+
+        /* Last row with 2 items — center them */
+        .lang-key.key-wide {
+            grid-column: span 1
+        }
+
+        .lang-extra {
+            display: flex;
+            gap: 8px;
+            width: 100%;
+            max-width: 340px;
+            justify-content: center;
+            margin-top: 4px
+        }
+
+        .lang-extra .lang-key {
+            flex: 1;
+            max-width: calc(33.33% - 4px)
+        }
+
+        .start-btn {
+            padding: 14px 48px;
+            border-radius: 50px;
+            background: linear-gradient(145deg, var(--green), #16a34a);
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            opacity: .3;
+            transition: all .25s;
+            margin-top: 16px;
+            letter-spacing: .5px;
+            text-transform: uppercase
+        }
+
+        .start-btn.ready {
+            opacity: 1;
+            box-shadow: 0 4px 30px rgba(34,197,94,.3), 0 0 0 0 var(--green-ring);
+            animation: startPulse 2s ease infinite
+        }
+
+        @keyframes startPulse {
+            0%,100% { box-shadow: 0 4px 30px rgba(34,197,94,.3), 0 0 0 0 var(--green-ring) }
+            50% { box-shadow: 0 4px 30px rgba(34,197,94,.3), 0 0 0 10px rgba(34,197,94,0) }
+        }
+
+        .start-btn.ready:hover {
+            transform: scale(1.04)
+        }
+
+        .start-btn.ready:active {
+            transform: scale(.95)
+        }
+
+        .back-link {
+            padding: 8px;
+            background: none;
+            color: var(--text3);
+            font-size: 12px;
+            margin-top: 8px
+        }
+
+        .lang-hint {
+            font-size: 10px;
+            color: var(--text4)
+        }
+
+        /* ═══ CONNECTING ═══ */
+        .connect-page {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            gap: 16px
+        }
+
+        .connect-ring {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 3px solid var(--green);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            animation: ringPulse 1.5s ease infinite
+        }
+
+        @keyframes ringPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 var(--green-ring)
+            }
+
+            50% {
+                box-shadow: 0 0 0 20px rgba(34, 197, 94, 0)
+            }
+        }
+
+        .connect-text {
+            font-size: 18px;
+            font-weight: 700
+        }
+
+        .connect-sub {
+            font-size: 12px;
+            color: var(--text3)
+        }
+
+        .connect-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border);
+            border-top-color: var(--green);
+            border-radius: 50%;
+            animation: spin .6s linear infinite
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        /* ═══ CALL PAGE ═══ */
+        .call-page {
+            background: var(--bg)
+        }
+
+        /* Call header */
+        .call-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 16px;
+            background: var(--surface);
+            border-bottom: 1px solid var(--border)
+        }
+
+        .call-top-left {
+            display: flex;
+            align-items: center;
+            gap: 8px
+        }
+
+        .live-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text3);
+            transition: background .2s
+        }
+
+        .live-label {
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .5px;
+            color: var(--text3);
+            transition: color .2s
+        }
+
+        .call-timer {
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text3);
+            font-family: 'JetBrains Mono', monospace
+        }
+
+        .call-brand {
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text4)
+        }
+
+        /* Error bar */
+        .err-bar {
+            margin: 0 16px 0;
+            padding: 8px 14px;
+            background: rgba(239, 68, 68, .08);
+            border: 1px solid rgba(239, 68, 68, .15);
+            border-radius: var(--radius);
+            font-size: 12px;
+            color: #fca5a5;
+            display: none
+        }
+
+        .err-bar.show {
+            display: block
+        }
+
+        /* Waveform */
+        .wave-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+            gap: 2px;
+            height: 36px;
+            padding: 8px 16px
+        }
+
+        .wbar {
+            width: 3px;
+            border-radius: 2px;
+            min-height: 2px;
+            height: 2px;
+            background: rgba(255, 255, 255, .03);
+            transition: height 80ms ease, background .2s
+        }
+
+        /* Status area */
+        .call-st {
+            text-align: center;
+            padding: 2px 16px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text3);
+            min-height: 20px
+        }
+
+        .filler-area {
+            text-align: center;
+            padding: 0 16px 4px;
+            font-size: 11px;
+            color: var(--amber);
+            font-style: italic;
+            min-height: 16px;
+            opacity: 0;
+            transition: opacity .3s
+        }
+
+        .filler-area.show {
+            opacity: 1
+        }
+
+        /* Messages */
+        .msgs {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            scroll-behavior: smooth
+        }
+
+        .msg {
+            display: flex;
+            animation: msgIn .25s ease
+        }
+
+        .msg.user {
+            justify-content: flex-end
+        }
+
+        @keyframes msgIn {
+            from {
+                opacity: 0;
+                transform: translateY(8px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        .bubble {
+            max-width: 82%;
+            padding: 12px 16px;
+            font-size: 13px;
+            line-height: 1.65;
+            word-break: break-word;
+            border-radius: var(--radius-lg)
+        }
+
+        .bubble.user-b {
+            background: linear-gradient(135deg, var(--primary), #ea580c);
+            color: #fff;
+            border-bottom-right-radius: 4px;
+            box-shadow: 0 2px 12px rgba(249, 115, 22, .2)
+        }
+
+        .bubble.ai-b {
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-bottom-left-radius: 4px
+        }
+
+        .b-who {
+            font-size: 9px;
+            font-weight: 700;
+            margin-bottom: 3px;
+            letter-spacing: .5px;
+            text-transform: uppercase
+        }
+
+        .b-when {
+            font-size: 9px;
+            color: rgba(255, 255, 255, .2);
+            margin-top: 4px
+        }
+
+        /* Typing indicator */
+        .typing {
+            display: flex;
+            gap: 5px;
+            padding: 10px 16px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            width: fit-content
+        }
+
+        .t-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--amber);
+            animation: tbounce .6s ease infinite
+        }
+
+        .t-dot:nth-child(2) {
+            animation-delay: .15s
+        }
+
+        .t-dot:nth-child(3) {
+            animation-delay: .3s
+        }
+
+        @keyframes tbounce {
+
+            0%,
+            100% {
+                opacity: .2;
+                transform: scale(.8)
+            }
+
+            50% {
+                opacity: 1;
+                transform: scale(1.1)
+            }
+        }
+
+        /* Suggestion chips */
+        .suggestions {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding: 6px 16px;
+            scrollbar-width: none
+        }
+
+        .suggestions::-webkit-scrollbar {
+            display: none
+        }
+
+        .sug {
+            padding: 8px 14px;
+            border-radius: 20px;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text2);
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            transition: all .15s;
+            flex-shrink: 0
+        }
+
+        .sug:hover {
+            background: var(--primary-glow);
+            border-color: var(--primary-ring);
+            color: var(--primary)
+        }
+
+        .sug:active {
+            transform: scale(.95)
+        }
+
+        /* Input area */
+        .input-area {
+            display: flex;
+            gap: 8px;
+            padding: 10px 16px;
+            align-items: center;
+            background: var(--surface);
+            border-top: 1px solid var(--border)
+        }
+
+        .txt-input {
+            flex: 1;
+            padding: 10px 16px;
+            border-radius: 24px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text);
+            font-size: 13px;
+            transition: border-color .2s
+        }
+
+        .txt-input:focus {
+            border-color: var(--primary)
+        }
+
+        .txt-input::placeholder {
+            color: var(--text4)
+        }
+
+        .send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: #fff;
+            font-size: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: transform .1s, background .15s
+        }
+
+        .send-btn:hover {
+            background: #ea580c
+        }
+
+        .send-btn:active {
+            transform: scale(.88)
+        }
+
+        /* Bottom controls */
+        .call-controls {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 12px 16px 16px
+        }
+
+        .ctrl-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            transition: all .15s;
+            flex-shrink: 0
+        }
+
+        .mic-btn {
+            background: rgba(34, 197, 94, .1);
+            border: 2px solid var(--green);
+            color: var(--green)
+        }
+
+        .mic-btn.off {
+            border-color: var(--red);
+            color: var(--red);
+            background: rgba(239, 68, 68, .1)
+        }
+
+        .hang-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--red), #b91c1c);
+            color: #fff;
+            font-size: 20px;
+            transform: rotate(135deg);
+            box-shadow: 0 0 0 0 rgba(239, 68, 68, .2);
+            animation: hangPulse 3s ease infinite
+        }
+
+        @keyframes hangPulse {
+
+            0%,
+            100% {
+                box-shadow: 0 0 0 0 rgba(239, 68, 68, .2)
+            }
+
+            50% {
+                box-shadow: 0 0 0 10px rgba(239, 68, 68, 0)
+            }
+        }
+
+        .skip-btn {
+            background: rgba(59, 130, 246, .1);
+            border: 2px solid var(--blue);
+            color: var(--blue)
+        }
+
+        .ctrl-btn:active {
+            transform: scale(.88)
+        }
+
+        /* ═══ END PAGE ═══ */
+        .end-page {
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 24px;
+            gap: 12px
+        }
+
+        .end-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: var(--green-glow);
+            border: 2px solid var(--green-ring);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px
+        }
+
+        .end-title {
+            font-size: 22px;
+            font-weight: 800
+        }
+
+        .end-time {
+            font-size: 12px;
+            color: var(--text3)
+        }
+
+        .end-cards {
+            width: 100%;
+            max-width: 400px;
+            max-height: 200px;
+            overflow-y: auto
+        }
+
+        .end-card {
+            padding: 12px 14px;
+            border-radius: var(--radius);
+            background: var(--surface);
+            border: 1px solid var(--border);
+            margin-bottom: 6px;
+            text-align: left;
+            font-size: 12px;
+            line-height: 1.6;
+            color: var(--text2)
+        }
+
+        .restart-btn {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            background: linear-gradient(145deg, var(--green), #16a34a);
+            color: #fff;
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-top: 8px;
+            animation: ctaPulse 2.5s ease infinite
+        }
+
+        .restart-btn:active {
+            transform: scale(.9)
+        }
+
+        .restart-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: var(--green)
+        }
+
+        /* Perf badge */
+        .perf {
+            position: fixed;
+            bottom: 4px;
+            right: 8px;
+            font-size: 9px;
+            color: var(--text4);
+            pointer-events: none;
+            z-index: 99;
+            font-family: 'JetBrains Mono', monospace
+        }
+
+        @keyframes blink {
+
+            0%,
+            100% {
+                opacity: .3
+            }
+
+            50% {
+                opacity: 1
+            }
+        }
+
+        /* Mobile optimizations */
+        @media(max-width:380px) {
+            .hero h1 {
+                font-size: 26px
+            }
+
+            .topics {
+                grid-template-columns: repeat(2, 1fr)
+            }
+
+            .stats {
+                flex-wrap: wrap
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- ═══ HOME ═══ -->
+    <div id="p-home" class="page active home">
+        <div class="home-bg">
+            <div class="orb orb1"></div>
+            <div class="orb orb2"></div>
+            <div class="orb orb3"></div>
+        </div>
+        <div class="home-content">
+            <!-- Nav -->
+            <div class="nav">
+                <div class="nav-brand">
+                    <div class="nav-icon">&#9878;</div>
+                    <span class="nav-name">NyayaSathi</span>
+                </div>
+                <span class="nav-badge">Gemini AI + Sarvam</span>
+            </div>
+
+            <!-- Hero -->
+            <div class="hero">
+                <div class="hero-eyebrow"><span class="hero-dot"></span> Free Legal Help &bull; 24/7 &bull; 11 Languages</div>
+                <h1>India's <span class="gradient">AI Legal</span> Helpline</h1>
+                <p>Talk to an AI lawyer. Get instant legal advice on FIR, property, salary, divorce, fraud &amp; 50+ topics. No login. No fees. Just speak.</p>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-val">50+</div>
+                    <div class="stat-label">Legal Topics</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-val">11</div>
+                    <div class="stat-label">Languages</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-val">&lt;5s</div>
+                    <div class="stat-label">Response</div>
+                </div>
+            </div>
+
+            <!-- Call CTA -->
+            <div class="cta-area">
+                <button class="call-btn" id="btn-call">&#128222;</button>
+                <span class="cta-label">Start Free Call</span>
+                <span class="cta-sub">No login required. 100% free.</span>
+            </div>
+
+            <!-- Topics -->
+            <div class="topics-title">Common Legal Topics</div>
+            <div class="topics">
+                <button class="topic" data-q="FIR kaise darj karein, police mana kar rahi hai">
+                    <div class="topic-icon">&#128680;</div>
+                    <div class="topic-name">File FIR</div>
+                </button>
+                <button class="topic" data-q="Landlord security deposit wapas nahi kar raha">
+                    <div class="topic-icon">&#127968;</div>
+                    <div class="topic-name">Rent/Deposit</div>
+                </button>
+                <button class="topic" data-q="Boss ne 3 mahine se salary nahi di">
+                    <div class="topic-icon">&#128188;</div>
+                    <div class="topic-name">Salary Issue</div>
+                </button>
+                <button class="topic" data-q="Online shopping fraud hua, paise wapas chahiye">
+                    <div class="topic-icon">&#128176;</div>
+                    <div class="topic-name">Online Fraud</div>
+                </button>
+                <button class="topic" data-q="Cheque bounce ho gaya, paise kaise recover karein">
+                    <div class="topic-icon">&#128179;</div>
+                    <div class="topic-name">Cheque Bounce</div>
+                </button>
+                <button class="topic" data-q="Domestic violence ho rahi hai, madad chahiye">
+                    <div class="topic-icon">&#128694;</div>
+                    <div class="topic-name">DV Help</div>
+                </button>
+                <button class="topic" data-q="Car accident hua, insurance claim kaise karein">
+                    <div class="topic-icon">&#128663;</div>
+                    <div class="topic-name">Accident</div>
+                </button>
+                <button class="topic" data-q="Builder ne flat possession nahi diya, RERA mein complaint">
+                    <div class="topic-icon">&#127959;</div>
+                    <div class="topic-name">RERA / Builder</div>
+                </button>
+                <button class="topic" data-q="Divorce file karna hai kya karna hoga">
+                    <div class="topic-icon">&#128148;</div>
+                    <div class="topic-name">Divorce</div>
+                </button>
+            </div>
+
+            <!-- Architecture Flow -->
+            <div class="arch-flow">
+                <div class="arch-step">
+                    <div class="arch-icon">&#127908;</div>
+                    <div class="arch-name">You Speak</div>
+                    <div class="arch-detail">11 Languages</div>
+                </div>
+                <div class="arch-arrow">&#8594;</div>
+                <div class="arch-step">
+                    <div class="arch-icon">&#127911;</div>
+                    <div class="arch-name">Sarvam STT</div>
+                    <div class="arch-detail">Speech to Text</div>
+                </div>
+                <div class="arch-arrow">&#8594;</div>
+                <div class="arch-step arch-brain">
+                    <div class="arch-icon">&#129504;</div>
+                    <div class="arch-name">Gemini AI</div>
+                    <div class="arch-detail">Brain + RAG</div>
+                </div>
+                <div class="arch-arrow">&#8594;</div>
+                <div class="arch-step">
+                    <div class="arch-icon">&#128264;</div>
+                    <div class="arch-name">Sarvam TTS</div>
+                    <div class="arch-detail">Text to Speech</div>
+                </div>
+            </div>
+
+            <!-- Helplines -->
+            <div class="helplines">
+                <span class="hl">&#128222; NALSA 15100</span>
+                <span class="hl">&#128222; Tele-Law 1516</span>
+                <span class="hl">&#128222; Consumer 1915</span>
+                <span class="hl">&#128222; Women 181</span>
+                <span class="hl">&#128222; Cyber 1930</span>
+                <span class="hl">&#128222; Police 112</span>
+            </div>
+
+            <!-- Built With -->
+            <div class="built-with">
+                <span class="bw-chip bw-sarvam">Sarvam AI</span>
+                <span class="bw-chip bw-gemini">Google Gemini</span>
+                <span class="bw-chip bw-node">Node.js</span>
+                <span class="bw-chip bw-oss">Open Source</span>
+            </div>
+            <div class="footer-note">100% Free. No billing. No app download. Works on any phone with Chrome.</div>
+            <div class="footer-note">NyayaSathi provides legal information, not legal advice.</div>
+        </div>
+    </div>
+
+    <!-- ═══ LANGUAGE SELECT ═══ -->
+    <div id="p-lang" class="page lang-page">
+        <div class="lang-head">
+            <h2>&#9742; Choose Your Language</h2>
+            <p>Tap a key or press the number on your keyboard</p>
+        </div>
+        <div class="lang-status" id="lang-status"></div>
+        <div class="lang-grid" id="lang-grid"></div>
+        <div class="lang-extra" id="lang-extra"></div>
+        <button class="start-btn" id="btn-start" disabled>&#128222; Start Call</button>
+        <button class="back-link" id="btn-back">&larr; Back</button>
+    </div>
+
+    <!-- ═══ CONNECTING ═══ -->
+    <div id="p-connect" class="page connect-page">
+        <div class="connect-ring">&#128222;</div>
+        <div class="connect-text">Connecting...</div>
+        <div class="connect-sub">Setting up your legal consultation</div>
+        <div class="connect-spinner"></div>
+    </div>
+
+    <!-- ═══ CALL PAGE ═══ -->
+    <div id="p-call" class="page call-page">
+        <div class="call-top">
+            <div class="call-top-left">
+                <span class="live-dot" id="live-dot"></span>
+                <span class="live-label" id="live-label">...</span>
+            </div>
+            <span class="call-timer" id="call-timer">00:00</span>
+            <span class="call-brand">NyayaSathi AI</span>
+        </div>
+        <div class="err-bar" id="err-bar"></div>
+        <div class="wave-wrap" id="wave-wrap"></div>
+        <div class="call-st" id="call-st">Call Active</div>
+        <div class="filler-area" id="filler-area"></div>
+        <div class="msgs" id="msgs"></div>
+        <div class="suggestions" id="suggestions"></div>
+        <div class="input-area">
+            <input type="text" id="txt-in" class="txt-input" placeholder="Type your legal question..."
+                autocomplete="off">
+            <button id="btn-send" class="send-btn">&#10148;</button>
+        </div>
+        <div class="call-controls">
+            <button class="ctrl-btn mic-btn" id="btn-mic" title="Toggle mic">&#127908;</button>
+            <button class="hang-btn" id="btn-hangup">&#128222;</button>
+            <button class="ctrl-btn skip-btn" id="btn-skip" title="Skip audio">&#9197;</button>
+        </div>
+    </div>
+
+    <!-- ═══ END PAGE ═══ -->
+    <div id="p-end" class="page end-page">
+        <div class="end-icon">&#9989;</div>
+        <div class="end-title">Call Ended</div>
+        <div class="end-time" id="end-time"></div>
+        <div class="end-cards" id="end-cards"></div>
+        <button class="restart-btn" id="btn-restart">&#128222;</button>
+        <span class="restart-label">New Call</span>
+        <div class="footer-note" style="margin-top:8px">Remember: NALSA 15100 for free lawyer. This was AI information,
+            not legal advice.</div>
+    </div>
+
+    <div class="perf" id="perf"></div>
+
+    <script>
+        const LANGS = [
+            { code: "hi-IN", name: "Hindi", native: "\u0939\u093f\u0928\u094d\u0926\u0940", greeting: "Namaste! Main NyayaSathi hoon, aapka AI kanooni sahayak. Bataiye aapki kya samasya hai, main madad karta hoon." },
+            { code: "en-IN", name: "English", native: "English", greeting: "Hello! I'm NyayaSathi, your AI legal assistant. Please tell me your legal problem, I'm here to help." },
+            { code: "bn-IN", name: "Bengali", native: "\u09ac\u09be\u0982\u09b2\u09be", greeting: "Nomoshkar! Aapnar shomoshya bolun." },
+            { code: "te-IN", name: "Telugu", native: "\u0c24\u0c46\u0c32\u0c41\u0c17\u0c41", greeting: "Namaskaram! Mee samashya cheppandi." },
+            { code: "ta-IN", name: "Tamil", native: "\u0ba4\u0bae\u0bbf\u0bb4\u0bcd", greeting: "Vanakkam! Ungal pirachanai sollungal." },
+            { code: "mr-IN", name: "Marathi", native: "\u092e\u0930\u093e\u0920\u0940", greeting: "Namaskar! Tumchi samasya sanga." },
+            { code: "gu-IN", name: "Gujarati", native: "\u0a97\u0ac1\u0a9c\u0ab0\u0abe\u0aa4\u0ac0", greeting: "Namaste! Tamari samasya janavo." },
+            { code: "kn-IN", name: "Kannada", native: "\u0c95\u0ca8\u0ccd\u0ca8\u0ca1", greeting: "Namaskara! Nimma samasye heli." },
+            { code: "ml-IN", name: "Malayalam", native: "\u0d2e\u0d32\u0d2f\u0d3e\u0d33\u0d02", greeting: "Namaskaram! Ningalude prashnam parayu." },
+            { code: "pa-IN", name: "Punjabi", native: "\u0a2a\u0a70\u0a1c\u0a3e\u0a2c\u0a40", greeting: "Sat Sri Akal! Apni samassia dasso." },
+            { code: "od-IN", name: "Odia", native: "\u0b13\u0b21\u0b3c\u0b3f\u0b06", greeting: "Namaskar! Apanka samasya kuhantu." },
+        ];
+
+        let lang = null, history = [], seconds = 0, timerInt = null;
+        let busy = false, mediaRec = null, aStream = null, aCtx = null;
+        let curAudio = null, fillAudio = null, waveRAF = null, quickQ = null, fails = 0;
+        let micOn = true, ivrAud = null, fillBlobs = {};
+
+        const $ = id => document.getElementById(id);
+        const show = id => { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); $(id).classList.add('active') };
+
+        // ═══ HOME ═══
+        $('btn-call').onclick = () => openLang();
+        document.querySelectorAll('.topic[data-q]').forEach(b => { b.onclick = () => { quickQ = b.dataset.q; openLang() } });
+
+        // ═══ LANGUAGE ═══
+        function openLang() {
+            show('p-lang');
+            const g = $('lang-grid'); g.innerHTML = '';
+            const ex = $('lang-extra'); ex.innerHTML = '';
+            // First 9 in 3x3 grid
+            const gridLangs = LANGS.slice(0, 9);
+            const extraLangs = LANGS.slice(9);
+            gridLangs.forEach((l, i) => {
+                const key = document.createElement('div'); key.className = 'lang-key';
+                key.innerHTML = `<span class="key-num">${i + 1}</span><span class="key-native">${l.native}</span><span class="key-en">${l.name}</span>`;
+                key.onclick = () => pickLang(i); g.appendChild(key);
+            });
+            // Extra langs (10, 11) in separate row
+            extraLangs.forEach((l, i) => {
+                const key = document.createElement('div'); key.className = 'lang-key';
+                const num = i === 0 ? '0' : '*';
+                key.innerHTML = `<span class="key-num">${num}</span><span class="key-native">${l.native}</span><span class="key-en">${l.name}</span>`;
+                key.onclick = () => pickLang(9 + i); ex.appendChild(key);
+            });
+            playIVR();
+        }
+
+        function pickLang(i) {
+            if (i < 0 || i >= LANGS.length) return;
+            lang = LANGS[i];
+            document.querySelectorAll('.lang-key').forEach((r, j) => r.classList.toggle('sel', j === i));
+            $('btn-start').disabled = false; $('btn-start').classList.add('ready');
+            $('lang-status').textContent = '\u2713 ' + lang.name + ' (' + lang.native + ')';
+            prefetchFill(lang.code);
+        }
+
+        document.addEventListener('keydown', e => {
+            if (!$('p-lang').classList.contains('active')) return;
+            const n = parseInt(e.key);
+            if (n >= 1 && n <= LANGS.length) { e.preventDefault(); pickLang(n - 1) }
+            if (e.key === '0' && LANGS.length >= 10) { e.preventDefault(); pickLang(9) }
+            if (e.key === 'Enter' && lang) { e.preventDefault(); stopIVR(); startCall() }
+            if (e.key === 'Escape') { e.preventDefault(); stopIVR(); show('p-home'); quickQ = null }
+        });
+
+        async function playIVR() {
+            $('lang-status').textContent = 'Loading voice menu...';
+            try {
+                const r = await ftime('/api/ivr-prompt', {}, 12000);
+                if (r.ok && r.status !== 204) {
+                    const b = await r.blob(); if (b.size > 100) {
+                        $('lang-status').textContent = '\uD83D\uDD0A Playing voice menu...';
+                        ivrAud = new Audio(URL.createObjectURL(b));
+                        ivrAud.onended = () => { $('lang-status').textContent = lang ? '\u2713 ' + lang.name : 'Press a number'; ivrAud = null };
+                        ivrAud.play().catch(() => { }); return;
+                    }
+                }
+            } catch { }
+            $('lang-status').textContent = 'Press a number to select';
+        }
+        function stopIVR() { if (ivrAud) { try { ivrAud.pause() } catch { } ivrAud = null } }
+
+        $('btn-start').onclick = () => { if (lang) { stopIVR(); startCall() } };
+        $('btn-back').onclick = () => { stopIVR(); show('p-home'); quickQ = null };
+
+        // ═══ FILLER ═══
+        async function prefetchFill(lc) {
+            if (fillBlobs[lc]) return;
+            try { const r = await ftime('/api/filler?lang=' + lc, {}, 8000); if (r.ok && r.status !== 204) { const b = await r.blob(); if (b.size > 100) fillBlobs[lc] = b } } catch { }
+        }
+        const FILL_TEXT = {
+            'hi-IN': ['Achha, dekhte hain...', 'Hmm, samajh raha hoon...', 'Ji haan, rukiye...', 'Theek hai, sochta hoon...'],
+            'en-IN': ['Let me think...', 'One moment...', 'Looking into it...', 'Hmm, let me check...'],
+        };
+        function playFill() {
+            const lc = lang?.code || 'hi-IN'; const fEl = $('filler-area');
+            const ph = FILL_TEXT[lc] || FILL_TEXT['hi-IN']; const txt = ph[Math.floor(Math.random() * ph.length)];
+            if (fEl) { fEl.textContent = txt; fEl.classList.add('show') }
+            const cached = fillBlobs[lc];
+            if (cached) { fillAudio = new Audio(URL.createObjectURL(cached)); fillAudio.play().catch(() => { }); delete fillBlobs[lc]; prefetchFill(lc); return }
+            ftime('/api/filler?lang=' + lc, {}, 6000).then(r => (r.ok && r.status !== 204) ? r.blob() : null).then(b => { if (b && b.size > 100) { fillAudio = new Audio(URL.createObjectURL(b)); fillAudio.play().catch(() => { }) } }).catch(() => { });
+        }
+        function stopFill() { if (fillAudio) { try { fillAudio.pause() } catch { } fillAudio = null } const f = $('filler-area'); if (f) f.classList.remove('show') }
+
+        // ═══ START CALL ═══
+        async function startCall() {
+            show('p-connect'); history = []; seconds = 0; fails = 0; micOn = true;
+            // No delay — show call page immediately
+            show('p-call'); $('msgs').innerHTML = ''; $('suggestions').innerHTML = ''; $('txt-in').value = '';
+            initWave(); timerInt = setInterval(tick, 1000); updateMic();
+            addMsgUI('ai', lang.greeting);
+            setSugs(["Kiraya problem", "Online fraud", "Salary nahi mili", "FIR kaise karein?"]);
+            setSt('speaking', 'Speaking...');
+            // Fire greeting TTS immediately — no wait
+            speakTTS(lang.greeting).then(() => {
+                busy = false; prefetchFill(lang.code);
+                if (quickQ) { const q = quickQ; quickQ = null; send(q) }
+                else if (micOn) startRec();
+            });
+        }
+
+        // ═══ END CALL ═══
+        $('btn-hangup').onclick = endCall;
+        function endCall() {
+            busy = true; stopRec(); stopAud(); stopFill();
+            clearInterval(timerInt); cancelAnimationFrame(waveRAF);
+            $('end-time').textContent = 'Duration: ' + fmtTime(seconds);
+            const c = $('end-cards'); c.innerHTML = '';
+            history.filter(m => !m.u).slice(-3).forEach(m => { c.innerHTML += '<div class="end-card">' + esc(m.t) + '</div>' });
+            show('p-end');
+        }
+        $('btn-restart').onclick = () => { history = []; seconds = 0; lang = null; quickQ = null; show('p-home') };
+
+        // ═══ TEXT INPUT ═══
+        $('btn-send').onclick = () => { const v = $('txt-in').value.trim(); if (v && !busy) { $('txt-in').value = ''; send(v) } };
+        $('txt-in').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('btn-send').click() } });
+
+        // ═══ MIC ═══
+        $('btn-mic').onclick = () => { micOn = !micOn; updateMic(); if (micOn && !busy) startRec(); else if (!micOn) stopRec() };
+        function updateMic() { const b = $('btn-mic'); if (micOn) { b.classList.remove('off'); b.title = 'Mic on' } else { b.classList.add('off'); b.title = 'Mic off' } }
+
+        // ═══ SKIP ═══
+        $('btn-skip').onclick = () => { stopAud(); stopFill(); if (!busy && micOn) startRec() };
+
+        // ═══ RECORDING ═══
+        function startRec() {
+            if (busy || !micOn) return;
+            navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, sampleRate: 16000 } }).then(stream => {
+                aStream = stream; const chunks = [];
+                const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm';
+                mediaRec = new MediaRecorder(stream, { mimeType: mime });
+                mediaRec.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data) };
+                mediaRec.onstop = () => {
+                    stream.getTracks().forEach(t => t.stop()); aStream = null;
+                    const blob = new Blob(chunks, { type: mime });
+                    if (blob.size > 800 && !busy) processAud(blob);
+                    else if (!busy && micOn) setTimeout(() => startRec(), 200);
+                };
+                mediaRec.start(200); setSt('listening', 'Listening... speak now');
+                aCtx = new AudioContext();
+                const src = aCtx.createMediaStreamSource(stream); const an = aCtx.createAnalyser(); an.fftSize = 256; src.connect(an);
+                const buf = new Uint8Array(an.frequencyBinCount); let sil = 0, spoke = false; const t0 = Date.now();
+                (function lp() {
+                    if (!mediaRec || mediaRec.state === 'inactive') return;
+                    if (Date.now() - t0 > 6000) { stopRec(); return }
+                    an.getByteFrequencyData(buf); const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
+                    animW(avg > 6);
+                    if (avg > 6) { sil = 0; spoke = true } else sil++;
+                    if (spoke && sil > 15) { stopRec(); return }
+                    setTimeout(lp, 100);
+                })();
+            }).catch(() => showErr('Allow microphone access.'));
+        }
+        function stopRec() { if (mediaRec && mediaRec.state !== 'inactive') try { mediaRec.stop() } catch { }; if (aCtx) { try { aCtx.close() } catch { } aCtx = null } animW(false) }
+        function stopAud() { if (curAudio) { try { curAudio.pause() } catch { } curAudio = null } speechSynthesis.cancel() }
+
+        // ═══ PIPELINE ═══
+        async function processAud(blob) {
+            busy = true; setSt('thinking', 'Converting speech...');
+            let transcript = '';
+            try {
+                const fd = new FormData(); fd.append('audio', blob, 'rec.webm'); fd.append('lang', lang?.code || 'unknown');
+                const r = await ftime('/api/stt', { method: 'POST', body: fd }, 6000);
+                const d = await r.json();
+                if (d.error) { showErr(d.error); busy = false; if (micOn) startRec(); return }
+                // Self-correction: if STT not confident, play clarification and re-listen
+                if (d.confident === false) {
+                    const clar = d.clarification || 'Please speak again.';
+                    setSt('speaking', clar); addMsgUI('ai', clar);
+                    await speakTTS(clar);
+                    busy = false; if (micOn) startRec(); return;
+                }
+                transcript = (d.transcript || '').trim();
+            } catch { showErr('STT failed.'); busy = false; if (micOn) startRec(); return }
+            if (!transcript) { setSt('listening', 'Could not hear \u2014 speak again'); busy = false; if (micOn) startRec(); return }
+            await send(transcript);
+        }
+
+        async function send(text) {
+            busy = true; stopRec(); stopAud();
+            addMsg('user', text);
+            setSt('thinking', 'AI thinking...'); showTyp(true);
+            playFill();
+            const t0 = performance.now();
+            let reply = '', gotReply = false;
+
+            // Audio queue: play chunks in order as they stream in
+            const audioQ = []; let audioIdx = 0, playing = false, streamDone = false;
+            function enqueueAudio(idx, b64) {
+                audioQ[idx] = { b64 };
+                if (!playing) playNext();
+            }
+            function playNext() {
+                if (audioQ[audioIdx]) {
+                    playing = true;
+                    const { b64 } = audioQ[audioIdx];
+                    try {
+                        const buf = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+                        const blob = new Blob([buf], { type: 'audio/wav' });
+                        const u = URL.createObjectURL(blob);
+                        curAudio = new Audio(u);
+                        curAudio.onended = () => { URL.revokeObjectURL(u); curAudio = null; audioIdx++; playNext() };
+                        curAudio.onerror = () => { URL.revokeObjectURL(u); curAudio = null; audioIdx++; playNext() };
+                        curAudio.play().catch(() => { curAudio = null; audioIdx++; playNext() });
+                    } catch { audioIdx++; playNext() }
+                } else {
+                    playing = false;
+                    if (streamDone && audioIdx >= audioQ.filter(Boolean).length) { finishSend() }
+                }
+            }
+            function finishSend() {
+                busy = false;
+                if (fails >= 5) { showErr('Server down.'); return }
+                if (micOn) startRec();
+            }
+
+            try {
+                const r = await fetch('/api/ask-stream', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN' }),
+                    signal: AbortSignal.timeout(15000),
+                });
+                const reader = r.body.getReader();
+                const dec = new TextDecoder();
+                let buf = '';
+                while (true) {
+                    const { done, value } = await reader.read();
+                    if (done) break;
+                    buf += dec.decode(value, { stream: true });
+                    const lines = buf.split('\n');
+                    buf = lines.pop() || '';
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const d = JSON.parse(line);
+                            if (d.type === 'reply') {
+                                reply = d.reply || ''; gotReply = true; fails = 0;
+                                stopFill(); showTyp(false);
+                                if (!reply) reply = 'Dobara boliye.';
+                                reply = reply.replace(/\*+/g, '').replace(/#+/g, '').replace(/\n+/g, ' ').trim();
+                                addMsg('ai', reply);
+                                setSugs(getCtxSugs(text, reply));
+                                setSt('speaking', 'Speaking...');
+                            }
+                            if (d.type === 'audio' && d.audio) { enqueueAudio(d.index, d.audio) }
+                            if (d.type === 'done') {
+                                const ms = Math.round(performance.now() - t0);
+                                $('perf').textContent = ms + 'ms ' + (d.aiMs ? 'AI:' + d.aiMs : '') + (d.ttsMs ? ' TTS:' + d.ttsMs : '');
+                                streamDone = true;
+                                if (!playing && audioIdx >= audioQ.filter(Boolean).length) finishSend();
+                            }
+                        } catch { }
+                    }
+                }
+                // If no audio arrived at all, fallback to speakTTS
+                if (gotReply && audioQ.filter(Boolean).length === 0) {
+                    streamDone = true; await speakTTS(reply); finishSend();
+                } else if (!gotReply) {
+                    // Stream failed entirely — no reply chunk received
+                    throw new Error('no reply');
+                }
+            } catch (e) {
+                // Fallback: use non-streaming /api/ask
+                stopFill(); showTyp(false);
+                try {
+                    const r2 = await ftime('/api/ask', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN' }),
+                    }, 10000);
+                    const d2 = await r2.json();
+                    reply = (d2.reply || '').replace(/\*+/g, '').replace(/#+/g, '').replace(/\n+/g, ' ').trim() || 'Dobara boliye.';
+                    if (!gotReply) addMsg('ai', reply);
+                    setSugs(getCtxSugs(text, reply));
+                    setSt('speaking', 'Speaking...');
+                    if (d2.audioChunks?.length) {
+                        for (const ch of d2.audioChunks) {
+                            if (!ch.audio) continue;
+                            try {
+                                const b = Uint8Array.from(atob(ch.audio), c => c.charCodeAt(0)); const bl = new Blob([b], { type: 'audio/wav' });
+                                await new Promise(rs => { curAudio = new Audio(URL.createObjectURL(bl)); curAudio.onended = () => { curAudio = null; rs() }; curAudio.onerror = () => { curAudio = null; rs() }; curAudio.play().catch(() => { curAudio = null; rs() }) });
+                            } catch { }
+                        }
+                    } else { await speakTTS(reply) }
+                    fails = 0;
+                } catch {
+                    fails++; showErr(fails >= 3 ? 'Server issue.' : 'Retrying...');
+                    reply = 'Thodi dikkat hai. NALSA 15100 par call karein \u2014 free vakeel milega.';
+                    if (!gotReply) { addMsg('ai', reply); setSugs(getCtxSugs(text, reply)) }
+                }
+                busy = false; if (micOn) startRec();
+            }
+        }
+
+        function getCtxSugs(ut, ar) {
+            const t = (ut + ' ' + ar).toLowerCase();
+            if (t.includes('fir') || t.includes('police') || t.includes('thana')) return ["Zero FIR kya hai?", "Online FIR kaise?", "Police mana kare toh?", "SP ko complaint"];
+            if (t.includes('rent') || t.includes('kiraya') || t.includes('landlord') || t.includes('makaan')) return ["Deposit wapas kaise?", "Eviction notice", "Rent agreement nahi", "Rent control act"];
+            if (t.includes('salary') || t.includes('naukri') || t.includes('employer') || t.includes('fired')) return ["PF nahi mila", "Notice period", "Labour court", "Wrongful termination"];
+            if (t.includes('fraud') || t.includes('scam') || t.includes('cheat') || t.includes('online')) return ["Cyber cell complaint", "Paise wapas kaise?", "Consumer forum", "Cheque bounce"];
+            if (t.includes('divorce') || t.includes('maintenance') || t.includes('custody') || t.includes('domestic')) return ["Maintenance kitna?", "Child custody", "DV Act protection", "Free legal aid"];
+            if (t.includes('accident') || t.includes('insurance') || t.includes('claim') || t.includes('vehicle')) return ["Insurance claim kaise?", "MACT tribunal", "Hit and run", "Challan dispute"];
+            if (t.includes('property') || t.includes('builder') || t.includes('rera') || t.includes('flat')) return ["RERA complaint", "Builder fraud", "Registry kaise?", "Encroachment"];
+            return ["Aur bataiye", "Vakeel kaise milega?", "FIR kaise karein?", "Court kaise jaayein?"];
+        }
+
+        // ═══ TTS fallback ═══
+        async function speakTTS(text) {
+            let ok = false;
+            try {
+                const r = await ftime('/api/tts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: text.slice(0, 400), lang: lang?.code || 'hi-IN' })
+                }, 8000);
+                if (r.ok) {
+                    const b = await r.blob(); if (b.size > 100) {
+                        const u = URL.createObjectURL(b);
+                        ok = await new Promise(res => { curAudio = new Audio(u); curAudio.onended = () => { URL.revokeObjectURL(u); curAudio = null; res(true) }; curAudio.onerror = () => { URL.revokeObjectURL(u); curAudio = null; res(false) }; curAudio.play().catch(() => { URL.revokeObjectURL(u); curAudio = null; res(false) }) });
+                    }
+                }
+            } catch { }
+            if (!ok) { try { await new Promise(res => { const u = new SpeechSynthesisUtterance(text); u.lang = lang?.code || 'hi-IN'; u.rate = .9; u.onend = res; u.onerror = res; speechSynthesis.speak(u) }) } catch { } }
+        }
+
+        // ═══ UI HELPERS ═══
+        function addMsgUI(who, text) {
+            const c = $('msgs'), d = document.createElement('div');
+            d.className = 'msg ' + (who === 'user' ? 'user' : '');
+            const lbl = who === 'user' ? 'You' : 'NyayaSathi';
+            const lc = who === 'user' ? 'rgba(255,255,255,.6)' : '#3b82f6';
+            const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            d.innerHTML = '<div class="bubble ' + (who === 'user' ? 'user-b' : 'ai-b') + '"><div class="b-who" style="color:' + lc + '">' + lbl + '</div>' + esc(text) + '<div class="b-when">' + now + '</div></div>';
+            c.appendChild(d); c.scrollTop = c.scrollHeight;
+        }
+        function addMsg(who, text) { history.push({ u: who === 'user' ? 1 : 0, t: text }); addMsgUI(who, text) }
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML }
+
+        function showTyp(on) {
+            let el = $('typ-ind');
+            if (on && !el) { const c = $('msgs'), d = document.createElement('div'); d.id = 'typ-ind'; d.className = 'msg'; d.innerHTML = '<div class="typing"><div class="t-dot"></div><div class="t-dot"></div><div class="t-dot"></div></div>'; c.appendChild(d); c.scrollTop = c.scrollHeight }
+            else if (!on && el) el.remove();
+        }
+
+        function setSt(state, text) {
+            const c = { listening: '#22c55e', speaking: '#3b82f6', thinking: '#f59e0b', idle: 'var(--text4)' }[state] || 'var(--text4)';
+            $('live-dot').style.background = c; $('live-dot').style.animation = state === 'listening' ? 'blink .8s ease infinite' : 'none';
+            $('live-label').textContent = { listening: 'Listening', speaking: 'Speaking', thinking: 'Thinking' }[state] || '...';
+            $('live-label').style.color = c; $('call-st').textContent = text; $('call-st').style.color = c;
+        }
+        function showErr(msg) { const b = $('err-bar'); b.textContent = msg; b.classList.add('show'); setTimeout(() => b.classList.remove('show'), 4000) }
+        function setSugs(labels) { const c = $('suggestions'); c.innerHTML = ''; labels.forEach(l => { const b = document.createElement('button'); b.className = 'sug'; b.textContent = l; b.onclick = () => { if (!busy) send(l) }; c.appendChild(b) }) }
+
+        // Wave
+        function initWave() { const b = $('wave-wrap'); b.innerHTML = ''; for (let i = 0; i < 28; i++) { const d = document.createElement('div'); d.className = 'wbar'; d.id = 'w' + i; b.appendChild(d) } }
+        let wT = 0;
+        function animW(on) {
+            cancelAnimationFrame(waveRAF);
+            if (!on) { for (let i = 0; i < 28; i++) { const b = $('w' + i); if (b) { b.style.height = '2px'; b.style.background = 'rgba(255,255,255,.03)' } } return }
+            const col = $('live-dot')?.style.background || '#22c55e';
+            (function f() { wT++; for (let i = 0; i < 28; i++) { const h = 3 + Math.abs(Math.sin(wT * .07 + i * .5)) * 24 + Math.sin(i * .7 + wT * .04) * 8; const b = $('w' + i); if (b) { b.style.height = Math.max(2, h) + 'px'; b.style.background = col } } waveRAF = requestAnimationFrame(f) })();
+        }
+
+        function tick() { seconds++; $('call-timer').textContent = fmtTime(seconds) }
+        function fmtTime(s) { return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0') }
+        function ftime(url, opts, ms) { return Promise.race([fetch(url, opts), new Promise((_, rej) => setTimeout(() => rej(new Error('Timeout')), ms))]) }
+        function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
+    </script>
+</body>
+
+</html>
