@@ -473,6 +473,16 @@ function cleanLLMResponse(text, lang) {
             }
             return n;
         });
+
+        // ── Hard Devanagari enforcer: strip any remaining Roman/Latin words ──
+        // Keep only: NyayaSathi, NALSA, RERA, RTI, PIL, IPC, BNS (no Hindi equivalent)
+        const ALLOWED_ACRONYMS = new Set(["NyayaSathi", "NALSA", "RERA", "RTI", "PIL", "NCLT", "NCLAT", "HC", "SC"]);
+        clean = clean.replace(/\b[A-Za-z]{3,}\b/g, (match) => {
+            if (ALLOWED_ACRONYMS.has(match) || ALLOWED_ACRONYMS.has(match.toUpperCase())) return match;
+            return ""; // strip unrecognized English words
+        });
+        // Collapse extra whitespace after stripping
+        clean = clean.replace(/\s{2,}/g, " ").trim();
     }
 
     // Enforce max length — keep concise but allow richer responses (90 words ≈ 580 chars)
@@ -1391,10 +1401,10 @@ async function ttsToUrl(text, lang, speaker) {
     return `${getPublicUrl()}/audio/${id}`;
 }
 
-// Store and get URL for combined TTS segments
-async function combinedTtsToUrl(text, lang) {
+// Store and get URL for combined TTS segments (supports gender-based custom speaker)
+async function combinedTtsToUrl(text, lang, speaker) {
     const segments = segmentForTTS(text);
-    const results = await Promise.allSettled(segments.map(c => generateTTS(c, lang)));
+    const results = await Promise.allSettled(segments.map(c => generateTTS(c, lang, speaker)));
     const buffers = results
         .filter(r => r.status === "fulfilled" && r.value)
         .map(r => Buffer.from(r.value.audio, "base64"));
@@ -1427,13 +1437,47 @@ async function warmExotelIVR() {
     } catch (e) { console.log("[EXOTEL] IVR warmup failed:", e.message); }
 }
 
+/**
+ * Detect caller gender from WAV audio using zero-crossing rate.
+ * Higher ZCR → higher pitch → female voice. Threshold: 0.12
+ * Returns: "female" | "male" | "unknown"
+ */
+function detectGender(wavBuffer) {
+    if (!wavBuffer || wavBuffer.length < 200) return "unknown";
+    try {
+        const start = 44; // Skip WAV header
+        let crossings = 0;
+        let prev = 0;
+        const limit = Math.min(start + 16000, wavBuffer.length - 1); // ~0.5s at 16kHz 16-bit
+        let samples = 0;
+        for (let i = start; i < limit - 1; i += 2) {
+            const curr = wavBuffer.readInt16LE(i);
+            if ((curr >= 0) !== (prev >= 0)) crossings++;
+            prev = curr;
+            samples++;
+        }
+        if (samples < 100) return "unknown";
+        const zcr = crossings / samples;
+        return zcr > 0.12 ? "female" : "male";
+    } catch { return "unknown"; }
+}
+
 // 1. Incoming call — play IVR greeting, collect DTMF
 app.post("/api/phone/exotel/call-start", async (req, res) => {
     const callSid = req.body?.CallSid || req.query?.CallSid || `exo_${Date.now()}`;
     console.log(`[EXOTEL] New call: ${callSid} from ${req.body?.From || req.query?.From || "unknown"}`);
 
-    // Create session
-    phoneSessions.set(callSid, { lang: "hi-IN", history: [], step: "ivr", provider: "exotel" });
+    // Create session with silence tracking + call duration
+    phoneSessions.set(callSid, {
+        lang: "hi-IN",
+        history: [],
+        step: "ivr",
+        provider: "exotel",
+        silenceCount: 0,        // consecutive silent recordings
+        startTime: Date.now(),  // for 5-minute call duration limit
+        speakerGender: null,    // detected from first voice recording
+        customSpeaker: null,    // female speaker override if female detected
+    });
 
     // Ensure IVR audio is ready
     if (!ivrAudioUrl) await warmExotelIVR();
@@ -1495,6 +1539,17 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
 
     const lang = session.lang || "hi-IN";
     let reply = getRefusal(lang);
+    const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+
+    // ── Call duration limit: 5 minutes ──────────────────────────────
+    const callAge = Date.now() - (session.startTime || Date.now());
+    if (callAge > 5 * 60 * 1000) {
+        const bye = GOODBYES[lang] || GOODBYES["hi-IN"];
+        const byeUrl = await ttsToUrl(bye, lang);
+        phoneSessions.delete(callSid);
+        res.set("Content-Type", "application/xml");
+        return res.send(exoml((byeUrl ? `  <Play>${byeUrl}</Play>` : `  <Say>${bye}</Say>`) + "\n  <Hangup />"));
+    }
 
     try {
         // Download recording from Exotel
@@ -1510,16 +1565,41 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
             }
         }
 
+        // ── Silence / empty audio detection ──────────────────────────
         if (!audioBuffer || audioBuffer.length < 300) {
-            // No audio or too short — ask to repeat
-            const clarification = getClarificationPrompt(lang, "too_short");
-            const clarUrl = await ttsToUrl(clarification, lang);
-            const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+            session.silenceCount = (session.silenceCount || 0) + 1;
+
+            if (session.silenceCount >= 2) {
+                // Second silence → goodbye + hangup
+                const bye = GOODBYES[lang] || GOODBYES["hi-IN"];
+                const byeUrl = await ttsToUrl(bye, lang);
+                phoneSessions.delete(callSid);
+                res.set("Content-Type", "application/xml");
+                return res.send(exoml((byeUrl ? `  <Play>${byeUrl}</Play>` : `  <Say>${bye}</Say>`) + "\n  <Hangup />"));
+            }
+
+            // First silence → warn caller, give 10 more seconds
+            const warn = SILENCE_WARNINGS[lang] || SILENCE_WARNINGS["hi-IN"];
+            const warnUrl = await ttsToUrl(warn, lang);
             res.set("Content-Type", "application/xml");
             return res.send(exoml(
-                (clarUrl ? `  <Play>${clarUrl}</Play>` : `  <Say>${clarification}</Say>`) +
-                `\n  <Record action="${recordUrl}" method="POST" maxLength="15" finishOnKey="#" timeout="3" />`
+                (warnUrl ? `  <Play>${warnUrl}</Play>` : `  <Say>${warn}</Say>`) +
+                `\n  <Record action="${recordUrl}" method="POST" maxLength="15" finishOnKey="#" timeout="10" />`
             ));
+        }
+
+        // Valid audio — reset silence counter
+        session.silenceCount = 0;
+
+        // ── Gender detection (first recording only) ──────────────────
+        if (!session.speakerGender) {
+            const gender = detectGender(audioBuffer);
+            session.speakerGender = gender;
+            if (gender === "female") {
+                const { LANG_VOICE_FEMALE } = require("./voice-engine");
+                session.customSpeaker = LANG_VOICE_FEMALE[lang]?.speaker || null;
+                console.log(`[EXOTEL] ${callSid} gender=female → speaker=${session.customSpeaker}`);
+            }
         }
 
         // STT
@@ -1597,9 +1677,8 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
         console.log("[EXOTEL-ERROR]", e.message);
     }
 
-    // Generate response audio and play + record next
-    const replyUrl = await combinedTtsToUrl(reply, lang);
-    const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+    // Generate response audio — use gender-appropriate speaker if detected
+    const replyUrl = await combinedTtsToUrl(reply, lang, session.customSpeaker || undefined);
 
     res.set("Content-Type", "application/xml");
     res.send(exoml(
@@ -1787,6 +1866,36 @@ const GREETINGS = {
     "ml-IN": "നമസ്കാരം! ഞാൻ ന്യായസാഥി — ഭാരതത്തിന്റെ സൗജന്യ നിയമ സഹായി. നിങ്ങളുടെ നിയമ പ്രശ്നം പറയൂ, ഞാൻ സഹായിക്കാം.",
     "pa-IN": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਨਿਆਂਸਾਥੀ ਹਾਂ — ਭਾਰਤ ਦਾ ਮੁਫ਼ਤ ਕਾਨੂੰਨੀ ਸਹਾਇਕ। ਆਪਣੀ ਕਾਨੂੰਨੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਮੈਂ ਮਦਦ ਕਰਾਂਗਾ।",
     "od-IN": "ନମସ୍କାର! ମୁଁ ନ୍ୟାୟସାଥୀ — ଭାରତର ମୁଫ୍ତ ଆଇନ ସହାୟକ। ଆପଣଙ୍କ ଆଇନ ସମସ୍ୟା କୁହନ୍ତୁ, ମୁଁ ସାହାଯ୍ୟ କରିବି।",
+};
+
+// Silence warning — played when caller is quiet for too long
+const SILENCE_WARNINGS = {
+    "hi-IN": "क्या आप अभी भी वहाँ हैं? कृपया अपनी बात बोलिए।",
+    "en-IN": "Are you still there? Please speak your question.",
+    "bn-IN": "আপনি কি এখনও আছেন? অনুগ্রহ করে আপনার কথা বলুন।",
+    "te-IN": "మీరు ఇంకా అక్కడ ఉన్నారా? దయచేసి మీ సమస్య చెప్పండి।",
+    "ta-IN": "நீங்கள் இன்னும் இருக்கிறீர்களா? தயவுசெய்து பேசுங்கள்.",
+    "mr-IN": "तुम्ही अजूनही आहात का? कृपया तुमची समस्या सांगा.",
+    "gu-IN": "શું તમે હજુ ત્યાં છો? કૃपया તમારી સમસ્યા જણાવો.",
+    "kn-IN": "ನೀವು ಇನ್ನೂ ಇದ್ದೀರಾ? ದಯವಿಟ್ಟು ನಿಮ್ಮ ಸಮಸ್ಯೆ ಹೇಳಿ.",
+    "ml-IN": "നിങ്ങൾ ഇനിയും ഉണ്ടോ? ദയവായി നിങ്ങളുടെ കാര്യം പറയൂ.",
+    "pa-IN": "ਕੀ ਤੁਸੀਂ ਅਜੇ ਵੀ ਉੱਥੇ ਹੋ? ਕਿਰਪਾ ਕਰਕੇ ਆਪਣੀ ਸਮੱਸਿਆ ਦੱਸੋ.",
+    "od-IN": "ଆପଣ ଏଖନ ବି ଅଛନ୍ତି? ଦୟାକରି ଆପଣଙ୍କ ସମସ୍ୟା କୁହନ୍ତୁ।",
+};
+
+// Goodbye messages — played before hanging up
+const GOODBYES = {
+    "hi-IN": "ठीक है। अगर आपको कोई कानूनी मदद चाहिए तो दोबारा फ़ोन करें। धन्यवाद।",
+    "en-IN": "Alright. Please call back anytime you need legal help. Thank you. Goodbye.",
+    "bn-IN": "ঠিক আছে। যেকোনো সময় আইনি সাহায্যের জন্য আবার ফোন করুন। ধন্যবাদ।",
+    "te-IN": "సరే. ఏ సమయంలోనైనా చట్టపరమైన సహాయం కావాలంటే తిరిగి ఫోన్ చేయండి. ధన్యవాదాలు.",
+    "ta-IN": "சரி. எப்போது வேண்டுமானாலும் சட்ட உதவிக்கு மீண்டும் அழைக்கவும். நன்றி.",
+    "mr-IN": "ठीक आहे. कधीही कायदेशीर मदतीसाठी परत फोन करा. धन्यवाद.",
+    "gu-IN": "ઠીક છે. ગમે ત્યારે કાયદાકીય મદદ માટે ફરી ફોન કરો. આભાર.",
+    "kn-IN": "ಸರಿ. ಯಾವಾಗ ಬೇಕಾದರೂ ಕಾನೂನು ಸಹಾಯಕ್ಕಾಗಿ ಮತ್ತೆ ಕರೆ ಮಾಡಿ. ಧನ್ಯವಾದ.",
+    "ml-IN": "ശരി. ഏത് സമയത്തും നിയമ സഹായത്തിനായി വിളിക്കൂ. നന്ദി.",
+    "pa-IN": "ਠੀਕ ਹੈ। ਕਿਸੇ ਵੀ ਸਮੇਂ ਕਾਨੂੰਨੀ ਮਦਦ ਲਈ ਦੁਬਾਰਾ ਫ਼ੋਨ ਕਰੋ। ਧੰਨਵਾਦ।",
+    "od-IN": "ଠିକ ଅଛି। ଯେ କୌଣସି ସମୟରେ ଆଇନ ସାହାଯ୍ୟ ପାଇଁ ପୁଣି ଫୋନ କରନ୍ତୁ। ଧନ୍ୟବାଦ।",
 };
 
 // ═══════════════════════════════════════════════════════════

@@ -233,19 +233,15 @@ function segmentForTTS(text, maxChunkLen = 120) {
 // ═══════════════════════════════════════════════════════════════════════
 //  LANGUAGE → TTS SPEAKER + PACE MAP
 // ═══════════════════════════════════════════════════════════════════════
-// bulbul:v2 speakers: anushka, abhilash, manisha, vidya, arya, karun, hitesh
-// Speaker selection rationale:
-//   karun  — warm Indian male voice, best for Hindi/Punjabi (authoritative, trustworthy)
-//   anushka — clear Indian female voice, best for South Indian scripts (less accent bleed)
-//   arya   — neutral female multilingual, good for Bengali/Marathi/Gujarati
-//   manisha — warm female, good for Odia
-// Optimized for CLARITY — rural users need clear pronunciation, proper breaks
-// Lower temperature (0.4-0.5) = consistent, clear diction, less mumbling
-// Pace 1.05-1.10 = natural speed, not rushed (rural users need time to understand)
+// Bulbul v3 available speakers (tested 2025-03): rahul, simran, ritu, pooja, priya,
+//   kavitha, kavya, anand, shruti, rupali, suhani, kabir, tanya, ishita, neha
+// Selection: lowest audio duration = fastest, clearest diction at same pace
+// Temperature 0.3 = most consistent diction (less variation = clearer for rural users)
+// Pace 1.0-1.10 = natural speed with good clarity
 const LANG_VOICE = {
     "hi-IN": { speaker: "rahul",     pace: 1.0,  model: "bulbul:v3", temperature: 0.3 },   // Male, clearest Hindi — natural diction, no accent
-    "en-IN": { speaker: "shubh",     pace: 1.10, model: "bulbul:v3", temperature: 0.4 },   // Male, Indian English — clear & steady
-    "bn-IN": { speaker: "simran",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Bengali
+    "en-IN": { speaker: "simran",    pace: 1.15, model: "bulbul:v3", temperature: 0.3 },   // Female, fastest+clearest Indian English (tested fastest at 11.5s)
+    "bn-IN": { speaker: "suhani",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Bengali
     "te-IN": { speaker: "priya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Telugu — fastest response
     "ta-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Tamil — slightly slower for clarity
     "mr-IN": { speaker: "ritu",      pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Marathi
@@ -256,7 +252,26 @@ const LANG_VOICE = {
     "od-IN": { speaker: "pooja",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Odia
 };
 
-function getVoiceParams(langCode) {
+// Female speaker alternatives — used when gender detection identifies female caller
+// Switches to a female-voiced speaker for better caller experience
+const LANG_VOICE_FEMALE = {
+    "hi-IN": { speaker: "ritu",      pace: 1.0,  model: "bulbul:v3", temperature: 0.3 },   // Female, warm clear Hindi
+    "en-IN": { speaker: "ishita",    pace: 1.15, model: "bulbul:v3", temperature: 0.3 },   // Female, clear Indian English alternative
+    "bn-IN": { speaker: "simran",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Bengali
+    "te-IN": { speaker: "kavitha",   pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Telugu
+    "ta-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Tamil
+    "mr-IN": { speaker: "shruti",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Marathi
+    "gu-IN": { speaker: "rupali",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Gujarati
+    "kn-IN": { speaker: "kavya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Kannada
+    "ml-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Malayalam
+    "pa-IN": { speaker: "simran",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Punjabi
+    "od-IN": { speaker: "pooja",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Odia
+};
+
+function getVoiceParams(langCode, gender) {
+    if (gender === "female" && LANG_VOICE_FEMALE[langCode]) {
+        return LANG_VOICE_FEMALE[langCode];
+    }
     return LANG_VOICE[langCode] || LANG_VOICE["hi-IN"];
 }
 
@@ -359,4 +374,6 @@ module.exports = {
     validateResponse,
     numToHindi,
     numToEnglish,
+    LANG_VOICE,
+    LANG_VOICE_FEMALE,
 };

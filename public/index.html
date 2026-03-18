@@ -1577,7 +1577,21 @@
             show('p-call'); $('msgs').innerHTML = ''; $('suggestions').innerHTML = ''; $('txt-in').value = '';
             initWave(); timerInt = setInterval(tick, 1000); updateMic();
             addMsgUI('ai', lang.greeting);
-            setSugs(["Kiraya problem", "Online fraud", "Salary nahi mili", "FIR kaise karein?"]);
+            // Per-language suggestion chips
+            const LANG_SUGGESTIONS = {
+                "hi-IN": ["किराया समस्या", "ऑनलाइन धोखाधड़ी", "तनख्वाह नहीं मिली", "एफआईआर कैसे करें"],
+                "en-IN": ["Rent problem", "Online fraud", "Salary not paid", "How to file FIR"],
+                "bn-IN": ["ভাড়ার সমস্যা", "অনলাইন প্রতারণা", "বেতন পাইনি", "FIR কীভাবে করব"],
+                "te-IN": ["అద్దె సమస్య", "ఆన్లైన్ మోసం", "జీతం రాలేదు", "FIR ఎలా వేయాలి"],
+                "ta-IN": ["வாடகை பிரச்சினை", "ஆன்லைன் மோசடி", "சம்பளம் கிடைக்கவில்லை", "FIR எப்படி போடுவது"],
+                "mr-IN": ["भाडे समस्या", "ऑनलाइन फसवणूक", "पगार मिळाला नाही", "FIR कसा नोंदवायचा"],
+                "gu-IN": ["ભાડાની સમસ્યા", "ઓનલાઇન છેતरपिंडी", "પગાર ન મળ્યો", "FIR કેવી રીતે"],
+                "kn-IN": ["ಬಾಡಿಗೆ ಸಮಸ್ಯೆ", "ಆನ್‌ಲೈನ್ ವಂಚನೆ", "ಸಂಬಳ ಬಂದಿಲ್ಲ", "FIR ಹೇಗೆ ದಾಖಲಿಸುವುದು"],
+                "ml-IN": ["വാടക പ്രശ്നം", "ഓൺലൈൻ തട്ടിപ്പ്", "ശമ്പളം കിട്ടിയില്ല", "FIR എങ്ങനെ"],
+                "pa-IN": ["ਕਿਰਾਇਆ ਸਮੱਸਿਆ", "ਔਨਲਾਈਨ ਧੋਖਾ", "ਤਨਖ਼ਾਹ ਨਹੀਂ ਮਿਲੀ", "FIR ਕਿਵੇਂ ਕਰੀਏ"],
+                "od-IN": ["ଭଡ଼ା ସମସ୍ୟା", "ଅନ୍‌ଲାଇନ ଠକେଇ", "ଦରମା ମିଳିଲା ନାହିଁ", "FIR କିପରି"],
+            };
+            setSugs(LANG_SUGGESTIONS[lang.code] || LANG_SUGGESTIONS["hi-IN"]);
             setSt('speaking', 'Speaking...');
             // Fire greeting TTS immediately — no wait
             speakTTS(lang.greeting).then(() => {
