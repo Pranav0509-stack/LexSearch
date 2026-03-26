@@ -264,15 +264,15 @@ function computeGroundingScore(responseText, ragChunks) {
 /**
  * sanitizeResponse(responseText, ragChunks, lang, fallbackText)
  *
- * If grounding score >= 0.6 → return responseText unchanged.
- * If grounding score < 0.6 → try to salvage grounded sentences, else use fallbackText.
+ * If grounding score >= 0.7 → return responseText unchanged.
+ * If grounding score < 0.7 → try to salvage grounded sentences, else use fallbackText.
  *
  * Returns sanitized string.
  */
 function sanitizeResponse(responseText, ragChunks, lang, fallbackText) {
   const { score, unverified } = computeGroundingScore(responseText, ragChunks);
 
-  if (score >= 0.6) return responseText;
+  if (score >= 0.7) return responseText;
 
   // Try to extract sentences that don't contain unverified section numbers
   const unverifiedRaws = unverified

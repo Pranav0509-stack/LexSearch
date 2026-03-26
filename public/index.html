@@ -1444,6 +1444,7 @@
         </div>
         <div class="call-controls">
             <button class="ctrl-btn mic-btn" id="btn-mic" title="Toggle mic">&#127908;</button>
+            <button class="ctrl-btn" id="btn-voice" title="Switch voice gender" style="font-size:1.2em">&#9794;</button>
             <button class="hang-btn" id="btn-hangup">&#128222;</button>
             <button class="ctrl-btn skip-btn" id="btn-skip" title="Skip audio">&#9197;</button>
         </div>
@@ -1465,23 +1466,23 @@
 
     <script>
         const LANGS = [
-            { code: "hi-IN", name: "Hindi", native: "हिन्दी", greeting: "नमस्ते! मैं न्यायसाथी हूँ — भारत का मुफ़्त कानूनी सहायक। बताइए, आपकी क्या कानूनी परेशानी है? मैं पूरी मदद करूँगा।" },
-            { code: "en-IN", name: "English", native: "English", greeting: "Hello! I'm NyayaSathi, India's free AI legal assistant. Please tell me your legal problem and I'll do my best to help you." },
-            { code: "bn-IN", name: "Bengali", native: "বাংলা", greeting: "নমস্কার! আমি ন্যায়সাথী — ভারতের বিনামূল্যে আইনি সহায়ক। আপনার আইনি সমস্যা বলুন, আমি সাহায্য করব।" },
-            { code: "te-IN", name: "Telugu", native: "తెలుగు", greeting: "నమస్కారం! నేను న్యాయసాథి — భారత్ యొక్క ఉచిత న్యాయ సహాయకుడు। మీ సమస్య చెప్పండి, నేను సహాయం చేస్తాను।" },
-            { code: "ta-IN", name: "Tamil", native: "தமிழ்", greeting: "வணக்கம்! நான் நியாயசாதி — இந்தியாவின் இலவச சட்ட உதவியாளர். உங்கள் பிரச்சனை சொல்லுங்கள், நான் உதவுகிறேன்." },
-            { code: "mr-IN", name: "Marathi", native: "मराठी", greeting: "नमस्कार! मी न्यायसाथी — भारताचा मोफत कायदेशीर सहाय्यक. तुमची समस्या सांगा, मी मदत करतो." },
-            { code: "gu-IN", name: "Gujarati", native: "ગુજરાતી", greeting: "નમસ્તે! હું ન્યાયસાથી છું — ભારતનો મફત કાનૂની સહાયક. તમારી સમસ્યા કહો, હું મદદ કરીશ." },
-            { code: "kn-IN", name: "Kannada", native: "ಕನ್ನಡ", greeting: "ನಮಸ್ಕಾರ! ನಾನು ನ್ಯಾಯಸಾಥಿ — ಭಾರತದ ಉಚಿತ ಕಾನೂನು ಸಹಾಯಕ. ನಿಮ್ಮ ಸಮಸ್ಯೆ ಹೇಳಿ, ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ." },
-            { code: "ml-IN", name: "Malayalam", native: "മലയാളം", greeting: "നമസ്കാരം! ഞാൻ ന്യായസാഥി — ഭാരതത്തിന്റെ സൗജന്യ നിയമ സഹായി. നിങ്ങളുടെ പ്രശ്നം പറയൂ, ഞാൻ സഹായിക്കാം." },
-            { code: "pa-IN", name: "Punjabi", native: "ਪੰਜਾਬੀ", greeting: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਨਿਆਂਸਾਥੀ ਹਾਂ — ਭਾਰਤ ਦਾ ਮੁਫ਼ਤ ਕਾਨੂੰਨੀ ਸਹਾਇਕ। ਆਪਣੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਮੈਂ ਮਦਦ ਕਰਾਂਗਾ।" },
-            { code: "od-IN", name: "Odia", native: "ଓଡ଼ିଆ", greeting: "ନମସ୍କାର! ମୁଁ ନ୍ୟାୟସାଥୀ — ଭାରତର ମୁଫ୍ତ ଆଇନ ସହାୟକ। ଆପଣଙ୍କ ସମସ୍ୟା କୁହନ୍ତୁ, ମୁଁ ସାହାଯ୍ୟ କରିବି।" },
+            { code: "hi-IN", name: "Hindi", native: "हिन्दी", greeting: "नमस्ते! मैं न्यायसाथी हूँ — भारत का मुफ़्त AI कानूनी सहायक। अपनी कानूनी समस्या बताइए, मैं पूरी मदद करूँगा।" },
+            { code: "en-IN", name: "English", native: "English", greeting: "Hello! I'm NyayaSathi — India's free AI legal assistant. Tell me your legal problem, I'll do my best to help you." },
+            { code: "bn-IN", name: "Bengali", native: "বাংলা", greeting: "নমস্কার! আমি ন্যায়সাথী — ভারতের বিনামূল্যে AI আইনি সহায়ক। আপনার আইনি সমস্যা বলুন, আমি পুরো সাহায্য করব।" },
+            { code: "te-IN", name: "Telugu", native: "తెలుగు", greeting: "నమస్కారం! నేను న్యాయసాథి — భారత్ యొక్క ఉచిత AI న్యాయ సహాయకుడు। మీ చట్టపరమైన సమస్య చెప్పండి, నేను పూర్తిగా సహాయం చేస్తాను." },
+            { code: "ta-IN", name: "Tamil", native: "தமிழ்", greeting: "வணக்கம்! நான் நியாயசாதி — இந்தியாவின் இலவச AI சட்ட உதவியாளர். உங்கள் சட்ட பிரச்சனை சொல்லுங்கள், நான் முழுமையாக உதவுகிறேன்." },
+            { code: "mr-IN", name: "Marathi", native: "मराठी", greeting: "नमस्कार! मी न्यायसाथी — भारताचा मोफत AI कायदेशीर सहाय्यक. तुमची कायदेशीर समस्या सांगा, मी पूर्ण मदत करतो." },
+            { code: "gu-IN", name: "Gujarati", native: "ગુજરાતી", greeting: "નમસ્તે! હું ન્યાયસાથી છું — ભારતનો મફત AI કાનૂની સહાયક. તમારી કાનૂની સમસ્યા કહો, હું પૂરી મદદ કરીશ." },
+            { code: "kn-IN", name: "Kannada", native: "ಕನ್ನಡ", greeting: "ನಮಸ್ಕಾರ! ನಾನು ನ್ಯಾಯಸಾಥಿ — ಭಾರತದ ಉಚಿತ AI ಕಾನೂನು ಸಹಾಯಕ. ನಿಮ್ಮ ಕಾನೂನು ಸಮಸ್ಯೆ ಹೇಳಿ, ನಾನು ಪೂರ್ಣವಾಗಿ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ." },
+            { code: "ml-IN", name: "Malayalam", native: "മലയാളം", greeting: "നമസ്കാരം! ഞാൻ ന്യായസാഥി — ഭാരതത്തിന്റെ സൗജന്യ AI നിയമ സഹായി. നിങ്ങളുടെ നിയമ പ്രശ്നം പറയൂ, ഞാൻ പൂർണ്ണമായി സഹായിക്കാം." },
+            { code: "pa-IN", name: "Punjabi", native: "ਪੰਜਾਬੀ", greeting: "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਨਿਆਂਸਾਥੀ ਹਾਂ — ਭਾਰਤ ਦਾ ਮੁਫ਼ਤ AI ਕਾਨੂੰਨੀ ਸਹਾਇਕ। ਆਪਣੀ ਕਾਨੂੰਨੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਮੈਂ ਪੂਰੀ ਮਦਦ ਕਰਾਂਗਾ।" },
+            { code: "od-IN", name: "Odia", native: "ଓଡ଼ିଆ", greeting: "ନମସ୍କାର! ମୁଁ ନ୍ୟାୟସାଥୀ — ଭାରତର ମୁଫ୍ତ AI ଆଇନ ସହାୟକ। ଆପଣଙ୍କ ଆଇନ ସମସ୍ୟା କୁହନ୍ତୁ, ମୁଁ ସମ୍ପୂର୍ଣ୍ଣ ସାହାଯ୍ୟ କରିବି।" },
         ];
 
         let lang = null, history = [], seconds = 0, timerInt = null;
         let busy = false, mediaRec = null, aStream = null, aCtx = null;
         let curAudio = null, fillAudio = null, waveRAF = null, quickQ = null, fails = 0;
-        let micOn = true, ivrAud = null, fillBlobs = {};
+        let micOn = true, ivrAud = null, fillBlobs = {}, speakerPref = 'male';
 
         const $ = id => document.getElementById(id);
         const show = id => { document.querySelectorAll('.page').forEach(p => p.classList.remove('active')); $(id).classList.add('active') };
@@ -1510,9 +1511,10 @@
                 key.innerHTML = `<span class="key-num">${num}</span><span class="key-native">${l.native}</span><span class="key-en">${l.name}</span>`;
                 key.onclick = () => pickLang(9 + i); ex.appendChild(key);
             });
-            playIVR();
+            // IVR autoplay removed — users pick language silently
         }
 
+        let greetingCache = {};
         function pickLang(i) {
             if (i < 0 || i >= LANGS.length) return;
             lang = LANGS[i];
@@ -1520,6 +1522,13 @@
             $('btn-start').disabled = false; $('btn-start').classList.add('ready');
             $('lang-status').textContent = '\u2713 ' + lang.name + ' (' + lang.native + ')';
             prefetchFill(lang.code);
+            // Pre-warm greeting TTS so it plays instantly on call start
+            if (!greetingCache[lang.code]) {
+                ftime('/api/tts', {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: lang.greeting.slice(0, 400), lang: lang.code, speaker: speakerPref })
+                }, 6000).then(r => r.ok ? r.blob() : null).then(b => { if (b && b.size > 100) greetingCache[lang.code] = b }).catch(() => {});
+            }
         }
 
         document.addEventListener('keydown', e => {
@@ -1553,20 +1562,31 @@
 
         // ═══ FILLER ═══
         async function prefetchFill(lc) {
-            if (fillBlobs[lc]) return;
-            try { const r = await ftime('/api/filler?lang=' + lc, {}, 8000); if (r.ok && r.status !== 204) { const b = await r.blob(); if (b.size > 100) fillBlobs[lc] = b } } catch { }
+            const key = lc + ':' + speakerPref;
+            if (fillBlobs[key]) return;
+            try { const r = await ftime('/api/filler?lang=' + lc + '&speaker=' + speakerPref, {}, 8000); if (r.ok && r.status !== 204) { const b = await r.blob(); if (b.size > 100) fillBlobs[key] = b } } catch { }
         }
         const FILL_TEXT = {
-            'hi-IN': ['Achha, dekhte hain...', 'Hmm, samajh raha hoon...', 'Ji haan, rukiye...', 'Theek hai, sochta hoon...'],
+            'hi-IN': ['अच्छा, देखते हैं...', 'हम्म, समझ रहा हूँ...', 'जी हाँ, रुकिए...', 'ठीक है, सोचता हूँ...'],
             'en-IN': ['Let me think...', 'One moment...', 'Looking into it...', 'Hmm, let me check...'],
+            'bn-IN': ['বুঝতে পারছি, একটু অপেক্ষা করুন...', 'দেখছি...', 'হ্যাঁ, বুঝেছি...'],
+            'te-IN': ['అర్థమవుతుంది, ఒక్క నిమిషం...', 'చూస్తున్నాను...', 'సరే, ఆలోచిస్తున్నా...'],
+            'ta-IN': ['புரிகிறேன், ஒரு கணம்...', 'பார்க்கிறேன்...', 'சரி, யோசித்துப் பார்க்கிறேன்...'],
+            'mr-IN': ['समजलं, एक पल...', 'पाहतो...', 'ठीक आहे, विचार करतो...'],
+            'gu-IN': ['સમજુ છું, એક પળ...', 'જોઉં છું...', 'ઠીક છે, વિચાર કરું છું...'],
+            'kn-IN': ['ಅರ್ಥಮಾಗುತ್ತಿದೆ, ಒಂದು ನಿಮಿಷ...', 'ನೋಡುತ್ತೇನೆ...', 'ಸರಿ, ಆಲೋಚಿಸುತ್ತೇನೆ...'],
+            'ml-IN': ['മനസ്സിലാക്കുന്നുണ്ട്, ഒരു നിമിഷം...', 'നോക്കുന്നുണ്ട്...', 'ശരി, ആലോചിക്കുന്നു...'],
+            'pa-IN': ['ਸਮਝ ਗਿਆ, ਇੱਕ ਪਲ...', 'ਦੇਖ ਰਿਹਾ ਹਾਂ...', 'ਠੀਕ ਹੈ, ਸੋਚਦਾ ਹਾਂ...'],
+            'od-IN': ['ବୁଝିଲି, ଗୋଟେ ମିନିଟ...', 'ଦେଖୁଅଛି...', 'ଠିକ, ଭାବୁଛି...'],
         };
         function playFill() {
             const lc = lang?.code || 'hi-IN'; const fEl = $('filler-area');
             const ph = FILL_TEXT[lc] || FILL_TEXT['hi-IN']; const txt = ph[Math.floor(Math.random() * ph.length)];
             if (fEl) { fEl.textContent = txt; fEl.classList.add('show') }
-            const cached = fillBlobs[lc];
-            if (cached) { fillAudio = new Audio(URL.createObjectURL(cached)); fillAudio.play().catch(() => { }); delete fillBlobs[lc]; prefetchFill(lc); return }
-            ftime('/api/filler?lang=' + lc, {}, 6000).then(r => (r.ok && r.status !== 204) ? r.blob() : null).then(b => { if (b && b.size > 100) { fillAudio = new Audio(URL.createObjectURL(b)); fillAudio.play().catch(() => { }) } }).catch(() => { });
+            const key = lc + ':' + speakerPref;
+            const cached = fillBlobs[key];
+            if (cached) { fillAudio = new Audio(URL.createObjectURL(cached)); fillAudio.play().catch(() => { }); delete fillBlobs[key]; prefetchFill(lc); return }
+            ftime('/api/filler?lang=' + lc + '&speaker=' + speakerPref, {}, 6000).then(r => (r.ok && r.status !== 204) ? r.blob() : null).then(b => { if (b && b.size > 100) { fillAudio = new Audio(URL.createObjectURL(b)); fillAudio.play().catch(() => { }) } }).catch(() => { });
         }
         function stopFill() { if (fillAudio) { try { fillAudio.pause() } catch { } fillAudio = null } const f = $('filler-area'); if (f) f.classList.remove('show') }
 
@@ -1593,9 +1613,11 @@
             };
             setSugs(LANG_SUGGESTIONS[lang.code] || LANG_SUGGESTIONS["hi-IN"]);
             setSt('speaking', 'Speaking...');
-            // Fire greeting TTS immediately — no wait
+            // Prefetch filler in parallel with greeting TTS
+            prefetchFill(lang.code);
+            // Fire greeting TTS — start mic immediately after
             speakTTS(lang.greeting).then(() => {
-                busy = false; prefetchFill(lang.code);
+                busy = false;
                 if (quickQ) { const q = quickQ; quickQ = null; send(q) }
                 else if (micOn) startRec();
             });
@@ -1621,6 +1643,13 @@
         $('btn-mic').onclick = () => { micOn = !micOn; updateMic(); if (micOn && !busy) startRec(); else if (!micOn) stopRec() };
         function updateMic() { const b = $('btn-mic'); if (micOn) { b.classList.remove('off'); b.title = 'Mic on' } else { b.classList.add('off'); b.title = 'Mic off' } }
 
+        // ═══ VOICE GENDER ═══
+        $('btn-voice').onclick = () => {
+            speakerPref = speakerPref === 'male' ? 'female' : 'male';
+            $('btn-voice').innerHTML = speakerPref === 'male' ? '&#9794;' : '&#9792;';
+            $('btn-voice').title = speakerPref === 'male' ? 'Voice: Male (tap to switch)' : 'Voice: Female (tap to switch)';
+        };
+
         // ═══ SKIP ═══
         $('btn-skip').onclick = () => { stopAud(); stopFill(); if (!busy && micOn) startRec() };
 
@@ -1636,7 +1665,7 @@
                     stream.getTracks().forEach(t => t.stop()); aStream = null;
                     const blob = new Blob(chunks, { type: mime });
                     if (blob.size > 800 && !busy) processAud(blob);
-                    else if (!busy && micOn) setTimeout(() => startRec(), 200);
+                    else if (!busy && micOn) startRec();
                 };
                 mediaRec.start(200); setSt('listening', 'Listening... speak now');
                 aCtx = new AudioContext();
@@ -1644,7 +1673,7 @@
                 const buf = new Uint8Array(an.frequencyBinCount); let sil = 0, spoke = false; const t0 = Date.now();
                 (function lp() {
                     if (!mediaRec || mediaRec.state === 'inactive') return;
-                    if (Date.now() - t0 > 6000) { stopRec(); return }
+                    if (Date.now() - t0 > 8000) { stopRec(); return }
                     an.getByteFrequencyData(buf); const avg = buf.reduce((a, b) => a + b, 0) / buf.length;
                     animW(avg > 6);
                     if (avg > 6) { sil = 0; spoke = true } else sil++;
@@ -1688,11 +1717,16 @@
 
             // Audio queue: play chunks in order as they stream in
             const audioQ = []; let audioIdx = 0, playing = false, streamDone = false;
+            let totalChunksExpected = 0;
             function enqueueAudio(idx, b64) {
                 audioQ[idx] = { b64 };
                 if (!playing) playNext();
             }
             function playNext() {
+                // Skip gaps (failed TTS chunks) so we don't stall
+                while (audioIdx < audioQ.length && audioQ[audioIdx] === undefined && streamDone) {
+                    audioIdx++;
+                }
                 if (audioQ[audioIdx]) {
                     playing = true;
                     const { b64 } = audioQ[audioIdx];
@@ -1707,20 +1741,24 @@
                     } catch { audioIdx++; playNext() }
                 } else {
                     playing = false;
-                    if (streamDone && audioIdx >= audioQ.filter(Boolean).length) { finishSend() }
+                    // If stream is done and we've played past all chunks, finish
+                    if (streamDone && audioIdx >= totalChunksExpected) { finishSend() }
                 }
             }
             function finishSend() {
+                if (!busy) return; // prevent double-finish
                 busy = false;
                 if (fails >= 5) { showErr('Server down.'); return }
                 if (micOn) startRec();
             }
+            // Safety: force-reset busy after 20s to prevent permanent freeze
+            const busyTimer = setTimeout(() => { if (busy) { console.warn('[SAFETY] busy timeout — force reset'); finishSend(); } }, 20000);
 
             try {
                 const r = await fetch('/api/ask-stream', {
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN' }),
-                    signal: AbortSignal.timeout(15000),
+                    body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN', speaker: speakerPref }),
+                    signal: AbortSignal.timeout(10000),
                 });
                 const reader = r.body.getReader();
                 const dec = new TextDecoder();
@@ -1748,15 +1786,18 @@
                             if (d.type === 'done') {
                                 const ms = Math.round(performance.now() - t0);
                                 $('perf').textContent = ms + 'ms ' + (d.aiMs ? 'AI:' + d.aiMs : '') + (d.ttsMs ? ' TTS:' + d.ttsMs : '');
+                                totalChunksExpected = d.segments || audioQ.length;
                                 streamDone = true;
-                                if (!playing && audioIdx >= audioQ.filter(Boolean).length) finishSend();
+                                clearTimeout(busyTimer);
+                                if (!playing) playNext(); // trigger completion check
                             }
                         } catch { }
                     }
                 }
                 // If no audio arrived at all, fallback to speakTTS
                 if (gotReply && audioQ.filter(Boolean).length === 0) {
-                    streamDone = true; await speakTTS(reply); finishSend();
+                    streamDone = true; totalChunksExpected = 0; clearTimeout(busyTimer);
+                    await speakTTS(reply); finishSend();
                 } else if (!gotReply) {
                     // Stream failed entirely — no reply chunk received
                     throw new Error('no reply');
@@ -1767,7 +1808,7 @@
                 try {
                     const r2 = await ftime('/api/ask', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN' }),
+                        body: JSON.stringify({ history: history.slice(-6), message: text.slice(0, 500), lang: lang?.code || 'hi-IN', speaker: speakerPref }),
                     }, 10000);
                     const d2 = await r2.json();
                     reply = (d2.reply || '').replace(/\*+/g, '').replace(/#+/g, '').replace(/\n+/g, ' ').trim() || 'Dobara boliye.';
@@ -1789,7 +1830,7 @@
                     reply = 'Thodi dikkat hai. NALSA 15100 par call karein \u2014 free vakeel milega.';
                     if (!gotReply) { addMsg('ai', reply); setSugs(getCtxSugs(text, reply)) }
                 }
-                busy = false; if (micOn) startRec();
+                clearTimeout(busyTimer); busy = false; if (micOn) startRec();
             }
         }
 
@@ -1809,18 +1850,25 @@
         async function speakTTS(text) {
             let ok = false;
             try {
-                const r = await ftime('/api/tts', {
-                    method: 'POST', headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: text.slice(0, 400), lang: lang?.code || 'hi-IN' })
-                }, 8000);
-                if (r.ok) {
-                    const b = await r.blob(); if (b.size > 100) {
-                        const u = URL.createObjectURL(b);
-                        ok = await new Promise(res => { curAudio = new Audio(u); curAudio.onended = () => { URL.revokeObjectURL(u); curAudio = null; res(true) }; curAudio.onerror = () => { URL.revokeObjectURL(u); curAudio = null; res(false) }; curAudio.play().catch(() => { URL.revokeObjectURL(u); curAudio = null; res(false) }) });
-                    }
+                // Check greeting cache first for instant playback
+                const lc = lang?.code || 'hi-IN';
+                let b = null;
+                if (greetingCache[lc] && text === lang?.greeting) {
+                    b = greetingCache[lc];
+                    delete greetingCache[lc];
+                } else {
+                    const r = await ftime('/api/tts', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ text: text.slice(0, 400), lang: lc, speaker: speakerPref })
+                    }, 6000);
+                    if (r.ok) b = await r.blob();
+                }
+                if (b && b.size > 100) {
+                    const u = URL.createObjectURL(b);
+                    ok = await new Promise(res => { curAudio = new Audio(u); curAudio.onended = () => { URL.revokeObjectURL(u); curAudio = null; res(true) }; curAudio.onerror = () => { URL.revokeObjectURL(u); curAudio = null; res(false) }; curAudio.play().catch(() => { URL.revokeObjectURL(u); curAudio = null; res(false) }) });
                 }
             } catch { }
-            if (!ok) { try { await new Promise(res => { const u = new SpeechSynthesisUtterance(text); u.lang = lang?.code || 'hi-IN'; u.rate = .9; u.onend = res; u.onerror = res; speechSynthesis.speak(u) }) } catch { } }
+            // No browser SpeechSynthesis fallback — keeps voice consistent with Sarvam TTS
         }
 
         // ═══ UI HELPERS ═══

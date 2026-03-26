@@ -531,11 +531,37 @@ function retrieve(query, k = 3) {
 
 /**
  * Build grounded context for LLM injection.
+ * Uses multi-tier RAG (SC/HC/DC) first, falls back to original corpus.
  * Returns both the formatted string AND raw chunk texts so citation-guard can verify claims.
  * @returns {{ contextString: string, chunks: string[] }}
  */
 function buildContext(query) {
-    const hits = retrieve(query, 3);
+    // Try multi-tier retrieval first (SC/HC/DC corpora)
+    let hits;
+    try {
+        const { retrieveMultiTier } = require("./rag-tiers");
+        hits = retrieveMultiTier(query, 3);
+    } catch {
+        hits = [];
+    }
+
+    // Fallback to original corpus if multi-tier returned nothing
+    if (!hits || hits.length === 0) {
+        hits = retrieve(query, 3);
+    }
+
+    // Merge: if multi-tier found something but original corpus also has strong matches, combine
+    if (hits.length > 0 && hits.length < 3) {
+        const originalHits = retrieve(query, 3);
+        const existingIds = new Set(hits.map(h => h.id));
+        for (const oh of originalHits) {
+            if (!existingIds.has(oh.id) && hits.length < 3) {
+                hits.push(oh);
+            }
+        }
+        hits.sort((a, b) => b.score - a.score);
+    }
+
     if (!hits.length) return { contextString: "", chunks: [] };
     const contextString = hits.map((h, i) => `--- Reference ${i + 1} ---\n${h.text}`).join("\n\n");
     const chunks = hits.map(h => h.text);

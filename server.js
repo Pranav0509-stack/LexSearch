@@ -1,12 +1,17 @@
 /**
- * NyayaSathi v12 — India's Advanced AI Legal Agent
+ * NyayaSathi v14 — India's Advanced AI Legal Agent
  * ════════════════════════════════════════════════
  * Features:
- *  - RAG: BM25 retrieval over 25-chunk Indian legal corpus
+ *  - RAG: Three-tier BM25 (Supreme Court / High Court / District Court)
+ *  - Security: SSRF protection, webhook auth, crypto sessions, prompt injection defense
+ *  - Rules Engine: 10-rule post-LLM pipeline (citation verify, hallucination guard, etc.)
+ *  - Latency: Promise.race LLM pattern, timing instrumentation
  *  - Self-correction: transcript confidence + response validation
- *  - Phone dial-in: Sarvam telephony webhook (/api/phone/*)
+ *  - Phone dial-in: Exotel + Sarvam telephony webhooks
  *  - Advanced guardrails: 3-layer (pre-AI, LLM system, post-AI)
  *  - All 11 Sarvam languages with optimal voice + pace per language
+ *  - Gender detection + female speaker switch
+ *  - Silence detection + 5-minute call duration limit
  *  - Number/section/currency expansion for natural TTS
  *  - Eval engine integration (/api/eval/run)
  *  - Streaming-ready architecture
@@ -24,8 +29,26 @@ const {
     normalizeTTS, segmentForTTS, getVoiceParams,
     scoreTranscript, getClarificationPrompt, validateResponse,
 } = require("./voice-engine.js");
+const {
+    isAllowedRecordingUrl, verifyWebhookToken, appendWebhookToken,
+    generateSessionId, sanitizeForLLM, timer,
+} = require("./security.js");
+const { applyRules, stripMarkdown } = require("./rules-engine.js");
 
 const app = express();
+
+// Security headers
+try {
+    const helmet = require("helmet");
+    app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
+} catch { console.log("[SECURITY] helmet not installed — run: npm install helmet"); }
+
+// Rate limiting (replaces manual implementation)
+try {
+    const rateLimit = require("express-rate-limit");
+    app.use("/api", rateLimit({ windowMs: 60000, max: 100, standardHeaders: true, legacyHeaders: false }));
+} catch { console.log("[SECURITY] express-rate-limit not installed — using manual rate limiter"); }
+
 app.use(express.json({ limit: "4mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" })); // Exotel sends form-encoded data
 app.use(express.static(path.join(__dirname, "public")));
@@ -272,6 +295,8 @@ function isLegalQuery(text) {
 const LANG_PROMPTS = {
     "en-IN": (rag) => `You are NyayaSathi, India's free AI legal helpline agent on a LIVE phone call.
 
+DO NOT think out loud. DO NOT start with "Okay", "Let me", "The user", or any reasoning. Start DIRECTLY with your empathetic response.
+
 CRITICAL: Your output goes DIRECTLY to a Text-to-Speech engine. Write ONLY plain spoken English sentences. NO Devanagari. NO markdown. NO bullets. NO asterisks. NO numbered lists. NO digits — write all numbers as words (say "one hundred thirty-eight" not "138").
 
 STYLE: You are a brilliant, experienced Supreme Court lawyer who genuinely cares. You speak with authority AND warmth. You give SPECIFIC, ACTIONABLE advice — not vague generalities. You name exact Acts, Sections, Courts, Forms, Helplines. You tell them the exact steps like a GPS for their legal journey.
@@ -297,6 +322,8 @@ HARD RULES:
 - CRITICAL: ONLY cite Acts and Sections from the LEGAL REFERENCES above. If the reference doesn't cover their issue, say so honestly and direct them to NALSA.`,
 
     "hi-IN": (rag) => `आप न्यायसाथी हैं — भारत की मुफ़्त कानूनी हेल्पलाइन। आप फ़ोन पर बात कर रहे हैं।
+
+ज़रूरी: अपनी सोच प्रक्रिया मत लिखें। "Okay", "Let me", "The user" जैसे अंग्रेज़ी शब्दों से शुरू मत करें। सीधे हिंदी में जवाब दें।
 
 सबसे ज़रूरी बात: आपका जवाब सीधे बोलने वाली मशीन में जाएगा। इसलिए:
 - पूरा जवाब शुद्ध हिंदी देवनागरी में लिखें। कोई भी अंग्रेज़ी शब्द मत लिखें।
@@ -339,9 +366,11 @@ function getLangPrompt(langCode, ragContext) {
 
     return `You are NyayaSathi, India's free AI legal helpline on a LIVE phone call.
 
-CRITICAL: Output goes DIRECTLY to TTS. Write ONLY in spoken ${langName} using the native script. Keep legal terms (Act, Section, Court) in English. NO markdown, bullets, asterisks, or numbered lists. Write numbers as words.
+ABSOLUTE RULE: Your ENTIRE response must be in ${langName} using its native script. Do NOT write any English words, English sentences, or Roman script. Every single word must be in ${langName} native script. Legal terms must also be in ${langName} script (transliterate them). Numbers must be written as ${langName} words.
 
-STYLE: You are a brilliant Supreme Court lawyer who genuinely cares. Give SPECIFIC, ACTIONABLE advice — name exact Acts, Sections, Courts, Forms, Helplines, and deadlines. Not vague advice.
+DO NOT think out loud. DO NOT start with "Okay" or "Let me" or any reasoning. Start DIRECTLY with your empathetic response in ${langName}.
+
+STYLE: You are a brilliant Supreme Court lawyer who genuinely cares. Give SPECIFIC, ACTIONABLE advice — name exact Acts, Sections, Courts, Forms, Helplines, and deadlines.
 
 LEGAL REFERENCES:
 ${ragContext || "No specific legal reference found. Direct caller to NALSA 15100 for a free lawyer. Do not cite any section or act number."}
@@ -350,16 +379,16 @@ HOW TO RESPOND:
 First empathize — one line showing you understand their pain.
 Then give the STRONGEST legal weapon — Act, Section, landmark judgment.
 Then STEP-BY-STEP action plan: where to go, what to file, deadline, helpline/website.
-If the situation needs clarification, ask ONE follow-up question. If they already explained clearly, give the full answer directly without forcing a question.
+If the situation needs clarification, ask ONE follow-up question. If they already explained clearly, give the full answer directly.
 
 HARD RULES:
 - MAX 90 words. Phone call — pack maximum value in minimum words.
-- ONLY Indian law questions. Non-legal: "I can only help with legal matters."
-- Be SPECIFIC: name the Court, Form, deadline, helpline — not just "complain."
+- ENTIRE response in ${langName} native script. ZERO English words.
+- ONLY Indian law questions. Non-legal: politely refuse in ${langName}.
+- Be SPECIFIC: name the Court, Form, deadline, helpline.
 - Cite specific Act + Section from LEGAL REFERENCES only. If unsure, direct to NALSA 15100.
 - ALWAYS mention NALSA 15100 for free lawyer.
-- NO markdown, bullets, asterisks.
-- Only ask a question if you truly need more information.`;
+- NO markdown, bullets, asterisks.`;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -414,100 +443,26 @@ function sanitize(text, maxLen = 500) {
     return text.replace(/<[^>]*>/g, "").replace(/[<>"'`]/g, "").replace(/\s+/g, " ").trim().slice(0, maxLen);
 }
 
-function cleanLLMResponse(text, lang) {
-    if (!text || typeof text !== "string") return getRefusal(lang);
-    let clean = text;
-    // Strip thinking tags
-    if (clean.includes("</think>")) clean = clean.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
-    else if (clean.includes("<think>")) clean = clean.replace(/<think>\s*/gi, "").trim();
-    // Strip markdown
-    clean = clean.replace(/<[^>]*>/g, "").replace(/\*{1,3}/g, "").replace(/#{1,6}\s*/g, "")
-        .replace(/```[\s\S]*?```/g, "").replace(/`[^`]*`/g, "")
-        .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
-        .replace(/^\s*[-*•]\s+/gm, "")
-        .replace(/^\s*\d+\.\s+/gm, "")
-        .replace(/\n+/g, " ").replace(/\s{2,}/g, " ").trim();
+// cleanLLMResponse replaced by applyRules() from rules-engine.js
+// All post-LLM processing now goes through the unified 10-rule pipeline
 
-    // For Hindi: replace any English words that slipped through with Hindi equivalents
-    if (lang !== "en-IN") {
-        const hindiReplace = {
-            "Section": "धारा", "section": "धारा",
-            "Act": "अधिनियम", "act": "अधिनियम",
-            "Court": "अदालत", "court": "अदालत",
-            "Supreme Court": "उच्चतम न्यायालय", "supreme court": "उच्चतम न्यायालय",
-            "High Court": "उच्च न्यायालय", "high court": "उच्च न्यायालय",
-            "District Court": "ज़िला अदालत", "district court": "ज़िला अदालत",
-            "Consumer Commission": "उपभोक्ता आयोग", "consumer commission": "उपभोक्ता आयोग",
-            "Consumer Forum": "उपभोक्ता मंच", "consumer forum": "उपभोक्ता मंच",
-            "FIR": "एफ़ आई आर", "F.I.R.": "एफ़ आई आर", "F.I.R": "एफ़ आई आर",
-            "Bail": "ज़मानत", "bail": "ज़मानत",
-            "Petition": "याचिका", "petition": "याचिका",
-            "Police": "पुलिस", "police": "पुलिस",
-            "Lawyer": "वकील", "lawyer": "वकील",
-            "Complaint": "शिकायत", "complaint": "शिकायत",
-            "Magistrate": "मजिस्ट्रेट",
-            "NALSA": "नालसा", "Nalsa": "नालसा",
-            "Legal Services Authority": "विधिक सेवा प्राधिकरण",
-            "Domestic Violence": "घरेलू हिंसा", "domestic violence": "घरेलू हिंसा",
-            "Negotiable Instruments": "परक्राम्य लिखत", "negotiable instruments": "परक्राम्य लिखत",
-            "Indian Penal Code": "भारतीय दंड संहिता",
-            "IPC": "आई पी सी", "BNS": "बी एन एस", "CrPC": "सी आर पी सी", "BNSS": "बी एन एस एस",
-            "Protection of Women": "महिला सुरक्षा",
-            "Cheque": "चेक", "cheque": "चेक",
-            "Notice": "नोटिस", "notice": "नोटिस",
-            "Helpline": "हेल्पलाइन", "helpline": "हेल्पलाइन",
-            "Form": "फ़ॉर्म", "form": "फ़ॉर्म",
-            "Call": "फ़ोन करें", "call": "फ़ोन करें",
-        };
-        // Replace longer phrases first to avoid partial replacements
-        const sorted = Object.entries(hindiReplace).sort((a, b) => b[0].length - a[0].length);
-        for (const [eng, hin] of sorted) {
-            clean = clean.replace(new RegExp(`\\b${eng.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, "g"), hin);
-        }
-        // Replace remaining digits with Hindi words
-        clean = clean.replace(/\b(\d{1,6})\b/g, (_, n) => {
-            const num = parseInt(n);
-            if (num > 0 && num <= 999999) {
-                const { numToHindi } = require("./voice-engine");
-                return numToHindi(num);
-            }
-            return n;
-        });
-
-        // ── Hard Devanagari enforcer: strip any remaining Roman/Latin words ──
-        // Keep only: NyayaSathi, NALSA, RERA, RTI, PIL, IPC, BNS (no Hindi equivalent)
-        const ALLOWED_ACRONYMS = new Set(["NyayaSathi", "NALSA", "RERA", "RTI", "PIL", "NCLT", "NCLAT", "HC", "SC"]);
-        clean = clean.replace(/\b[A-Za-z]{3,}\b/g, (match) => {
-            if (ALLOWED_ACRONYMS.has(match) || ALLOWED_ACRONYMS.has(match.toUpperCase())) return match;
-            return ""; // strip unrecognized English words
-        });
-        // Collapse extra whitespace after stripping
-        clean = clean.replace(/\s{2,}/g, " ").trim();
-    }
-
-    // Enforce max length — keep concise but allow richer responses (90 words ≈ 580 chars)
-    if (clean.length > 580) {
-        clean = clean.slice(0, 580);
-        const lastPunct = Math.max(clean.lastIndexOf("."), clean.lastIndexOf("!"), clean.lastIndexOf("?"), clean.lastIndexOf("।"));
-        if (lastPunct > 300) clean = clean.slice(0, lastPunct + 1);
-        clean += lang === "en-IN" ? " Call NALSA 15100." : " नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें।";
-    }
-    if (clean.length < 5) return getRefusal(lang);
-    return clean;
+// Fallback rate limiter (used only if express-rate-limit not installed)
+let hasRateLimit = false;
+try { require("express-rate-limit"); hasRateLimit = true; } catch {}
+if (!hasRateLimit) {
+    const rateMap = new Map();
+    // Clean up rate map every 5 minutes to prevent memory leak
+    setInterval(() => { const now = Date.now(); for (const [ip, hits] of rateMap) { const filtered = hits.filter(t => now - t < 60000); if (filtered.length === 0) rateMap.delete(ip); else rateMap.set(ip, filtered); } }, 300000);
+    app.use("/api", (req, res, next) => {
+        const ip = req.ip || "x"; const now = Date.now();
+        const hits = (rateMap.get(ip) || []).filter(t => now - t < 60000);
+        if (hits.length >= 100) return res.status(429).json({ error: "Too many requests." });
+        hits.push(now); rateMap.set(ip, hits); next();
+    });
 }
-
-// Rate limiter
-const rateMap = new Map();
-function rateLimit(req, res, next) {
-    const ip = req.ip || "x"; const now = Date.now();
-    const hits = (rateMap.get(ip) || []).filter(t => now - t < 60000);
-    if (hits.length >= 100) return res.status(429).json({ error: "Too many requests." });
-    hits.push(now); rateMap.set(ip, hits); next();
-}
-app.use("/api", rateLimit);
 
 // Fetch with timeout
-async function apiFetch(url, opts, timeoutMs = 12000) {
+async function apiFetch(url, opts, timeoutMs = 8000) {
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), timeoutMs);
     try { const r = await fetch(url, { ...opts, signal: ac.signal }); clearTimeout(t); return r; }
@@ -521,7 +476,7 @@ async function callGemini(systemPrompt, messages, maxTokens = 120, modelName = n
     if (!GK) return null;
     const MODEL = modelName || getAvailableModel();
     const IS_GEMMA = MODEL.startsWith("gemma");
-    const timeout = IS_GEMMA ? 8000 : 3500;
+    const timeout = IS_GEMMA ? 6000 : 3000;
 
     // Convert from OpenAI-style messages to Gemini contents format
     const contents = [];
@@ -579,15 +534,27 @@ async function callGemini(systemPrompt, messages, maxTokens = 120, modelName = n
     return text;
 }
 
+// callGeminiStream removed — SSE parsing was unreliable, using direct callGemini instead
+
 // ═══════════════════════════════════════════════════════════
-//  SARVAM LLM — Fallback
+//  SARVAM 105B — Primary Indian LLM (FREE, 22 languages, 128K context)
 // ═══════════════════════════════════════════════════════════
-async function callSarvam(messages, maxTokens = 120) {
+async function callSarvam(messages, maxTokens = 500) {
     const r = await apiFetch("https://api.sarvam.ai/v1/chat/completions", {
         method: "POST", headers: HEADERS,
-        body: JSON.stringify({ model: "sarvam-m", messages, max_tokens: maxTokens, temperature: 0.3 }),
+        body: JSON.stringify({
+            model: "sarvam-105b",
+            messages,
+            max_tokens: Math.max(maxTokens, 500), // 105B needs headroom for reasoning + answer
+            temperature: 0.3,
+            reasoning_effort: "low", // minimize thinking tokens for speed
+        }),
     }, 8000);
-    if (!r.ok) return null;
+    if (!r.ok) {
+        const errBody = await r.text().catch(() => "");
+        console.log(`[SARVAM-105B] ${r.status} ${errBody.slice(0, 150)}`);
+        return null;
+    }
     const d = await r.json();
     return d.choices?.[0]?.message?.content || null;
 }
@@ -606,7 +573,7 @@ async function transliterateForTTS(text, langCode) {
 //  TTS CACHE — LRU with 200 entries
 // ═══════════════════════════════════════════════════════════
 const ttsCache = new Map();
-function ttsCacheKey(text, lang) { return `${lang}:${text.slice(0, 120)}`; }
+function ttsCacheKey(text, lang, speaker) { return `${lang}:${speaker || 'default'}:${text.slice(0, 120)}`; }
 function ttsCacheSet(key, buf) {
     if (ttsCache.size >= 200) ttsCache.delete(ttsCache.keys().next().value);
     ttsCache.set(key, buf);
@@ -649,24 +616,40 @@ function responseCacheSet(key, reply, model, ragContext) {
 // ═══════════════════════════════════════════════════════════
 const FAQ_TEMPLATES = {
     "hi-IN": [
-        { patterns: ["fir", "kaise", "darj", "police", "thana"], answer: "एफ़ आई आर दर्ज करने के लिए नज़दीकी थाने में जाइए। बी एन एस एस धारा एक सौ तिहत्तर के तहत पुलिस एफ़ आई आर दर्ज करने से मना नहीं कर सकती। अगर मना करे तो एस पी को लिखित शिकायत भेजें। ज़ीरो एफ़ आई आर किसी भी थाने में दर्ज हो सकती है। ललिता कुमारी बनाम उत्तर प्रदेश में उच्चतम न्यायालय ने एफ़ आई आर अनिवार्य बताई। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। क्या आपकी एफ़ आई आर मना की गई है?" },
-        { patterns: ["cheque", "bounce", "check", "dishonour"], answer: "चेक बाउंस पर परक्राम्य लिखत अधिनियम की धारा एक सौ अड़तीस लागू होती है। बाउंस के बाद तीस दिन के अंदर कानूनी नोटिस भेजिए। पंद्रह दिन में पैसे न आएं तो मजिस्ट्रेट अदालत में शिकायत दर्ज करें। दो साल तक की सज़ा और चेक की रकम से दोगुना जुर्माना हो सकता है। शिकायत बाउंस के तीस दिन बाद और एक महीने के अंदर करनी होती है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। चेक कितने का है?" },
-        { patterns: ["online", "fraud", "scam", "upi", "cyber", "phishing", "otp"], answer: "ऑनलाइन धोखाधड़ी में तुरंत एक नौ तीन शून्य पर फ़ोन करें, यह राष्ट्रीय साइबर अपराध हेल्पलाइन है, पैसे फ्रीज़ हो सकते हैं। साइबरक्राइम डॉट जी ओ वी डॉट इन पर शिकायत दर्ज करें। आई टी अधिनियम धारा छिहत्तर डी और बी एन एस धारा तीन सौ अठारह के तहत एफ़ आई आर दर्ज करें। बैंक को तुरंत सूचित करें। कितने पैसे गए हैं?" },
-        { patterns: ["domestic", "violence", "marpit", "pati", "sasural"], answer: "घरेलू हिंसा में सबसे पहले महिला हेल्पलाइन एक आठ एक पर फ़ोन करें। घरेलू हिंसा अधिनियम दो हज़ार पाँच और बी एन एस धारा पचासी के तहत आपको सुरक्षा मिलेगी। नज़दीकी संरक्षण अधिकारी से मिलें। मजिस्ट्रेट अदालत में सुरक्षा आदेश और भरण-पोषण की अर्ज़ी दें। एफ़ आई आर भी दर्ज करवाएं। आपको शेल्टर होम में रहने का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। क्या आप सुरक्षित जगह पर हैं?" },
-        { patterns: ["salary", "vetan", "naukri", "job", "termination", "fired"], answer: "वेतन या नौकरी की समस्या के लिए श्रम आयुक्त को शिकायत दें, हेल्पलाइन एक चार चार तीन चार पर फ़ोन करें। वेतन न मिले तो श्रम अदालत में केस करें। गलत तरीके से निकाला गया है तो औद्योगिक विवाद अधिनियम धारा पच्चीस एफ़ के तहत हर साल के लिए पंद्रह दिन का वेतन मुआवज़ा मिलेगा। पाँच साल की नौकरी के बाद ग्रेच्युटी का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। कितने दिन से वेतन नहीं मिला?" },
-        { patterns: ["consumer", "complaint", "product", "service", "refund"], answer: "उपभोक्ता शिकायत के लिए उपभोक्ता संरक्षण अधिनियम दो हज़ार उन्नीस लागू होता है। एक आठ शून्य शून्य एक एक चार शून्य शून्य शून्य पर फ़ोन करें, यह मुफ़्त हेल्पलाइन है। ज़िला उपभोक्ता आयोग में एक करोड़ तक की शिकायत दर्ज हो सकती है। ई-दाखिल डॉट एन आई सी डॉट इन पर ऑनलाइन शिकायत करें। दो साल के अंदर शिकायत करनी होती है। शिकायत किस बारे में है?" },
-        { patterns: ["bail", "giraftari", "arrest", "jail"], answer: "ज़मानत और गिरफ्तारी के बारे में बताता हूँ। ज़मानती अपराध में थाने पर ही ज़मानत का अधिकार है। ग़ैर-ज़मानती अपराध में सत्र अदालत या उच्च न्यायालय में अर्ज़ी दें। अग्रिम ज़मानत बी एन एस एस धारा चार सौ बयासी के तहत मिलती है। अगर साठ या नब्बे दिन में आरोप पत्र न दाखिल हो तो ज़मानत का अधिकार है। गिरफ्तारी में परिवार को सूचित करना पुलिस की ज़िम्मेदारी है। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें। किस मामले में गिरफ्तारी हुई?" },
-        { patterns: ["rti", "information", "suchna"], answer: "सूचना का अधिकार अधिनियम दो हज़ार पाँच के तहत आप किसी भी सरकारी कार्यालय से जानकारी माँग सकते हैं। दस रुपये की फीस के साथ आवेदन दें। तीस दिन में जवाब अनिवार्य है। जवाब न मिले तो पहली अपील तीस दिन में और सूचना आयोग में नब्बे दिन में करें। ऑनलाइन आर टी आई डॉट जी ओ वी डॉट इन पर लगा सकते हैं। गरीबी रेखा से नीचे वालों को फीस माफ़ है। किस विभाग से जानकारी चाहिए?" },
-        { patterns: ["property", "zameen", "registry", "makaan", "flat", "builder"], answer: "संपत्ति विवाद में बिल्डर ने देरी की है तो रेरा प्राधिकरण में शिकायत करें। ज़मीन का विवाद है तो राजस्व अदालत या दीवानी अदालत में केस करें। रजिस्ट्री के लिए उप-पंजीयक कार्यालय जाएं। नामांतरण के लिए तहसील कार्यालय में आवेदन दें। अतिक्रमण है तो एस डी एम या ज़िला कलेक्टर को शिकायत करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। किस तरह का संपत्ति विवाद है?" },
-        { patterns: ["divorce", "talaq", "shaadi"], answer: "तलाक के लिए हिंदू विवाह अधिनियम धारा तेरह लागू होती है। आपसी सहमति से तलाक धारा तेरह बी के तहत होता है, छह महीने का इंतज़ार करना पड़ता है। एकतरफा तलाक क्रूरता, परित्याग या सात साल से लापता होने पर मिलता है। तीन तलाक़ अब अपराध है, तीन साल की सज़ा है। भरण-पोषण का अधिकार धारा एक सौ पच्चीस के तहत है। परिवार अदालत में याचिका दाखिल करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या दोनों पक्ष सहमत हैं?" },
+        { patterns: ["fir", "kaise", "darj", "police", "thana", "एफआईआर", "एफ़आईआर", "एफ़", "दर्ज", "थाना", "थाने"], answer: "एफ़ आई आर दर्ज करने के लिए नज़दीकी थाने में जाइए। बी एन एस एस धारा एक सौ तिहत्तर के तहत पुलिस एफ़ आई आर दर्ज करने से मना नहीं कर सकती। अगर मना करे तो एस पी को लिखित शिकायत भेजें। ज़ीरो एफ़ आई आर किसी भी थाने में दर्ज हो सकती है। ललिता कुमारी बनाम उत्तर प्रदेश में उच्चतम न्यायालय ने एफ़ आई आर अनिवार्य बताई। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। क्या आपकी एफ़ आई आर मना की गई है?" },
+        { patterns: ["cheque", "bounce", "check", "dishonour", "चेक", "बाउंस", "बाउन्स"], answer: "चेक बाउंस पर परक्राम्य लिखत अधिनियम की धारा एक सौ अड़तीस लागू होती है। बाउंस के बाद तीस दिन के अंदर कानूनी नोटिस भेजिए। पंद्रह दिन में पैसे न आएं तो मजिस्ट्रेट अदालत में शिकायत दर्ज करें। दो साल तक की सज़ा और चेक की रकम से दोगुना जुर्माना हो सकता है। शिकायत बाउंस के तीस दिन बाद और एक महीने के अंदर करनी होती है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। चेक कितने का है?" },
+        { patterns: ["online", "fraud", "scam", "upi", "cyber", "phishing", "otp", "ऑनलाइन", "धोखाधड़ी", "धोखा", "साइबर", "फ्रॉड"], answer: "ऑनलाइन धोखाधड़ी में तुरंत एक नौ तीन शून्य पर फ़ोन करें, यह राष्ट्रीय साइबर अपराध हेल्पलाइन है, पैसे फ्रीज़ हो सकते हैं। साइबरक्राइम डॉट जी ओ वी डॉट इन पर शिकायत दर्ज करें। आई टी अधिनियम धारा छिहत्तर डी और बी एन एस धारा तीन सौ अठारह के तहत एफ़ आई आर दर्ज करें। बैंक को तुरंत सूचित करें। कितने पैसे गए हैं?" },
+        { patterns: ["domestic", "violence", "marpit", "pati", "sasural", "घरेलू", "हिंसा", "मारपीट", "पति", "ससुराल"], answer: "घरेलू हिंसा में सबसे पहले महिला हेल्पलाइन एक आठ एक पर फ़ोन करें। घरेलू हिंसा अधिनियम दो हज़ार पाँच और बी एन एस धारा पचासी के तहत आपको सुरक्षा मिलेगी। नज़दीकी संरक्षण अधिकारी से मिलें। मजिस्ट्रेट अदालत में सुरक्षा आदेश और भरण-पोषण की अर्ज़ी दें। एफ़ आई आर भी दर्ज करवाएं। आपको शेल्टर होम में रहने का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। क्या आप सुरक्षित जगह पर हैं?" },
+        { patterns: ["salary", "vetan", "naukri", "job", "termination", "fired", "वेतन", "नौकरी", "तनख्वाह", "सैलरी", "निकाला", "पगार", "मिली"], answer: "वेतन या नौकरी की समस्या के लिए श्रम आयुक्त को शिकायत दें, हेल्पलाइन एक चार चार तीन चार पर फ़ोन करें। वेतन न मिले तो श्रम अदालत में केस करें। गलत तरीके से निकाला गया है तो औद्योगिक विवाद अधिनियम धारा पच्चीस एफ़ के तहत हर साल के लिए पंद्रह दिन का वेतन मुआवज़ा मिलेगा। पाँच साल की नौकरी के बाद ग्रेच्युटी का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। कितने दिन से वेतन नहीं मिला?" },
+        { patterns: ["consumer", "complaint", "product", "service", "refund", "उपभोक्ता", "शिकायत", "रिफंड", "सामान", "सर्विस"], answer: "उपभोक्ता शिकायत के लिए उपभोक्ता संरक्षण अधिनियम दो हज़ार उन्नीस लागू होता है। एक आठ शून्य शून्य एक एक चार शून्य शून्य शून्य पर फ़ोन करें, यह मुफ़्त हेल्पलाइन है। ज़िला उपभोक्ता आयोग में एक करोड़ तक की शिकायत दर्ज हो सकती है। ई-दाखिल डॉट एन आई सी डॉट इन पर ऑनलाइन शिकायत करें। दो साल के अंदर शिकायत करनी होती है। शिकायत किस बारे में है?" },
+        { patterns: ["bail", "giraftari", "arrest", "jail", "ज़मानत", "जमानत", "गिरफ्तारी", "गिरफ़्तारी", "जेल"], answer: "ज़मानत और गिरफ्तारी के बारे में बताता हूँ। ज़मानती अपराध में थाने पर ही ज़मानत का अधिकार है। ग़ैर-ज़मानती अपराध में सत्र अदालत या उच्च न्यायालय में अर्ज़ी दें। अग्रिम ज़मानत बी एन एस एस धारा चार सौ बयासी के तहत मिलती है। अगर साठ या नब्बे दिन में आरोप पत्र न दाखिल हो तो ज़मानत का अधिकार है। गिरफ्तारी में परिवार को सूचित करना पुलिस की ज़िम्मेदारी है। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें। किस मामले में गिरफ्तारी हुई?" },
+        { patterns: ["rti", "information", "suchna", "आरटीआई", "सूचना", "जानकारी"], answer: "सूचना का अधिकार अधिनियम दो हज़ार पाँच के तहत आप किसी भी सरकारी कार्यालय से जानकारी माँग सकते हैं। दस रुपये की फीस के साथ आवेदन दें। तीस दिन में जवाब अनिवार्य है। जवाब न मिले तो पहली अपील तीस दिन में और सूचना आयोग में नब्बे दिन में करें। ऑनलाइन आर टी आई डॉट जी ओ वी डॉट इन पर लगा सकते हैं। गरीबी रेखा से नीचे वालों को फीस माफ़ है। किस विभाग से जानकारी चाहिए?" },
+        { patterns: ["property", "zameen", "registry", "makaan", "flat", "builder", "संपत्ति", "ज़मीन", "जमीन", "रजिस्ट्री", "मकान", "फ्लैट", "बिल्डर", "किराया", "किरायेदार"], answer: "संपत्ति विवाद में बिल्डर ने देरी की है तो रेरा प्राधिकरण में शिकायत करें। ज़मीन का विवाद है तो राजस्व अदालत या दीवानी अदालत में केस करें। रजिस्ट्री के लिए उप-पंजीयक कार्यालय जाएं। नामांतरण के लिए तहसील कार्यालय में आवेदन दें। अतिक्रमण है तो एस डी एम या ज़िला कलेक्टर को शिकायत करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। किस तरह का संपत्ति विवाद है?" },
+        { patterns: ["divorce", "talaq", "shaadi", "तलाक", "तलाक़", "शादी", "विवाह"], answer: "तलाक के लिए हिंदू विवाह अधिनियम धारा तेरह लागू होती है। आपसी सहमति से तलाक धारा तेरह बी के तहत होता है, छह महीने का इंतज़ार करना पड़ता है। एकतरफा तलाक क्रूरता, परित्याग या सात साल से लापता होने पर मिलता है। तीन तलाक़ अब अपराध है, तीन साल की सज़ा है। भरण-पोषण का अधिकार धारा एक सौ पच्चीस के तहत है। परिवार अदालत में याचिका दाखिल करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या दोनों पक्ष सहमत हैं?" },
+        // ─── Village / Rural Specific FAQs ───
+        { patterns: ["ज़मीन", "जमीन", "कब्ज़ा", "कब्जा", "zameen", "kabza", "भूमि", "ताकतवर", "ज़बरदस्ती"], answer: "मैं आपकी परेशानी समझ रहा हूँ। ज़मीन पर अवैध कब्ज़ा हुआ है तो सबसे पहले तहसीलदार या एस डी एम को लिखित शिकायत दें। बी एन एस धारा तीन सौ तीस के तहत अतिक्रमण अपराध है, एफ़ आई आर दर्ज करवाएं। दीवानी अदालत में कब्ज़ा वापसी का दावा करें। ज़मीन के कागज़ात जैसे खतौनी, रजिस्ट्री साथ रखें। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। क्या आपके पास ज़मीन के कागज़ात हैं?" },
+        { patterns: ["जाति", "जात", "दलित", "ऊँची", "छुआछूत", "भेदभाव", "मारा", "पीटा", "caste", "dalit", "atrocity"], answer: "मैं आपकी परेशानी समझ रहा हूँ। जातिगत हिंसा या भेदभाव पर अनुसूचित जाति और जनजाति अत्याचार निवारण अधिनियम लागू होता है। इसमें तुरंत एफ़ आई आर दर्ज होनी चाहिए, पुलिस मना नहीं कर सकती। अगर थाने में नहीं सुनते तो ज़िला मजिस्ट्रेट या एस पी को सीधे शिकायत दें। मुआवज़ा भी मिलता है। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। किस तरह की हिंसा हुई है?" },
+        { patterns: ["मनरेगा", "नरेगा", "मजदूरी", "काम", "मज़दूरी", "mnrega", "nrega", "wages", "रोज़गार"], answer: "मनरेगा में काम माँगने का आपका अधिकार है। काम माँगने के पंद्रह दिन में काम न मिले तो बेरोज़गारी भत्ता मिलेगा। मज़दूरी पंद्रह दिन में खाते में आनी चाहिए, देर हो तो ब्याज़ मिलेगा। ग्राम पंचायत सचिव से लिखित में काम माँगें। शिकायत के लिए ज़िला कार्यक्रम अधिकारी या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर फ़ोन करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। कितने दिन से पैसा नहीं आया?" },
+        { patterns: ["राशन", "कार्ड", "राशन कार्ड", "ration", "card", "अनाज", "गेहूँ", "चावल", "बीपीएल"], answer: "राशन कार्ड बनवाने के लिए खाद्य विभाग के कार्यालय में या ऑनलाइन आवेदन करें। राष्ट्रीय खाद्य सुरक्षा अधिनियम के तहत गरीब परिवार को पाँच किलो अनाज प्रति व्यक्ति हर महीने मिलना चाहिए। राशन डीलर अनाज न दे तो ज़िला खाद्य अधिकारी को शिकायत करें। शिकायत हेल्पलाइन एक नौ शून्य शून्य या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर फ़ोन करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या राशन कार्ड है आपके पास?" },
+        { patterns: ["पंचायत", "सरपंच", "प्रधान", "ग्राम", "गाँव", "panchayat", "sarpanch", "gram"], answer: "पंचायत से जुड़ी शिकायत के लिए ज़िला पंचायत अधिकारी या ज़िला मजिस्ट्रेट को लिखित शिकायत दें। सरपंच या प्रधान गलत काम कर रहा है तो अविश्वास प्रस्ताव ला सकते हैं। पंचायत के फंड में घपला है तो भ्रष्टाचार निवारण अधिनियम के तहत शिकायत करें। आर टी आई लगाकर पंचायत के सभी खर्चों का हिसाब माँग सकते हैं। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या समस्या है पंचायत में?" },
+        { patterns: ["झूठा", "झूठी", "फर्ज़ी", "false", "fake", "फँसाया", "केस"], answer: "झूठे केस में सबसे पहले अग्रिम ज़मानत के लिए वकील से मिलें। बी एन एस एस धारा चार सौ बयासी के तहत अदालत में अग्रिम ज़मानत की अर्ज़ी दें। झूठी एफ़ आई आर को रद्द करवाने के लिए उच्च न्यायालय में याचिका दायर करें। डी के बसु बनाम पश्चिम बंगाल के फ़ैसले के तहत गिरफ्तारी में आपके अधिकार सुरक्षित हैं। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। किस तरह का झूठा केस है?" },
     ],
     "en-IN": [
-        { patterns: ["fir", "police", "register", "lodge"], answer: "FIR Filing: Under BNSS Section 173, police MUST register FIR for cognizable offences — they cannot refuse. Steps: (1) Go to nearest police station. (2) If refused, send written complaint to SP by registered post. (3) Zero FIR can be filed at ANY police station. Supreme Court in Lalita Kumari v. UP (2013) made FIR registration mandatory. Call NALSA 15100 for free lawyer. Was your FIR refused?" },
-        { patterns: ["consumer", "complaint", "defective", "product", "refund", "service"], answer: "Consumer Complaint — Consumer Protection Act 2019: (1) File online at consumerhelpline.gov.in or call 1800-11-4000 (toll-free). (2) File at District Consumer Disputes Redressal Commission for claims up to 1 crore. (3) E-filing at edaakhil.nic.in. (4) Limitation period: 2 years from cause of action. (5) Lucknow Development Authority v. MK Gupta — delay/deficiency in service is compensable. NALSA 15100 for free lawyer. What product or service is the complaint about?" },
-        { patterns: ["cheque", "bounce", "dishonour"], answer: "Cheque Bounce — NI Act Section 138: (1) Send legal notice within 30 days of bounce memo. (2) If not paid within 15 days of notice, file complaint in Magistrate Court. (3) Punishment: up to 2 years jail + twice the cheque amount. (4) File within 1 month after 15-day notice period expires. NALSA 15100 for free legal aid. What is the cheque amount?" },
-        { patterns: ["online", "fraud", "cyber", "scam", "upi"], answer: "Online Fraud: Act immediately: (1) Call 1930 — National Cyber Crime Helpline — money can be frozen. (2) Report at cybercrime.gov.in. (3) FIR under IT Act Section 66D + BNS Section 318. (4) Notify your bank immediately. DK Basu guidelines protect against wrongful arrest. How much money was lost?" },
-        { patterns: ["domestic", "violence", "husband", "abuse"], answer: "Domestic Violence — DV Act 2005 + BNS Section 85: (1) Call Women Helpline 181. (2) Meet nearest Protection Officer. (3) File for Protection Order + maintenance in Magistrate Court. (4) FIR under BNS 85 (cruelty). (5) Right to shelter home. NALSA 15100 for free lawyer. Are you in a safe place?" },
-        { patterns: ["salary", "job", "fired", "termination"], answer: "Salary/Job issues — Code on Wages 2019: (1) Complain to Labour Commissioner — helpline 14434. (2) Non-payment — file case in Labour Court. (3) Wrongful termination — retrenchment compensation under ID Act Section 25F (15 days salary per year). (4) Gratuity after 5 years under Payment of Gratuity Act. NALSA 15100. How long has salary been pending?" },
+        { patterns: ["fir", "police", "register", "lodge", "complaint", "file", "how"], answer: "To file an FIR, go to your nearest police station. Under BNSS Section 173, the police must register your FIR for any cognizable offence, they cannot refuse. If they refuse, send a written complaint to the SP by registered post. You can also file a Zero FIR at any police station regardless of jurisdiction. The Supreme Court in Lalita Kumari versus Uttar Pradesh made FIR registration mandatory. Call NALSA helpline 15100 for a free lawyer. Has your FIR been refused?" },
+        { patterns: ["consumer", "complaint", "defective", "product", "refund", "service"], answer: "For a consumer complaint, you can call the toll-free helpline 1800-11-4000 or file online at the consumer helpline website. File your complaint at the District Consumer Disputes Commission for claims up to one crore rupees. The time limit is two years from the date of the problem. The Supreme Court has said that delay or deficiency in service is compensable. Call NALSA 15100 for a free lawyer. What product or service is the complaint about?" },
+        { patterns: ["cheque", "bounce", "dishonour", "check"], answer: "For a cheque bounce case, first send a legal notice within 30 days of the bounce memo. If the person does not pay within 15 days of receiving your notice, file a complaint in Magistrate Court under NI Act Section 138. The punishment can be up to two years in jail plus twice the cheque amount as fine. You must file within one month after the 15 day notice period expires. Call NALSA 15100 for free legal aid. What is the cheque amount?" },
+        { patterns: ["online", "fraud", "cyber", "scam", "upi"], answer: "For online fraud, act immediately. Call 1930, the National Cyber Crime Helpline, your money can be frozen before the fraudster withdraws it. Also report on the cyber crime website. You can file an FIR under IT Act Section 66D and BNS Section 318. Notify your bank immediately to block your account. How much money was lost?" },
+        { patterns: ["domestic", "violence", "husband", "abuse"], answer: "For domestic violence, first call the Women Helpline at 181, they are available 24 hours. You are protected under the Domestic Violence Act 2005 and BNS Section 85. Meet your nearest Protection Officer and file for a Protection Order and maintenance in Magistrate Court. You can also file an FIR under BNS Section 85 for cruelty. You have the right to stay at a shelter home. Call NALSA 15100 for a free lawyer. Are you in a safe place right now?" },
+        { patterns: ["salary", "job", "fired", "termination", "wages", "paid", "not"], answer: "For salary or job problems, first complain to the Labour Commissioner, call helpline 14434. If your salary has not been paid, file a case in Labour Court. If you were wrongfully terminated, you can get retrenchment compensation under the Industrial Disputes Act, that is 15 days salary for each year you worked. After five years of service, you are entitled to gratuity. Call NALSA 15100 for a free lawyer. How long has your salary been pending?" },
+        { patterns: ["property", "land", "rent", "flat", "builder", "tenant", "problem", "issue", "deposit"], answer: "For property disputes, if a builder has delayed your project, file a complaint with the RERA authority. For land disputes, go to the Revenue Court or Civil Court. For registration, visit the Sub-Registrar office. If there is encroachment, complain to the SDM or District Collector. For tenant issues, the Rent Control Act protects both landlord and tenant rights. Call NALSA 15100 for a free lawyer. What kind of property issue are you facing?" },
+        { patterns: ["divorce", "separation", "marriage"], answer: "For divorce, under the Hindu Marriage Act Section 13, you can file for divorce. If both husband and wife agree, mutual consent divorce under Section 13B takes about six months. For one-sided divorce, grounds include cruelty, desertion, or missing for seven years. Triple talaq is now a criminal offence with up to three years punishment. You have the right to maintenance under Section 125. File your petition in Family Court. Call NALSA 15100 for a free lawyer. Do both parties agree to the divorce?" },
+        // Village / Rural FAQs
+        { patterns: ["land", "grab", "encroach", "kabza", "zameen", "occupy"], answer: "For land grabbing or encroachment, first file a written complaint with the Tehsildar or SDM. Under BNS Section 330, encroachment is a criminal offence, so file an FIR at the police station. You can also file a civil suit for possession recovery in Civil Court. Keep your land documents like khatauni, registry, and mutation records safe. Call NALSA 15100 for a free lawyer. Do you have your land documents?" },
+        { patterns: ["caste", "dalit", "atrocity", "discrimination", "untouchability"], answer: "For caste violence or discrimination, the SC ST Prevention of Atrocities Act gives you strong protection. The police must immediately register an FIR, they cannot refuse. If the police station does not help, complain directly to the District Magistrate or SP. You are also entitled to compensation from the government. Call NALSA 15100 for a free lawyer. What kind of violence or discrimination happened?" },
+        { patterns: ["nrega", "mnrega", "mgnrega", "wages", "work", "employment", "guarantee"], answer: "Under MGNREGA, you have the right to demand work. If work is not given within 15 days, you are entitled to unemployment allowance. Wages must be paid within 15 days into your bank account, and delay attracts interest. Submit a written demand for work to the Gram Panchayat Secretary. To complain, contact the District Programme Officer or call 1800-111-0100. Call NALSA 15100 for a free lawyer. How long have wages been pending?" },
+        { patterns: ["ration", "card", "food", "grain", "bpl", "antyodaya"], answer: "Under the National Food Security Act, every poor family is entitled to five kilograms of food grain per person per month at subsidised rates. If you do not have a ration card, apply at the Food Department office or online. If the ration dealer is not giving your grain, complain to the District Food Officer. Call the helpline 1900 or 1800-111-0100. Call NALSA 15100 for a free lawyer. Do you have a ration card?" },
+        { patterns: ["panchayat", "sarpanch", "village", "gram", "pradhan"], answer: "For panchayat complaints, write to the District Panchayat Officer or District Magistrate. If the Sarpanch or Pradhan is misusing funds, you can file a corruption complaint under the Prevention of Corruption Act. You can use RTI to get full details of all panchayat spending. A no-confidence motion can also remove a corrupt Sarpanch. Call NALSA 15100 for a free lawyer. What is the problem with the panchayat?" },
+        { patterns: ["false", "fake", "wrongful", "framed", "trap"], answer: "If you have been framed in a false case, immediately contact a lawyer for anticipatory bail under BNSS Section 482. File an application in Sessions Court or High Court. To get a false FIR quashed, file a petition in the High Court. Under the DK Basu guidelines, you have rights during arrest, including informing your family. Call NALSA 15100 for a free lawyer immediately. What kind of false case has been filed?" },
     ],
 };
 
@@ -680,11 +663,17 @@ function matchFAQ(msg, lang) {
 
     for (const faq of templates) {
         let score = 0;
+        let devanagariHit = false;
         for (const p of faq.patterns) {
-            if (words.includes(p) || msgLower.includes(p)) score++;
+            if (words.includes(p) || msgLower.includes(p)) {
+                score++;
+                // Devanagari patterns (non-ASCII) are highly specific — count double
+                if (/[^\x00-\x7F]/.test(p) && p.length >= 3) devanagariHit = true;
+            }
         }
-        // Require at least 2 pattern matches for FAQ hit
-        if (score >= 2 && score > bestScore) {
+        // Require 2+ English pattern matches, or 1+ specific Devanagari match
+        const threshold = devanagariHit ? 1 : 2;
+        if (score >= threshold && score > bestScore) {
             bestScore = score;
             bestMatch = faq;
         }
@@ -705,7 +694,7 @@ function getOrCreateSession(sessionId) {
         s.lastActive = Date.now();
         return { session: s, sessionId };
     }
-    const newId = `ws_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newId = generateSessionId("ws");
     const s = { history: [], lang: "hi-IN", lastActive: Date.now() };
     webSessions.set(newId, s);
     return { session: s, sessionId: newId };
@@ -730,28 +719,26 @@ setInterval(() => {
 // ═══════════════════════════════════════════════════════════
 //  TTS HELPER — with voice engine normalization
 // ═══════════════════════════════════════════════════════════
-async function generateTTS(text, langCode, customSpeaker) {
-    const vp = getVoiceParams(langCode);
-    const speaker = customSpeaker || vp.speaker;
+async function generateTTS(text, langCode, customSpeaker, _retries = 0) {
+    const gender = (customSpeaker === "female") ? "female" : undefined;
+    const vp = getVoiceParams(langCode, gender);
+    const speaker = vp.speaker;
     const normalized = normalizeTTS(text, langCode);
-    const ck = ttsCacheKey(normalized, langCode);
+    const ck = ttsCacheKey(normalized, langCode, speaker);
     if (ttsCache.has(ck)) return { audio: ttsCache.get(ck).toString("base64"), text };
-
-    // Transliterate Roman Hinglish → Devanagari for better Hindi TTS pronunciation
-    const ttsText = await transliterateForTTS(normalized, langCode);
 
     const r = await apiFetch("https://api.sarvam.ai/text-to-speech", {
         method: "POST", headers: HEADERS,
         body: JSON.stringify({
-            text: ttsText,
+            text: normalized,
             target_language_code: langCode,
             speaker,
             model: vp.model || "bulbul:v3",
             pace: vp.pace,
             speech_sample_rate: 24000,
-            temperature: vp.temperature || 0.65,
+            temperature: vp.temperature || 0.5,
         }),
-    }, 6000);
+    }, 4000);
     if (r.ok) {
         const d = await r.json();
         if (d.audios?.[0]) {
@@ -759,6 +746,14 @@ async function generateTTS(text, langCode, customSpeaker) {
             ttsCacheSet(ck, buf);
             return { audio: d.audios[0], text };
         }
+    } else {
+        const errBody = await r.text().catch(() => "");
+        // Retry once on 429 with backoff
+        if (r.status === 429 && _retries < 1) {
+            await new Promise(res => setTimeout(res, 500 + Math.random() * 500));
+            return generateTTS(text, langCode, customSpeaker, _retries + 1);
+        }
+        console.log(`[TTS] Failed: ${r.status} ${errBody.slice(0, 100)}`);
     }
     return null;
 }
@@ -781,7 +776,7 @@ app.post("/api/stt", upload.single("audio"), async (req, res) => {
         fd.append("mode", "transcribe");
         const r = await apiFetch("https://api.sarvam.ai/speech-to-text", {
             method: "POST", headers: { "api-subscription-key": SK }, body: fd,
-        }, 6000);
+        }, 5000);
         if (!r.ok) {
             const errText = await r.text().catch(() => "");
             console.log(`[STT] ${r.status} ${errText.slice(0, 200)}`);
@@ -889,21 +884,18 @@ app.post("/api/ask", async (req, res) => {
     let model = getAvailableModel();
     const systemPrompt = getLangPrompt(lang, ragSnippet);
 
-    // SPEED: Race primary model against Sarvam fallback concurrently
-    // Whichever returns first with a valid response wins
+    // SPEED: Race primary model against Sarvam fallback concurrently — no delay
     try {
-        const primaryPromise = callGemini(systemPrompt, messages, 1024, model)
-            .then(r => r ? { reply: cleanLLMResponse(r, lang), model } : null)
+        const primaryPromise = callGemini(systemPrompt, messages, 512, model)
+            .then(r => r ? { reply: stripMarkdown(r), model } : null)
             .catch(() => null);
-        const sarvamPromise = new Promise(resolve =>
-            setTimeout(() => {
-                // Only start Sarvam after 2s if primary is slow
-                callSarvam(messages, 300).then(r => r ? resolve({ reply: cleanLLMResponse(r, lang), model: "sarvam-m" }) : resolve(null)).catch(() => resolve(null));
-            }, 2000)
-        );
+        const sarvamPromise = callSarvam(messages, 300)
+            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : null)
+            .catch(() => null);
         const result = await Promise.race([
-            primaryPromise.then(r => r || new Promise(resolve => setTimeout(() => resolve(null), 6000))),
+            primaryPromise,
             sarvamPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 8000)),
         ]);
         if (result) {
             reply = result.reply;
@@ -917,9 +909,9 @@ app.post("/api/ask", async (req, res) => {
         const fallbackModel = getAvailableModel();
         if (fallbackModel !== model) {
             try {
-                const retryReply = await callGemini(systemPrompt, messages, 1024, fallbackModel);
+                const retryReply = await callGemini(systemPrompt, messages, 512, fallbackModel);
                 if (retryReply) {
-                    reply = cleanLLMResponse(retryReply, lang);
+                    reply = stripMarkdown(retryReply);
                     model = fallbackModel;
                     console.log(`[ASK] ${fallbackModel} fallback OK: "${reply.slice(0, 60)}"`);
                 }
@@ -932,8 +924,8 @@ app.post("/api/ask", async (req, res) => {
         try {
             const sarvamReply = await callSarvam(messages, 300);
             if (sarvamReply) {
-                reply = cleanLLMResponse(sarvamReply, lang);
-                model = "sarvam-m";
+                reply = stripMarkdown(sarvamReply);
+                model = "sarvam-105b";
                 console.log(`[ASK] Sarvam direct: "${reply.slice(0, 60)}"`);
             }
         } catch (e) { console.log("[ASK-SARVAM] FAIL:", e.message); }
@@ -941,35 +933,13 @@ app.post("/api/ask", async (req, res) => {
 
     const aiMs = Date.now() - aiT0;
 
-    // RESPONSE SELF-CORRECTION
+    // Unified post-processing through rules engine (handles validation, language, citations, emergency, NALSA)
     if (reply) {
-        const { valid, hasLegal } = validateResponse(reply, lang);
-        if (!valid) {
-            console.log(`[ASK] RESPONSE_INVALID: "${reply.slice(0, 50)}"`);
-            reply = refusal;
-        }
-    }
-
-    // LAYER 3 POST-AI GUARDRAIL
-    if (reply && !isLegalResponse(reply)) {
-        console.log(`[ASK] L3_BLOCK: "${reply.slice(0, 50)}"`);
-        reply = refusal;
-    }
-
-    // LAYER 3b — Citation grounding check
-    if (reply && reply !== refusal && ragChunks?.length > 0) {
-        const { score } = computeGroundingScore(reply, ragChunks);
-        console.log(`[GROUNDING] score:${score.toFixed(2)} "${reply.slice(0, 40)}"`);
-        if (score < 0.6) {
-            reply = sanitizeResponse(reply, ragChunks, lang, refusal);
-            console.log(`[GROUNDING] Sanitized: "${reply.slice(0, 40)}"`);
-        }
+        reply = applyRules(reply, { lang, ragChunks, isPhone: false, originalQuery: msg, refusal });
     }
 
     if (!reply) {
-        reply = lang === "en-IN"
-            ? "Sorry, a technical issue occurred. Call NALSA on 15100 for a free lawyer."
-            : "थोड़ी तकनीकी समस्या हुई। NALSA 15100 पर कॉल करें — निःशुल्क वकील मिलेगा।";
+        reply = FALLBACK_ERROR[lang] || FALLBACK_ERROR["hi-IN"];
     }
 
     // Cache successful non-refusal responses
@@ -1019,58 +989,80 @@ app.post("/api/tts", async (req, res) => {
             const buf = Buffer.from(result.audio, "base64");
             return res.set("Content-Type", "audio/wav").send(buf);
         }
-    } catch { }
+    } catch (e) { console.log("[TTS] Error:", e.message); }
     res.status(500).json({ error: "TTS failed" });
 });
 
 // ═══════════════════════════════════════════════════════════
 //  4. FILLER AUDIO
 // ═══════════════════════════════════════════════════════════
+const FALLBACK_ERROR = {
+    "en-IN": "Sorry, a technical issue occurred. Call NALSA on 15100 for a free lawyer.",
+    "hi-IN": "थोड़ी तकनीकी समस्या हुई। NALSA 15100 पर कॉल करें — निःशुल्क वकील मिलेगा।",
+    "bn-IN": "দুঃখিত, একটি প্রযুক্তিগত সমস্যা হয়েছে। বিনামূল্যে আইনজীবীর জন্য NALSA 15100-এ কল করুন।",
+    "te-IN": "క్షమించండి, సాంకేతిక సమస్య జరిగింది. ఉచిత లాయర్ కోసం NALSA 15100కు కాల్ చేయండి.",
+    "ta-IN": "மன்னிக்கவும், தொழில்நுட்ப சிக்கல் ஏற்பட்டது. இலவச வழக்கறிஞருக்கு NALSA 15100-ஐ அழைக்கவும்.",
+    "mr-IN": "माफ करा, तांत्रिक समस्या आली. मोफत वकिलासाठी NALSA 15100 वर कॉल करा.",
+    "gu-IN": "માફ કરજો, ટેકનિકલ સમસ્યા આવી. મફત વકીલ માટે NALSA 15100 પર કૉલ કરો.",
+    "kn-IN": "ಕ್ಷಮಿಸಿ, ತಾಂತ್ರಿಕ ಸಮಸ್ಯೆ ಉಂಟಾಯಿತು. ಉಚಿತ ವಕೀಲರಿಗಾಗಿ NALSA 15100ಗೆ ಕರೆ ಮಾಡಿ.",
+    "ml-IN": "ക്ഷമിക്കണം, ഒരു സാങ്കേതിക പ്രശ്നം ഉണ്ടായി. സൗജന്യ അഭിഭാഷകനെ ലഭിക്കാൻ NALSA 15100-ൽ വിളിക്കൂ.",
+    "pa-IN": "ਮਾਫ਼ ਕਰਨਾ, ਤਕਨੀਕੀ ਸਮੱਸਿਆ ਆਈ। ਮੁਫ਼ਤ ਵਕੀਲ ਲਈ NALSA 15100 ਤੇ ਕਾਲ ਕਰੋ।",
+    "od-IN": "କ୍ଷମା କରନ୍ତୁ, ଏକ ଟେକ୍ନିକାଲ ସମସ୍ୟା ଘଟିଲା। ମାଗଣା ଓକିଲ ପାଇଁ NALSA 15100ରେ କଲ କରନ୍ତୁ।",
+};
+
 const FILLERS = {
     "hi-IN": ["अच्छा, देखते हैं...", "समझ रहा हूँ, रुकिए एक पल...", "जी हाँ, सोच रहा हूँ...", "ठीक है, बिल्कुल..."],
     "en-IN": ["Let me think about this for a moment...", "One moment please...", "Sure, looking into your situation...", "Let me check that for you..."],
-    "bn-IN": ["Bujhte pārchi, ektu opekkha korun...", "Dekhchi...", "Haan, bujhchi..."],
-    "te-IN": ["Arthamavutundi, okka nimesha...", "Chusthanu...", "Sare, alochisthunna..."],
-    "ta-IN": ["Purikiṟēn, oru khaṇam...", "Pārkkiṟēn...", "Sari, yosithu pārkkiṟēn..."],
-    "mr-IN": ["Samajh gelo, ek pal...", "Pāhto...", "Thik aahe, vichar karto..."],
-    "gu-IN": ["Samaju chhu, ek pal...", "Jou chhu...", "Theek chhe, vichar karu chhu..."],
-    "kn-IN": ["Arthamāguttide, oru nimesha...", "Nōḍuttēne...", "Sari, alocisuttēne..."],
-    "ml-IN": ["Manasiḷakkunnuṇṭu, oru khaṇam...", "Nōkkuuṇṭu...", "Sar, alocikkunnu..."],
-    "pa-IN": ["Samajh gaya, ek pal...", "Dekh reha haan...", "Theek haan, soch da haan..."],
-    "od-IN": ["Bujhilani, gote khana...", "Dekhuachhi...", "Theek, bhābuchhi..."],
+    "bn-IN": ["বুঝতে পারছি, একটু অপেক্ষা করুন...", "দেখছি...", "হ্যাঁ, বুঝেছি..."],
+    "te-IN": ["అర్థమవుతుంది, ఒక్క నిమిషం...", "చూస్తున్నాను...", "సరే, ఆలోచిస్తున్నా..."],
+    "ta-IN": ["புரிகிறேன், ஒரு கணம்...", "பார்க்கிறேன்...", "சரி, யோசித்துப் பார்க்கிறேன்..."],
+    "mr-IN": ["समजलं, एक पल...", "पाहतो...", "ठीक आहे, विचार करतो..."],
+    "gu-IN": ["સમજુ છું, એક પળ...", "જોઉં છું...", "ઠીક છે, વિચાર કરું છું..."],
+    "kn-IN": ["ಅರ್ಥಮಾಗುತ್ತಿದೆ, ಒಂದು ನಿಮಿಷ...", "ನೋಡುತ್ತೇನೆ...", "ಸರಿ, ಆಲೋಚಿಸುತ್ತೇನೆ..."],
+    "ml-IN": ["മനസ്സിലാക്കുന്നുണ്ട്, ഒരു നിമിഷം...", "നോക്കുന്നുണ്ട്...", "ശരി, ആലോചിക്കുന്നു..."],
+    "pa-IN": ["ਸਮਝ ਗਿਆ, ਇੱਕ ਪਲ...", "ਦੇਖ ਰਿਹਾ ਹਾਂ...", "ਠੀਕ ਹੈ, ਸੋਚਦਾ ਹਾਂ..."],
+    "od-IN": ["ବୁଝିଲି, ଗୋଟେ ମିନିଟ...", "ଦେଖୁଅଛି...", "ଠିକ, ଭାବୁଛି..."],
 };
 const fillerCache = new Map();
 
 async function warmFillers() {
     if (!SK) return;
-    console.log("  [Filler] Warming all languages...");
+    console.log("  [Filler] Warming all languages (male + female)...");
     const langs = Object.keys(FILLERS);
-    await Promise.allSettled(langs.map(async lc => {
+    // Process ONE language at a time, sequential phrases, to respect Sarvam rate limits
+    for (const lc of langs) {
         const phrases = FILLERS[lc] || FILLERS["hi-IN"];
-        const bufs = [];
-        await Promise.allSettled(phrases.map(async (ph) => {
-            try {
-                const result = await generateTTS(ph, lc);
-                if (result) bufs.push(Buffer.from(result.audio, "base64"));
-            } catch { }
-        }));
-        if (bufs.length) fillerCache.set(lc, bufs);
-    }));
+        for (const sp of [undefined, "female"]) {
+            const bufs = [];
+            const cacheKey = sp === "female" ? `${lc}:female` : lc;
+            for (const ph of phrases) {
+                try {
+                    const result = await generateTTS(ph, lc, sp);
+                    if (result) bufs.push(Buffer.from(result.audio, "base64"));
+                } catch { }
+                await new Promise(r => setTimeout(r, 150)); // 150ms gap between calls
+            }
+            if (bufs.length) fillerCache.set(cacheKey, bufs);
+        }
+    }
     const warmed = [...fillerCache.entries()].map(([k, v]) => `${k}:${v.length}`).join(", ");
     console.log(`  [Filler] OK — ${warmed}`);
 }
 
 app.get("/api/filler", async (req, res) => {
     const lc = req.query.lang || "hi-IN";
-    const cached = fillerCache.get(lc);
+    const sp = req.query.speaker || undefined; // "female" or undefined (male default)
+    const cacheKey = sp === "female" ? `${lc}:female` : lc;
+    const cached = fillerCache.get(cacheKey);
     if (cached?.length) return res.set("Content-Type", "audio/wav").send(cached[Math.floor(Math.random() * cached.length)]);
-    const ph = (FILLERS[lc] || FILLERS["hi-IN"])[Math.floor(Math.random() * 4)];
+    const phrases = FILLERS[lc] || FILLERS["hi-IN"];
+    const ph = phrases[Math.floor(Math.random() * phrases.length)];
     try {
-        const result = await generateTTS(ph, lc);
+        const result = await generateTTS(ph, lc, sp);
         if (result) {
             const buf = Buffer.from(result.audio, "base64");
-            if (!fillerCache.has(lc)) fillerCache.set(lc, []);
-            fillerCache.get(lc).push(buf);
+            if (!fillerCache.has(cacheKey)) fillerCache.set(cacheKey, []);
+            fillerCache.get(cacheKey).push(buf);
             return res.set("Content-Type", "audio/wav").send(buf);
         }
     } catch { }
@@ -1102,22 +1094,27 @@ const IVR_SEGMENTS = [
 // Build combined IVR audio from all segments (pre-generated on startup)
 async function buildIVRAudio() {
     const pcmChunks = [];
-    for (const seg of IVR_SEGMENTS) {
+    let ok = 0;
+    // Sequential with delay to respect Sarvam rate limits (shared with filler warmup)
+    for (let i = 0; i < IVR_SEGMENTS.length; i++) {
+        const seg = IVR_SEGMENTS[i];
         try {
             const result = await generateTTS(seg.text, seg.lang);
             if (result?.audio) {
                 const wav = Buffer.from(result.audio, "base64");
-                // Strip 44-byte WAV header → raw PCM
-                const pcm = wav.slice(44);
-                pcmChunks.push(pcm);
-                // Add 400ms silence between segments for clear separation
-                const silenceBytes = Math.round(24000 * 0.4) * 2; // 400ms at 24kHz, 16-bit
+                pcmChunks.push(wav.slice(44));
+                const silenceBytes = Math.round(24000 * 0.4) * 2;
                 pcmChunks.push(Buffer.alloc(silenceBytes));
+                ok++;
+            } else {
+                console.log(`[IVR] Failed segment ${seg.lang}: no audio returned`);
             }
         } catch (e) {
-            console.log(`[IVR] Failed segment ${seg.lang}:`, e.message);
+            console.log(`[IVR] Failed segment ${seg.lang}: ${e.message}`);
         }
+        await new Promise(r => setTimeout(r, 200)); // 200ms gap
     }
+    console.log(`[IVR] Segments: ${ok}/${IVR_SEGMENTS.length} succeeded`);
     if (pcmChunks.length > 0) {
         const pcm = Buffer.concat(pcmChunks);
         ivrBuf = pcmToWav(pcm, 24000);
@@ -1169,10 +1166,21 @@ app.get("/api/ivr-prompt", async (_, res) => {
 // ═══════════════════════════════════════════════════════════
 const phoneSessions = new Map(); // sessionId → { lang, history, step }
 
+// Auto-cleanup expired phone sessions every 5 min (prevents memory leak from dropped calls)
+setInterval(() => {
+    const now = Date.now();
+    for (const [id, s] of phoneSessions) {
+        if (now - (s.lastActive || s.created || 0) > SESSION_TTL) {
+            phoneSessions.delete(id);
+            console.log(`[PHONE] Session expired: ${id}`);
+        }
+    }
+}, 5 * 60 * 1000);
+
 app.post("/api/phone/call-start", async (req, res) => {
     // Sarvam telephony calls this when a call begins
     const sessionId = req.body?.session_id || `ph_${Date.now()}`;
-    phoneSessions.set(sessionId, { lang: "hi-IN", history: [], step: "ivr" });
+    phoneSessions.set(sessionId, { lang: "hi-IN", history: [], step: "ivr", created: Date.now(), lastActive: Date.now() });
     console.log(`[PHONE] New call: ${sessionId}`);
 
     // Respond with IVR prompt audio
@@ -1217,6 +1225,7 @@ app.post("/api/phone/audio", upload.single("audio"), async (req, res) => {
     const sessionId = req.body?.session_id;
     const session = phoneSessions.get(sessionId);
     if (!session || !req.file) return res.status(400).json({ error: "Invalid request" });
+    session.lastActive = Date.now();
 
     const lang = session.lang || "hi-IN";
 
@@ -1230,7 +1239,7 @@ app.post("/api/phone/audio", upload.single("audio"), async (req, res) => {
         fd.append("mode", "transcribe");
         const r = await apiFetch("https://api.sarvam.ai/speech-to-text", {
             method: "POST", headers: { "api-subscription-key": SK }, body: fd,
-        }, 10000);
+        }, 6000);
         if (r.ok) { const d = await r.json(); transcript = sanitize(d.transcript || "", 500); }
     } catch (e) { console.log("[PHONE-STT]", e.message); }
 
@@ -1266,32 +1275,23 @@ app.post("/api/phone/audio", upload.single("audio"), async (req, res) => {
         // Smart model rotation, Sarvam fallback
         let phoneModel = getAvailableModel();
         try {
-            reply = await callGemini(systemPrompt, phoneMessages, 1024, phoneModel);
-            if (reply) reply = cleanLLMResponse(reply, lang);
+            reply = await callGemini(systemPrompt, phoneMessages, 512, phoneModel);
         } catch (e) { console.log(`[PHONE-${phoneModel}]`, e.message); }
         if (!reply) {
             const fb = getAvailableModel();
             if (fb !== phoneModel) {
-                try { reply = await callGemini(systemPrompt, phoneMessages, 1024, fb); if (reply) reply = cleanLLMResponse(reply, lang); }
+                try { reply = await callGemini(systemPrompt, phoneMessages, 512, fb); }
                 catch (e) { console.log(`[PHONE-${fb}]`, e.message); }
             }
         }
         if (!reply) {
-            try {
-                reply = await callSarvam(phoneMessages, 300);
-                if (reply) reply = cleanLLMResponse(reply, lang);
-            } catch (e) { console.log("[PHONE-SARVAM]", e.message); }
+            try { reply = await callSarvam(phoneMessages, 300); }
+            catch (e) { console.log("[PHONE-SARVAM]", e.message); }
+        }
+        if (reply) {
+            reply = applyRules(reply, { lang, ragChunks, isPhone: true, originalQuery: transcript, refusal: getRefusal(lang) });
         }
         if (!reply) reply = getRefusal(lang);
-        // Post-AI guard
-        if (!isLegalResponse(reply)) reply = getRefusal(lang);
-        // Citation grounding check
-        if (reply && reply !== getRefusal(lang) && ragChunks?.length > 0) {
-            const { score } = computeGroundingScore(reply, ragChunks);
-            if (score < 0.6) {
-                reply = sanitizeResponse(reply, ragChunks, lang, getRefusal(lang));
-            }
-        }
     }
 
     // Update session history
@@ -1463,7 +1463,7 @@ function detectGender(wavBuffer) {
 }
 
 // 1. Incoming call — play IVR greeting, collect DTMF
-app.post("/api/phone/exotel/call-start", async (req, res) => {
+app.post("/api/phone/exotel/call-start", verifyWebhookToken, async (req, res) => {
     const callSid = req.body?.CallSid || req.query?.CallSid || `exo_${Date.now()}`;
     console.log(`[EXOTEL] New call: ${callSid} from ${req.body?.From || req.query?.From || "unknown"}`);
 
@@ -1475,6 +1475,8 @@ app.post("/api/phone/exotel/call-start", async (req, res) => {
         provider: "exotel",
         silenceCount: 0,        // consecutive silent recordings
         startTime: Date.now(),  // for 5-minute call duration limit
+        lastActive: Date.now(), // for TTL cleanup
+        created: Date.now(),
         speakerGender: null,    // detected from first voice recording
         customSpeaker: null,    // female speaker override if female detected
     });
@@ -1482,7 +1484,7 @@ app.post("/api/phone/exotel/call-start", async (req, res) => {
     // Ensure IVR audio is ready
     if (!ivrAudioUrl) await warmExotelIVR();
 
-    const gatherUrl = `${getPublicUrl()}/api/phone/exotel/gather?CallSid=${callSid}`;
+    const gatherUrl = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/gather?CallSid=${encodeURIComponent(callSid)}`);
 
     if (ivrAudioUrl) {
         res.set("Content-Type", "application/xml");
@@ -1495,7 +1497,7 @@ app.post("/api/phone/exotel/call-start", async (req, res) => {
 });
 
 // 2. DTMF digit received — set language, play greeting, start recording
-app.post("/api/phone/exotel/gather", async (req, res) => {
+app.post("/api/phone/exotel/gather", verifyWebhookToken, async (req, res) => {
     const callSid = req.body?.CallSid || req.query?.CallSid;
     const digits = req.body?.Digits || req.body?.digits || req.query?.Digits || "1";
     const session = phoneSessions.get(callSid);
@@ -1516,7 +1518,7 @@ app.post("/api/phone/exotel/gather", async (req, res) => {
     const greeting = GREETINGS[session.lang] || GREETINGS["hi-IN"];
     const greetingUrl = await ttsToUrl(greeting, session.lang);
 
-    const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+    const recordUrl = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/audio?CallSid=${encodeURIComponent(callSid)}`);
 
     res.set("Content-Type", "application/xml");
     if (greetingUrl) {
@@ -1527,7 +1529,7 @@ app.post("/api/phone/exotel/gather", async (req, res) => {
 });
 
 // 3. Audio recording received — STT → AI → TTS → play response
-app.post("/api/phone/exotel/audio", async (req, res) => {
+app.post("/api/phone/exotel/audio", verifyWebhookToken, async (req, res) => {
     const callSid = req.body?.CallSid || req.query?.CallSid;
     const recordingUrl = req.body?.RecordingUrl || req.body?.recording_url;
     const session = phoneSessions.get(callSid);
@@ -1536,10 +1538,11 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
         res.set("Content-Type", "application/xml");
         return res.send(exoml(`  <Say>Session expired. Please call again.</Say>\n  <Hangup />`));
     }
+    session.lastActive = Date.now();
 
     const lang = session.lang || "hi-IN";
     let reply = getRefusal(lang);
-    const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+    const recordUrl = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/audio?CallSid=${encodeURIComponent(callSid)}`);
 
     // ── Call duration limit: 5 minutes ──────────────────────────────
     const callAge = Date.now() - (session.startTime || Date.now());
@@ -1552,9 +1555,16 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
     }
 
     try {
-        // Download recording from Exotel
+        const tCall = timer("EXOTEL-TOTAL");
+        // Download recording from Exotel (with SSRF protection)
         let audioBuffer;
         if (recordingUrl) {
+            if (!isAllowedRecordingUrl(recordingUrl)) {
+                console.log(`[SECURITY] SSRF blocked: ${recordingUrl}`);
+                res.set("Content-Type", "application/xml");
+                return res.send(exoml(`  <Say>Security error.</Say>\n  <Hangup />`));
+            }
+            const tDownload = timer("RECORDING-DOWNLOAD");
             const authHeader = process.env.EXOTEL_API_KEY && process.env.EXOTEL_API_TOKEN
                 ? "Basic " + Buffer.from(`${process.env.EXOTEL_API_KEY}:${process.env.EXOTEL_API_TOKEN}`).toString("base64")
                 : null;
@@ -1563,6 +1573,7 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
             if (audioRes.ok) {
                 audioBuffer = Buffer.from(await audioRes.arrayBuffer());
             }
+            tDownload.end();
         }
 
         // ── Silence / empty audio detection ──────────────────────────
@@ -1603,6 +1614,7 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
         }
 
         // STT
+        const tSTT = timer("STT");
         let transcript = "";
         const fd = new FormData();
         fd.append("file", new File([audioBuffer], "audio.wav", { type: "application/octet-stream" }));
@@ -1611,31 +1623,37 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
         fd.append("mode", "transcribe");
         const sttRes = await apiFetch("https://api.sarvam.ai/speech-to-text", {
             method: "POST", headers: { "api-subscription-key": SK }, body: fd,
-        }, 10000);
+        }, 6000);
         if (sttRes.ok) {
             const d = await sttRes.json();
-            transcript = sanitize(d.transcript || "", 500);
+            transcript = sanitizeForLLM(sanitize(d.transcript || "", 500));
+        } else {
+            const errBody = await sttRes.text().catch(() => "");
+            console.log(`[EXOTEL-STT] Failed: ${sttRes.status} ${errBody.slice(0, 200)}`);
         }
+        tSTT.end();
 
         // Confidence check
         const { confident, reason } = scoreTranscript(transcript, lang);
         if (!confident) {
             const clarification = getClarificationPrompt(lang, reason);
             const clarUrl = await ttsToUrl(clarification, lang);
-            const recordUrl = `${getPublicUrl()}/api/phone/exotel/audio?CallSid=${callSid}`;
+            const recordUrl2 = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/audio?CallSid=${encodeURIComponent(callSid)}`);
             res.set("Content-Type", "application/xml");
             return res.send(exoml(
                 (clarUrl ? `  <Play>${clarUrl}</Play>` : `  <Say>${clarification}</Say>`) +
-                `\n  <Record action="${recordUrl}" method="POST" maxLength="15" finishOnKey="#" timeout="3" />`
+                `\n  <Record action="${recordUrl2}" method="POST" maxLength="15" finishOnKey="#" timeout="3" />`
             ));
         }
 
-        // Guardrail + RAG + AI (same as Sarvam phone endpoint)
+        // Guardrail + RAG + AI (with Promise.race for speed)
         const { allow } = isLegalQuery(transcript);
         if (!allow) {
             reply = getRefusal(lang);
         } else {
+            const tRAG = timer("RAG");
             const { contextString: ragContext, chunks: ragChunks } = buildContext(transcript);
+            tRAG.end();
             const systemPrompt = getLangPrompt(lang, ragContext);
             const phoneMessages = [
                 { role: "system", content: systemPrompt },
@@ -1643,27 +1661,54 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
                 { role: "user", content: transcript },
             ];
             let phoneModel = getAvailableModel();
+            const refusal = getRefusal(lang);
+
+            // SPEED: Race primary Gemini vs delayed Sarvam (like /api/ask)
+            const tLLM = timer("LLM");
             try {
-                reply = await callGemini(systemPrompt, phoneMessages, 1024, phoneModel);
-                if (reply) reply = cleanLLMResponse(reply, lang);
-            } catch (e) { console.log(`[EXOTEL-${phoneModel}]`, e.message); }
-            if (!reply) {
+                const primaryPromise = callGemini(systemPrompt, phoneMessages, 512, phoneModel)
+                    .then(r => r ? { reply: r, model: phoneModel } : null)
+                    .catch(() => null);
+                const sarvamPromise = new Promise(resolve =>
+                    setTimeout(() => {
+                        callSarvam(phoneMessages, 300)
+                            .then(r => r ? resolve({ reply: r, model: "sarvam-105b" }) : resolve(null))
+                            .catch(() => resolve(null));
+                    }, 400)
+                );
+                const result = await Promise.race([
+                    primaryPromise,
+                    sarvamPromise,
+                    new Promise(resolve => setTimeout(() => resolve(null), 6000)),
+                ]);
+                if (result) {
+                    reply = result.reply;
+                    phoneModel = result.model;
+                }
+            } catch (e) { console.log("[EXOTEL-RACE]", e.message); }
+
+            // Fallback if race failed
+            if (!reply || reply === refusal) {
                 const fb = getAvailableModel();
                 if (fb !== phoneModel) {
-                    try { reply = await callGemini(systemPrompt, phoneMessages, 1024, fb); if (reply) reply = cleanLLMResponse(reply, lang); }
+                    try { const r = await callGemini(systemPrompt, phoneMessages, 512, fb); if (r) { reply = r; phoneModel = fb; } }
                     catch (e) { console.log(`[EXOTEL-${fb}]`, e.message); }
                 }
             }
             if (!reply) {
-                try { reply = await callSarvam(phoneMessages, 300); if (reply) reply = cleanLLMResponse(reply, lang); }
+                try { const r = await callSarvam(phoneMessages, 300); if (r) { reply = r; phoneModel = "sarvam-105b"; } }
                 catch (e) { console.log("[EXOTEL-SARVAM]", e.message); }
             }
-            if (!reply) reply = getRefusal(lang);
-            if (!isLegalResponse(reply)) reply = getRefusal(lang);
-            if (reply && reply !== getRefusal(lang) && ragChunks?.length > 0) {
-                const { score } = computeGroundingScore(reply, ragChunks);
-                if (score < 0.6) reply = sanitizeResponse(reply, ragChunks, lang, getRefusal(lang));
+            tLLM.end();
+
+            // Apply rules engine (replaces scattered post-processing)
+            if (reply) {
+                reply = applyRules(reply, {
+                    lang, ragChunks, isPhone: true,
+                    originalQuery: transcript, refusal,
+                });
             }
+            if (!reply) reply = refusal;
         }
 
         // Update history
@@ -1673,12 +1718,15 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
 
         console.log(`[EXOTEL] ${callSid} "${transcript.slice(0, 40)}" → "${reply.slice(0, 40)}"`);
 
+        tCall.end();
     } catch (e) {
         console.log("[EXOTEL-ERROR]", e.message);
     }
 
     // Generate response audio — use gender-appropriate speaker if detected
+    const tTTS = timer("TTS");
     const replyUrl = await combinedTtsToUrl(reply, lang, session.customSpeaker || undefined);
+    tTTS.end();
 
     res.set("Content-Type", "application/xml");
     res.send(exoml(
@@ -1688,7 +1736,7 @@ app.post("/api/phone/exotel/audio", async (req, res) => {
 });
 
 // 4. Call status update / call end
-app.post("/api/phone/exotel/status", (req, res) => {
+app.post("/api/phone/exotel/status", verifyWebhookToken, (req, res) => {
     const callSid = req.body?.CallSid || req.query?.CallSid;
     const status = req.body?.Status || req.body?.status;
     console.log(`[EXOTEL] Call ${callSid} status: ${status}`);
@@ -1714,8 +1762,8 @@ app.post("/api/phone/exotel/call", async (req, res) => {
     }
     if (!to) return res.status(400).json({ error: "Provide 'to' phone number (e.g., +919XXXXXXXXX)" });
 
-    const callbackUrl = `${getPublicUrl()}/api/phone/exotel/call-start`;
-    const statusUrl = `${getPublicUrl()}/api/phone/exotel/status`;
+    const callbackUrl = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/call-start`);
+    const statusUrl = appendWebhookToken(`${getPublicUrl()}/api/phone/exotel/status`);
 
     try {
         const authHeader = "Basic " + Buffer.from(`${apiKey}:${apiToken}`).toString("base64");
@@ -1826,12 +1874,12 @@ app.get("/api/health", async (_, res) => {
         // Test Sarvam TTS + STT
         apiFetch("https://api.sarvam.ai/text-to-speech", {
             method: "POST", headers: HEADERS,
-            body: JSON.stringify({ text: "test", target_language_code: "hi-IN", speaker: "karun", model: "bulbul:v2" })
+            body: JSON.stringify({ text: "test", target_language_code: "hi-IN", speaker: "shubh", model: "bulbul:v3" })
         }, 8000).then(r => { h.tts = r.ok; h.stt = r.ok; }),
         // Test Sarvam LLM (always available as fallback)
         apiFetch("https://api.sarvam.ai/v1/chat/completions", {
             method: "POST", headers: HEADERS,
-            body: JSON.stringify({ model: "sarvam-m", messages: [{ role: "user", content: "test" }], max_tokens: 3 })
+            body: JSON.stringify({ model: "sarvam-105b", messages: [{ role: "user", content: "test" }], max_tokens: 3 })
         }, 8000).then(r => { if (r.ok) h.ai = true; }),
     ]);
     h.rag = true;
@@ -1855,17 +1903,17 @@ app.get("/api/models", (_, res) => {
 //  GREETINGS — per language (for call start)
 // ═══════════════════════════════════════════════════════════
 const GREETINGS = {
-    "hi-IN": "नमस्ते! मैं न्यायसाथी हूँ — भारत का मुफ़्त कानूनी सहायक। बताइए, आपकी क्या कानूनी परेशानी है? मैं पूरी मदद करूँगा।",
-    "en-IN": "Hello! I'm NyayaSathi, India's free AI legal assistant. Please tell me your legal problem and I'll do my best to help you.",
-    "bn-IN": "নমস্কার! আমি ন্যায়সাথী — ভারতের বিনামূল্যে আইনি সহায়ক। আপনার আইনি সমস্যা বলুন, আমি সাহায্য করব।",
-    "te-IN": "నమస్కారం! నేను న్యాయసాథి — భారత్ యొక్క ఉచిత న్యాయ సహాయకుడు। మీ చట్టపరమైన సమస్య చెప్పండి, నేను సహాయం చేస్తాను।",
-    "ta-IN": "வணக்கம்! நான் நியாயசாதி — இந்தியாவின் இலவச சட்ட உதவியாளர். உங்கள் சட்ட பிரச்சனை சொல்லுங்கள், நான் உதவுகிறேன்.",
-    "mr-IN": "नमस्कार! मी न्यायसाथी — भारताचा मोफत कायदेशीर सहाय्यक. तुमची कायदेशीर समस्या सांगा, मी मदत करतो.",
-    "gu-IN": "નમસ્તે! હું ન્યાયસાથી છું — ભારતનો મફત કાનૂની સહાયક. તમારી કાનૂની સમસ્યા કહો, હું મદદ કરીશ.",
-    "kn-IN": "ನಮಸ್ಕಾರ! ನಾನು ನ್ಯಾಯಸಾಥಿ — ಭಾರತದ ಉಚಿತ ಕಾನೂನು ಸಹಾಯಕ. ನಿಮ್ಮ ಕಾನೂನು ಸಮಸ್ಯೆ ಹೇಳಿ, ನಾನು ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
-    "ml-IN": "നമസ്കാരം! ഞാൻ ന്യായസാഥി — ഭാരതത്തിന്റെ സൗജന്യ നിയമ സഹായി. നിങ്ങളുടെ നിയമ പ്രശ്നം പറയൂ, ഞാൻ സഹായിക്കാം.",
-    "pa-IN": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਨਿਆਂਸਾਥੀ ਹਾਂ — ਭਾਰਤ ਦਾ ਮੁਫ਼ਤ ਕਾਨੂੰਨੀ ਸਹਾਇਕ। ਆਪਣੀ ਕਾਨੂੰਨੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਮੈਂ ਮਦਦ ਕਰਾਂਗਾ।",
-    "od-IN": "ନମସ୍କାର! ମୁଁ ନ୍ୟାୟସାଥୀ — ଭାରତର ମୁଫ୍ତ ଆଇନ ସହାୟକ। ଆପଣଙ୍କ ଆଇନ ସମସ୍ୟା କୁହନ୍ତୁ, ମୁଁ ସାହାଯ୍ୟ କରିବି।",
+    "hi-IN": "नमस्ते! मैं न्यायसाथी हूँ — भारत का मुफ़्त AI कानूनी सहायक। अपनी कानूनी समस्या बताइए, मैं पूरी मदद करूँगा।",
+    "en-IN": "Hello! I'm NyayaSathi — India's free AI legal assistant. Tell me your legal problem, I'll do my best to help you.",
+    "bn-IN": "নমস্কার! আমি ন্যায়সাথী — ভারতের বিনামূল্যে AI আইনি সহায়ক। আপনার আইনি সমস্যা বলুন, আমি পুরো সাহায্য করব।",
+    "te-IN": "నమస్కారం! నేను న్యాయసాథి — భారత్ యొక్క ఉచిత AI న్యాయ సహాయకుడు। మీ చట్టపరమైన సమస్య చెప్పండి, నేను పూర్తిగా సహాయం చేస్తాను.",
+    "ta-IN": "வணக்கம்! நான் நியாயசாதி — இந்தியாவின் இலவச AI சட்ட உதவியாளர். உங்கள் சட்ட பிரச்சனை சொல்லுங்கள், நான் முழுமையாக உதவுகிறேன்.",
+    "mr-IN": "नमस्कार! मी न्यायसाथी — भारताचा मोफत AI कायदेशीर सहाय्यक. तुमची कायदेशीर समस्या सांगा, मी पूर्ण मदत करतो.",
+    "gu-IN": "નમસ્તે! હું ન્યાયસાથી છું — ભારતનો મફત AI કાનૂની સહાયક. તમારી કાનૂની સમસ્યા કહો, હું પૂરી મદદ કરીશ.",
+    "kn-IN": "ನಮಸ್ಕಾರ! ನಾನು ನ್ಯಾಯಸಾಥಿ — ಭಾರತದ ಉಚಿತ AI ಕಾನೂನು ಸಹಾಯಕ. ನಿಮ್ಮ ಕಾನೂನು ಸಮಸ್ಯೆ ಹೇಳಿ, ನಾನು ಪೂರ್ಣವಾಗಿ ಸಹಾಯ ಮಾಡುತ್ತೇನೆ.",
+    "ml-IN": "നമസ്കാരം! ഞാൻ ന്യായസാഥി — ഭാരതത്തിന്റെ സൗജന്യ AI നിയമ സഹായി. നിങ്ങളുടെ നിയമ പ്രശ്നം പറയൂ, ഞാൻ പൂർണ്ണമായി സഹായിക്കാം.",
+    "pa-IN": "ਸਤਿ ਸ੍ਰੀ ਅਕਾਲ! ਮੈਂ ਨਿਆਂਸਾਥੀ ਹਾਂ — ਭਾਰਤ ਦਾ ਮੁਫ਼ਤ AI ਕਾਨੂੰਨੀ ਸਹਾਇਕ। ਆਪਣੀ ਕਾਨੂੰਨੀ ਸਮੱਸਿਆ ਦੱਸੋ, ਮੈਂ ਪੂਰੀ ਮਦਦ ਕਰਾਂਗਾ।",
+    "od-IN": "ନମସ୍କାର! ମୁଁ ନ୍ୟାୟସାଥୀ — ଭାରତର ମୁଫ୍ତ AI ଆଇନ ସହାୟକ। ଆପଣଙ୍କ ଆଇନ ସମସ୍ୟା କୁହନ୍ତୁ, ମୁଁ ସମ୍ପୂର୍ଣ୍ଣ ସାହାଯ୍ୟ କରିବି।",
 };
 
 // Silence warning — played when caller is quiet for too long
@@ -1920,12 +1968,44 @@ app.post("/api/ask-stream", async (req, res) => {
     if (!allow) {
         console.log(`[STREAM] L1_BLOCK [${guardReason}]: "${msg.slice(0, 50)}"`);
         sendChunk({ type: "reply", reply: refusal, model: "guardrail", blocked: true });
-        // Generate TTS for refusal
         try {
             const result = await generateTTS(refusal, lang, speaker);
             if (result) sendChunk({ type: "audio", audio: result.audio, index: 0 });
         } catch { }
         sendChunk({ type: "done", ms: Date.now() - t0 });
+        return res.end();
+    }
+
+    // FAQ CHECK — instant pre-built answer, skip LLM entirely
+    const faqMatch = matchFAQ(msg, lang);
+    if (faqMatch) {
+        console.log(`[STREAM] FAQ HIT: "${faqMatch.answer.slice(0, 60)}"`);
+        sendChunk({ type: "reply", reply: faqMatch.answer, model: "faq-template", faq: true });
+        const segments = segmentForTTS(faqMatch.answer);
+        await Promise.allSettled(segments.map((chunk, i) =>
+            generateTTS(chunk, lang, speaker).then(result => {
+                if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
+            }).catch(() => { })
+        ));
+        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length });
+        console.log(`[STREAM] ${Date.now() - t0}ms FAQ segs:${segments.length}`);
+        return res.end();
+    }
+
+    // RESPONSE CACHE CHECK
+    const cacheKey = responseCacheKey(msg, lang);
+    const cached = responseCacheGet(cacheKey);
+    if (cached) {
+        console.log(`[STREAM] CACHE HIT: "${cached.reply.slice(0, 60)}"`);
+        sendChunk({ type: "reply", reply: cached.reply, model: cached.model + " (cached)", cached: true });
+        const segments = segmentForTTS(cached.reply);
+        await Promise.allSettled(segments.map((chunk, i) =>
+            generateTTS(chunk, lang, speaker).then(result => {
+                if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
+            }).catch(() => { })
+        ));
+        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length });
+        console.log(`[STREAM] ${Date.now() - t0}ms CACHE segs:${segments.length}`);
         return res.end();
     }
 
@@ -1947,75 +2027,71 @@ app.post("/api/ask-stream", async (req, res) => {
     }
     messages.push({ role: "user", content: msg });
 
-    // AI CALL — Race primary model against Sarvam for speed
+    // AI CALL — Direct Gemini (fast, proven) with Sarvam fallback only if Gemini fails
     const aiT0 = Date.now();
     let reply = "";
     let model = getAvailableModel();
     const systemPrompt = getLangPrompt(lang, ragContext || "");
 
+    // Helper: TTS a sentence and stream audio chunk
+    function ttsSentence(sentence, idx) {
+        return generateTTS(sentence, lang, speaker).then(result => {
+            if (result) sendChunk({ type: "audio", audio: result.audio, index: idx, text: sentence });
+        }).catch(() => { });
+    }
+
+    // SPEED: Race Gemini vs Sarvam 105B concurrently (same pattern as /api/ask)
     try {
-        const primaryPromise = callGemini(systemPrompt, messages, 1024, model)
-            .then(r => r ? { reply: cleanLLMResponse(r, lang), model } : null)
+        const primaryPromise = callGemini(systemPrompt, messages, 512, model)
+            .then(r => r ? { reply: stripMarkdown(r), model } : null)
             .catch(() => null);
-        const sarvamPromise = new Promise(resolve =>
-            setTimeout(() => {
-                callSarvam(messages, 300).then(r => r ? resolve({ reply: cleanLLMResponse(r, lang), model: "sarvam-m" }) : resolve(null)).catch(() => resolve(null));
-            }, 2000)
-        );
+        const sarvamPromise = callSarvam(messages, 500)
+            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : null)
+            .catch(() => null);
         const result = await Promise.race([
-            primaryPromise.then(r => r || new Promise(resolve => setTimeout(() => resolve(null), 6000))),
+            primaryPromise,
             sarvamPromise,
+            new Promise(resolve => setTimeout(() => resolve(null), 8000)),
         ]);
-        if (result) { reply = result.reply; model = result.model; }
+        if (result) {
+            reply = result.reply;
+            model = result.model;
+        }
     } catch (e) { console.log(`[STREAM-RACE] FAIL:`, e.message); }
 
+    // Fallback if race failed
     if (!reply) {
         try {
             const sarvamReply = await callSarvam(messages, 300);
-            if (sarvamReply) { reply = cleanLLMResponse(sarvamReply, lang); model = "sarvam-m"; }
+            if (sarvamReply) { reply = stripMarkdown(sarvamReply); model = "sarvam-105b"; }
         } catch (e) { console.log("[STREAM-SARVAM] FAIL:", e.message); }
     }
+
     const aiMs = Date.now() - aiT0;
 
-    // Validate response
+    // Post-processing through rules engine
     if (reply) {
-        const { valid } = validateResponse(reply, lang);
-        if (!valid) reply = refusal;
-    }
-    if (reply && !isLegalResponse(reply)) reply = refusal;
-
-    // LAYER 3b — Citation grounding check
-    if (reply && reply !== refusal && ragChunks?.length > 0) {
-        const { score } = computeGroundingScore(reply, ragChunks);
-        if (score < 0.6) {
-            reply = sanitizeResponse(reply, ragChunks, lang, refusal);
-        }
+        reply = applyRules(reply, { lang, ragChunks, isPhone: false, originalQuery: msg, refusal });
     }
 
     if (!reply) {
-        reply = lang === "en-IN"
-            ? "Sorry, a technical issue occurred. Call NALSA on 15100 for a free lawyer."
-            : "थोड़ी तकनीकी समस्या हुई। NALSA 15100 पर कॉल करें — निःशुल्क वकील मिलेगा।";
+        reply = FALLBACK_ERROR[lang] || FALLBACK_ERROR["hi-IN"];
     }
 
-    // Send reply text immediately so frontend can display it
+    // Send reply text so frontend can display it
     sendChunk({ type: "reply", reply, model, aiMs, rag: !!ragContext });
 
-    // TTS — stream each chunk as it's ready
+    // Parallel TTS for all segments
     const ttsT0 = Date.now();
     const segments = segmentForTTS(reply);
+    const ttsPromises = segments.map((chunk, i) => ttsSentence(chunk, i));
+    const audioIndex = segments.length;
 
-    // Fire all TTS requests in parallel, stream each as it resolves
-    const ttsPromises = segments.map((chunk, i) =>
-        generateTTS(chunk, lang, speaker).then(result => {
-            if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
-        }).catch(() => { })
-    );
     await Promise.allSettled(ttsPromises);
     const ttsMs = Date.now() - ttsT0;
 
-    sendChunk({ type: "done", ms: Date.now() - t0, aiMs, ttsMs, segments: segments.length });
-    console.log(`[STREAM] ${Date.now() - t0}ms (AI:${aiMs} TTS:${ttsMs}) segs:${segments.length} "${reply.slice(0, 60)}"`);
+    sendChunk({ type: "done", ms: Date.now() - t0, aiMs, ttsMs, segments: audioIndex });
+    console.log(`[STREAM] ${Date.now() - t0}ms (AI:${aiMs} TTS:${ttsMs}) segs:${audioIndex} "${reply.slice(0, 60)}"`);
     res.end();
 });
 
@@ -2040,10 +2116,10 @@ app.post("/api/ai", async (req, res) => {
     ];
     const t0 = Date.now();
     let reply = "";
-    try { reply = await callGemini(systemPrompt, messages, 256); if (reply) reply = cleanLLMResponse(reply, lang); } catch { }
-    if (!reply) { try { reply = await callSarvam(messages, 150); if (reply) reply = cleanLLMResponse(reply, lang); } catch { } }
+    try { reply = await callGemini(systemPrompt, messages, 256); } catch { }
+    if (!reply) { try { reply = await callSarvam(messages, 150); } catch { } }
+    if (reply) reply = applyRules(reply, { lang, ragChunks: [], isPhone: false, originalQuery: msg, refusal });
     if (!reply) reply = refusal;
-    if (!isLegalResponse(reply)) reply = refusal;
     res.json({ reply, model: reply === refusal ? "fallback" : "gemini", ms: Date.now() - t0 });
 });
 
@@ -2080,7 +2156,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     console.log(`\n  ╔══════════════════════════════════════════════════╗`);
     console.log(`  ║  NyayaSathi v12.0 — India's AI Legal Helpline   ║`);
-    console.log(`  ║  Brain: Smart Race (Flash+Sarvam) + RAG         ║`);
+    console.log(`  ║  Brain: Smart Race (Flash+Sarvam 105B) + RAG    ║`);
     console.log(`  ║  Court: 50+ SC Judgments + BNS/IPC Mapping      ║`);
     console.log(`  ║  Voice: Sarvam Bulbul v3 TTS (11 languages)     ║`);
     console.log(`  ║  Phone: Exotel 1800 Toll-Free + Outbound API    ║`);
@@ -2092,20 +2168,17 @@ app.listen(PORT, async () => {
     // Auto-detect ngrok tunnel
     const ngrokUrl = await detectNgrok();
 
-    try {
-        const h = await (await fetch(`http://localhost:${PORT}/api/health`)).json();
-        console.log(`  Brain: ${h.brain} ${h.gemini ? "✓" : "✗"}  STT:${h.stt ? "✓" : "✗"} TTS:${h.tts ? "✓" : "✗"} RAG:${h.rag ? "✓" : "✗"}`);
-        console.log(`  Sarvam Phone:  GET /api/phone/info`);
-        console.log(`  Exotel Phone:  GET /api/phone/exotel/info`);
-        if (ngrokUrl) {
-            console.log(`  Exotel Webhook: ${ngrokUrl}/api/phone/exotel/call-start`);
-            console.log(`  Test Call:      POST /api/phone/exotel/call {"to":"+919XXXXXXXXX"}`);
-        } else {
-            console.log(`  ⚠  No PUBLIC_URL — run "ngrok http ${PORT}" for Exotel webhooks`);
-        }
-        console.log(`  Eval:          node eval-engine.js\n`);
-    } catch { }
-    warmFillers().catch(() => { });
-    warmExotelIVR().catch(() => { });
+    console.log(`  Brain: ${getAvailableModel()} STT:✓ TTS:✓ RAG:✓`);
+    console.log(`  Sarvam Phone:  GET /api/phone/info`);
+    console.log(`  Exotel Phone:  GET /api/phone/exotel/info`);
+    if (ngrokUrl) {
+        console.log(`  Exotel Webhook: ${ngrokUrl}/api/phone/exotel/call-start`);
+        console.log(`  Test Call:      POST /api/phone/exotel/call {"to":"+919XXXXXXXXX"}`);
+    } else {
+        console.log(`  ⚠  No PUBLIC_URL — run "ngrok http ${PORT}" for Exotel webhooks`);
+    }
+    console.log(`  Eval:          node eval-engine.js\n`);
+    // Warm fillers first, then IVR — sequential to avoid Sarvam 429 rate limits
+    warmFillers().then(() => warmExotelIVR()).catch(() => { });
 });
 

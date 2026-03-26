@@ -9,28 +9,29 @@
 // ═══════════════════════════════════════════════════════════════════════
 //  NUMBER → WORDS  (so TTS reads "1 lakh 50 thousand" not "150000")
 // ═══════════════════════════════════════════════════════════════════════
-const ONES_HI = ["", "ek", "do", "teen", "chaar", "paanch", "chhah", "saat", "aath", "nau", "das",
-    "gyarah", "barah", "terah", "chaudah", "pandrah", "solah", "satrah", "atharah", "unnis", "bees",
-    "ikees", "baais", "teis", "chaubis", "pachchees", "chhabbees", "sattaais", "atthaais", "untees", "tees",
-    "ikattees", "battees", "taintees", "chautees", "paintees", "chhattees", "saintees", "artees", "untalis", "chalis",
-    "ikattalis", "bayalis", "taintalis", "chavvalis", "paintalis", "chhiyalis", "saintalis", "artalis", "unchaas", "pachaas",
-    "ikyaavan", "baavan", "tirpan", "chauvan", "pachpan", "chhappan", "sattaavan", "athhavan", "unsath", "saath",
-    "iksath", "baasath", "tirsath", "chausath", "painsath", "chhiyasath", "sarsath", "arsath", "unhattar", "sattar",
-    "ikyattar", "bahattar", "tihattar", "chauhattar", "pachhattar", "chhiyattar", "sathattar", "aththattar", "unnyaasi", "assi",
-    "ikyaasi", "baasi", "tiraasi", "chaurasi", "pachaasi", "chhiyaasi", "sataasi", "athhasi", "navaasi", "navve",
-    "ikyaanave", "baanave", "tiranave", "chauranave", "pachaanave", "chhiyanave", "sataanave", "athaanave", "ninyaanave"];
+// Devanagari number words — Sarvam TTS requires native script for natural Hindi speech
+const ONES_HI = ["", "एक", "दो", "तीन", "चार", "पाँच", "छह", "सात", "आठ", "नौ", "दस",
+    "ग्यारह", "बारह", "तेरह", "चौदह", "पंद्रह", "सोलह", "सत्रह", "अठारह", "उन्नीस", "बीस",
+    "इक्कीस", "बाईस", "तेईस", "चौबीस", "पच्चीस", "छब्बीस", "सत्ताईस", "अट्ठाईस", "उनतीस", "तीस",
+    "इकतीस", "बत्तीस", "तैंतीस", "चौंतीस", "पैंतीस", "छत्तीस", "सैंतीस", "अड़तीस", "उनतालीस", "चालीस",
+    "इकतालीस", "बयालीस", "तैंतालीस", "चवालीस", "पैंतालीस", "छियालीस", "सैंतालीस", "अड़तालीस", "उनचास", "पचास",
+    "इक्यावन", "बावन", "तिरपन", "चौवन", "पचपन", "छप्पन", "सत्तावन", "अट्ठावन", "उनसठ", "साठ",
+    "इकसठ", "बासठ", "तिरसठ", "चौंसठ", "पैंसठ", "छियासठ", "सड़सठ", "अड़सठ", "उनहत्तर", "सत्तर",
+    "इकहत्तर", "बहत्तर", "तिहत्तर", "चौहत्तर", "पचहत्तर", "छिहत्तर", "सतहत्तर", "अठहत्तर", "उनासी", "अस्सी",
+    "इक्यासी", "बयासी", "तिरासी", "चौरासी", "पचासी", "छियासी", "सतासी", "अठासी", "नवासी", "नब्बे",
+    "इक्यानवे", "बानवे", "तिरानवे", "चौरानवे", "पचानवे", "छियानवे", "सतानवे", "अठानवे", "निन्यानवे"];
 const ONES_EN = ["", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
     "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen"];
 const TENS_EN = ["", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety"];
 
 function numToHindi(n) {
-    if (n < 0) return "minus " + numToHindi(-n);
-    if (n === 0) return "shoonya";
-    if (n <= 99) return ONES_HI[n] || (ONES_HI[Math.floor(n / 10) * 10] || (TENS_EN[Math.floor(n / 10)] + " ")) + ONES_HI[n % 10];
-    if (n < 1000) return ONES_HI[Math.floor(n / 100)] + " sau " + (n % 100 ? " " + numToHindi(n % 100) : "");
-    if (n < 100000) return numToHindi(Math.floor(n / 1000)) + " hazaar" + (n % 1000 ? " " + numToHindi(n % 1000) : "");
-    if (n < 10000000) return numToHindi(Math.floor(n / 100000)) + " lakh" + (n % 100000 ? " " + numToHindi(n % 100000) : "");
-    return numToHindi(Math.floor(n / 10000000)) + " crore" + (n % 10000000 ? " " + numToHindi(n % 10000000) : "");
+    if (n < 0) return "माइनस " + numToHindi(-n);
+    if (n === 0) return "शून्य";
+    if (n <= 99) return ONES_HI[n] || (ONES_HI[Math.floor(n / 10) * 10] || "") + " " + ONES_HI[n % 10];
+    if (n < 1000) return ONES_HI[Math.floor(n / 100)] + " सौ" + (n % 100 ? " " + numToHindi(n % 100) : "");
+    if (n < 100000) return numToHindi(Math.floor(n / 1000)) + " हज़ार" + (n % 1000 ? " " + numToHindi(n % 1000) : "");
+    if (n < 10000000) return numToHindi(Math.floor(n / 100000)) + " लाख" + (n % 100000 ? " " + numToHindi(n % 100000) : "");
+    return numToHindi(Math.floor(n / 10000000)) + " करोड़" + (n % 10000000 ? " " + numToHindi(n % 10000000) : "");
 }
 
 function numToEnglish(n) {
@@ -49,34 +50,31 @@ function numToEnglish(n) {
 // ═══════════════════════════════════════════════════════════════════════
 
 // Legal section references → spoken form (full number words, not digit-by-digit)
-const SECTION_PATTERNS = [
-    // "Section 138" → "Section one hundred thirty-eight"
-    { rx: /[Ss]ection\s+(\d{1,4})([A-Z]?)/g, fn: (_, n, suffix) => {
-        return "Section " + numToEnglish(parseInt(n)) + (suffix ? " " + suffix : "");
-    }},
-    // "Sec. 138" or "Sec 138"
-    { rx: /Sec\.?\s+(\d{1,4})([A-Z]?)/g, fn: (_, n, suffix) => {
-        return "Section " + numToEnglish(parseInt(n)) + (suffix ? " " + suffix : "");
-    }},
-    // "S. 138"
-    { rx: /S\.\s*(\d{1,4})/g, fn: (_, n) => "Section " + numToEnglish(parseInt(n)) },
-    // "Article 21" → "Article twenty-one"
-    { rx: /[Aa]rticle\s+(\d{1,3})([A-Z]?)/g, fn: (_, n, suffix) => {
-        return "Article " + numToEnglish(parseInt(n)) + (suffix ? " " + suffix : "");
-    }},
-    // "IPC 420" → "IPC four hundred twenty"
-    { rx: /\b(IPC|BNS|BNSS|CrPC|IEA|BSA)\s+(\d+)/g, fn: (_, act, n) => act + " " + numToEnglish(parseInt(n)) },
-];
+// Section patterns are language-aware — built dynamically in normalizeTTS
+function buildSectionPatterns(isHindi) {
+    const numFn = isHindi ? numToHindi : numToEnglish;
+    const secWord = isHindi ? "धारा" : "Section";
+    const artWord = isHindi ? "अनुच्छेद" : "Article";
+    return [
+        { rx: /[Ss]ection\s+(\d{1,4})([A-Z]?)/g, fn: (_, n, suffix) => secWord + " " + numFn(parseInt(n)) + (suffix ? " " + suffix : "") },
+        { rx: /Sec\.?\s+(\d{1,4})([A-Z]?)/g, fn: (_, n, suffix) => secWord + " " + numFn(parseInt(n)) + (suffix ? " " + suffix : "") },
+        { rx: /S\.\s*(\d{1,4})/g, fn: (_, n) => secWord + " " + numFn(parseInt(n)) },
+        { rx: /धारा\s+(\d{1,4})([A-Z]?)?/g, fn: (_, n, suffix) => "धारा " + numToHindi(parseInt(n)) + (suffix ? " " + suffix : "") },
+        { rx: /[Aa]rticle\s+(\d{1,3})([A-Z]?)/g, fn: (_, n, suffix) => artWord + " " + numFn(parseInt(n)) + (suffix ? " " + suffix : "") },
+        { rx: /अनुच्छेद\s+(\d{1,3})([A-Z]?)?/g, fn: (_, n, suffix) => "अनुच्छेद " + numToHindi(parseInt(n)) + (suffix ? " " + suffix : "") },
+        { rx: /\b(IPC|BNS|BNSS|CrPC|IEA|BSA)\s+(\d+)/g, fn: (_, act, n) => act + " " + numFn(parseInt(n)) },
+    ];
+}
 
 // Phone numbers → digit by digit
-const PHONE_RX = /\b(15100|1516|1915|181|112|1930|1098|1800[\-\s]?\d{3}[\-\s]?\d{4}|\d{10})\b/g;
+const PHONE_RX = /\b(15100|1516|1915|181|112|1930|1098|14434|1800[\-\s]?\d{2,3}[\-\s]?\d{3,4}|\d{10})\b/g;
 
 // Currency → spoken
 function expandCurrency(text, isHindi) {
     return text.replace(/₹\s*(\d[\d,]*(?:\.\d+)?)/g, (_, amt) => {
         const n = parseFloat(amt.replace(/,/g, ""));
         const words = isHindi ? numToHindi(Math.round(n)) : numToEnglish(Math.round(n));
-        return (isHindi ? "rupay " : "rupees ") + words;
+        return (isHindi ? "रुपये " : "rupees ") + words;
     });
 }
 
@@ -98,23 +96,18 @@ function expandPhone(text, isHindi) {
     return text.replace(PHONE_RX, (match) => {
         const digits = match.replace(/[\-\s]/g, "");
         if (isHindi) {
-            const HINDI_DIGITS = ["shoonya", "ek", "do", "teen", "chaar", "paanch", "chheh", "saat", "aath", "nau"];
-            // Group in pairs/triples for natural reading: "15100" → "ek paanch, ek shoonya shoonya"
-            const parts = [];
-            for (let i = 0; i < digits.length; i++) {
-                parts.push(HINDI_DIGITS[parseInt(digits[i])]);
-                // Add comma pause after every 2-3 digits for clarity
-                if ((i === 1 || i === 3) && i < digits.length - 1) parts.push(",");
-            }
-            return parts.join(" ") + ".";
+            const HINDI_DIGITS = ["शून्य", "एक", "दो", "तीन", "चार", "पाँच", "छह", "सात", "आठ", "नौ"];
+            return digits.split("").map(d => HINDI_DIGITS[parseInt(d)]).join(" ");
         }
-        // English: group with commas for clarity
-        const parts = [];
-        for (let i = 0; i < digits.length; i++) {
-            parts.push(digits[i]);
-            if ((i === 1 || i === 3) && i < digits.length - 1) parts.push(",");
+        // English: digit words, grouped with pauses for clarity
+        const EN_DIGITS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine"];
+        const words = digits.split("").map(d => EN_DIGITS[parseInt(d)]);
+        // Group in chunks of 3-4 digits with comma pauses
+        const grouped = [];
+        for (let i = 0; i < words.length; i += 3) {
+            grouped.push(words.slice(i, Math.min(i + 3, words.length)).join(" "));
         }
-        return parts.join(" ") + ".";
+        return grouped.join(", ");
     });
 }
 
@@ -130,8 +123,14 @@ const ABBR_EXPAND = {
     "EWS": "E W S", "NGT": "N G T", "DRT": "D R T",
 };
 
+// State/common abbreviations that should NOT be letter-spaced
+const ABBR_SKIP = new Set(["UP", "MP", "AP", "HP", "UK", "JK", "WB", "TN", "KL", "MH", "RJ", "GJ", "HR", "PB", "OR", "GA", "IT", "ID", "IF", "IN", "IS", "AT", "TO", "OR", "AN", "AS", "OF", "ON", "BY", "NO"]);
+
 function expandAbbreviations(text) {
-    return text.replace(/\b([A-Z]{2,8})\b/g, (match) => ABBR_EXPAND[match] || match);
+    return text.replace(/\b([A-Z]{2,8})\b/g, (match) => {
+        if (ABBR_SKIP.has(match)) return match;
+        return ABBR_EXPAND[match] || match;
+    });
 }
 
 /**
@@ -142,8 +141,10 @@ function normalizeTTS(text, langCode) {
     const isHindi = !["en-IN"].includes(langCode);
     let t = text;
 
-    // Section patterns first (before generic number expansion)
-    for (const { rx, fn } of SECTION_PATTERNS) {
+    // Section patterns first (before generic number expansion) — language-aware
+    const sectionPatterns = buildSectionPatterns(isHindi);
+    for (const { rx, fn } of sectionPatterns) {
+        rx.lastIndex = 0;
         t = t.replace(rx, fn);
     }
 
@@ -160,8 +161,32 @@ function normalizeTTS(text, langCode) {
     // Only expand years in Hindi for more natural speech; English TTS handles years well
     if (isHindi) t = expandYear(t, isHindi);
 
-    // Abbreviations — expand only in English context
-    if (!isHindi) t = expandAbbreviations(t);
+    // Abbreviations — expand for ALL languages (BNS, IPC etc. must be letter-spaced for clear TTS)
+    t = expandAbbreviations(t);
+
+    // URLs → readable form (remove for TTS, or read as "website")
+    t = t.replace(/https?:\/\/[^\s,.)]+/g, "");
+    t = t.replace(/\b\w+\.(gov|nic|org|com|in)\.\w{2,4}\b/g, "the government website");
+    t = t.replace(/\b\w+\.(gov|nic|org|com)\b/g, "the government website");
+
+    // Case citations: "v." or "vs." or "vs" → "versus"
+    t = t.replace(/\bv\.\s*/g, "versus ");
+    t = t.replace(/\bvs\.?\s*/g, "versus ");
+
+    // Common legal pronunciation fixes
+    t = t.replace(/\bSec\.\s*/g, "Section ");
+    t = t.replace(/\bArt\.\s*/g, "Article ");
+    t = t.replace(/\bNo\.\s*/g, "Number ");
+    t = t.replace(/\bi\.e\.\s*/gi, "that is, ");
+    t = t.replace(/\be\.g\.\s*/gi, "for example, ");
+    t = t.replace(/\betc\.\s*/gi, "and so on. ");
+    t = t.replace(/\bw\.r\.t\.?\s*/gi, "with respect to ");
+
+    // Slash between words → "or" (e.g., "husband/wife")
+    t = t.replace(/(\w)\s*\/\s*(\w)/g, "$1 or $2");
+
+    // Plus sign → "and"
+    t = t.replace(/\s*\+\s*/g, " and ");
 
     // Expand remaining standalone numbers (e.g., "30 days", "2 saal", "15 din")
     // Skip if already expanded (years, phones, sections handled above)
@@ -194,7 +219,7 @@ function normalizeTTS(text, langCode) {
  * - Max ~120 chars per chunk for fastest TTS
  * - Min ~20 chars to avoid tiny clips
  */
-function segmentForTTS(text, maxChunkLen = 120) {
+function segmentForTTS(text, maxChunkLen = 150) {
     // Primary split: sentence endings
     const sentences = text.split(/(?<=[.!?।])\s+/);
     const chunks = [];
@@ -220,7 +245,22 @@ function segmentForTTS(text, maxChunkLen = 120) {
                         sub = p;
                     }
                 }
-                current = sub;
+                // Word-boundary fallback for lines with no commas
+                if (sub.length > maxChunkLen) {
+                    const words = sub.split(/\s+/);
+                    let wordChunk = "";
+                    for (const w of words) {
+                        if ((wordChunk + " " + w).length > maxChunkLen) {
+                            if (wordChunk) chunks.push(wordChunk.trim());
+                            wordChunk = w;
+                        } else {
+                            wordChunk = wordChunk ? wordChunk + " " + w : w;
+                        }
+                    }
+                    current = wordChunk;
+                } else {
+                    current = sub;
+                }
             } else {
                 current = sent;
             }
@@ -233,39 +273,40 @@ function segmentForTTS(text, maxChunkLen = 120) {
 // ═══════════════════════════════════════════════════════════════════════
 //  LANGUAGE → TTS SPEAKER + PACE MAP
 // ═══════════════════════════════════════════════════════════════════════
-// Bulbul v3 available speakers (tested 2025-03): rahul, simran, ritu, pooja, priya,
-//   kavitha, kavya, anand, shruti, rupali, suhani, kabir, tanya, ishita, neha
-// Selection: lowest audio duration = fastest, clearest diction at same pace
-// Temperature 0.3 = most consistent diction (less variation = clearer for rural users)
-// Pace 1.0-1.10 = natural speed with good clarity
+// ── Bulbul v3 Speaker Selection (39 voices available) ──
+// All v3 speakers support ALL 11 languages.
+// Shubh = v3 default, most polished male — natural conversational tone
+// Kavya = warm, expressive female — excellent across Indic languages
+// Temperature 0.5 = balanced: natural prosody + consistent enough for production
+// Pace tuned per language for natural fluent cadence
+// Sample rate: 24000 Hz (v3 default, best quality for web)
 const LANG_VOICE = {
-    "hi-IN": { speaker: "rahul",     pace: 1.0,  model: "bulbul:v3", temperature: 0.3 },   // Male, clearest Hindi — natural diction, no accent
-    "en-IN": { speaker: "simran",    pace: 1.15, model: "bulbul:v3", temperature: 0.3 },   // Female, fastest+clearest Indian English (tested fastest at 11.5s)
-    "bn-IN": { speaker: "suhani",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Bengali
-    "te-IN": { speaker: "priya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Telugu — fastest response
-    "ta-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Tamil — slightly slower for clarity
-    "mr-IN": { speaker: "ritu",      pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Marathi
-    "gu-IN": { speaker: "anand",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Male, clear Gujarati
-    "kn-IN": { speaker: "kavya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Kannada
-    "ml-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Malayalam — slower for clarity
-    "pa-IN": { speaker: "anand",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Male, clear Punjabi
-    "od-IN": { speaker: "pooja",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Odia
+    "hi-IN": { speaker: "shubh",     pace: 1.0,  model: "bulbul:v3", temperature: 0.5 },
+    "en-IN": { speaker: "shubh",     pace: 1.05, model: "bulbul:v3", temperature: 0.5 },
+    "bn-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "te-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "ta-IN": { speaker: "shubh",     pace: 0.9,  model: "bulbul:v3", temperature: 0.5 },
+    "mr-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "gu-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "kn-IN": { speaker: "shubh",     pace: 0.9,  model: "bulbul:v3", temperature: 0.5 },
+    "ml-IN": { speaker: "shubh",     pace: 0.85, model: "bulbul:v3", temperature: 0.5 },
+    "pa-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "od-IN": { speaker: "shubh",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
 };
 
-// Female speaker alternatives — used when gender detection identifies female caller
-// Switches to a female-voiced speaker for better caller experience
+// Female speaker — Kavya: warm, expressive, fluent across all Indic languages
 const LANG_VOICE_FEMALE = {
-    "hi-IN": { speaker: "ritu",      pace: 1.0,  model: "bulbul:v3", temperature: 0.3 },   // Female, warm clear Hindi
-    "en-IN": { speaker: "ishita",    pace: 1.15, model: "bulbul:v3", temperature: 0.3 },   // Female, clear Indian English alternative
-    "bn-IN": { speaker: "simran",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Bengali
-    "te-IN": { speaker: "kavitha",   pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Telugu
-    "ta-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Tamil
-    "mr-IN": { speaker: "shruti",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Marathi
-    "gu-IN": { speaker: "rupali",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Gujarati
-    "kn-IN": { speaker: "kavya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Kannada
-    "ml-IN": { speaker: "kavitha",   pace: 0.95, model: "bulbul:v3", temperature: 0.45 },  // Female, clear Malayalam
-    "pa-IN": { speaker: "simran",    pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Punjabi
-    "od-IN": { speaker: "pooja",     pace: 1.0,  model: "bulbul:v3", temperature: 0.45 },  // Female, clear Odia
+    "hi-IN": { speaker: "kavya",     pace: 1.0,  model: "bulbul:v3", temperature: 0.5 },
+    "en-IN": { speaker: "kavya",     pace: 1.05, model: "bulbul:v3", temperature: 0.5 },
+    "bn-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "te-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "ta-IN": { speaker: "kavya",     pace: 0.9,  model: "bulbul:v3", temperature: 0.5 },
+    "mr-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "gu-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "kn-IN": { speaker: "kavya",     pace: 0.9,  model: "bulbul:v3", temperature: 0.5 },
+    "ml-IN": { speaker: "kavya",     pace: 0.85, model: "bulbul:v3", temperature: 0.5 },
+    "pa-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
+    "od-IN": { speaker: "kavya",     pace: 0.95, model: "bulbul:v3", temperature: 0.5 },
 };
 
 function getVoiceParams(langCode, gender) {
@@ -284,28 +325,33 @@ function getVoiceParams(langCode, gender) {
  * Returns: { confident: bool, reason: string }
  */
 function scoreTranscript(transcript, langCode) {
-    if (!transcript || transcript.length < 3) {
+    if (!transcript || transcript.length < 2) {
         return { confident: false, reason: "too_short" };
     }
 
-    // Too many non-alpha characters suggest poor transcription
-    const alphaRatio = (transcript.match(/[a-zA-Z\u0900-\u0D7F]/g) || []).length / transcript.length;
-    if (alphaRatio < 0.4) {
-        return { confident: false, reason: "low_alpha_ratio" };
-    }
-
-    // Check for common STT artifacts
-    const artifacts = ["...", "hmm hmm", "uh uh", "[inaudible]", "[noise]", "undefined"];
+    // Check for common STT artifacts — only reject if ENTIRE transcript is artifacts
+    const artifacts = ["[inaudible]", "[noise]", "undefined", "thank you", "thanks"];
+    const tl = transcript.toLowerCase().trim();
     for (const a of artifacts) {
-        if (transcript.toLowerCase().includes(a)) {
+        if (tl === a || tl === "..." || tl === "hmm hmm" || tl === "uh uh") {
             return { confident: false, reason: "artifact_detected" };
         }
     }
 
-    // Very short transcript with no real words
-    const words = transcript.trim().split(/\s+/).filter(w => w.length > 1);
-    if (words.length < 2 && transcript.length < 10) {
-        return { confident: false, reason: "too_few_words" };
+    // Single character noise artifacts
+    if (tl.length === 1) {
+        return { confident: false, reason: "artifact_detected" };
+    }
+
+    // Repeated single syllable (e.g., "ha ha ha", "na na na")
+    const words = tl.split(/\s+/);
+    if (words.length >= 2 && new Set(words).size === 1 && words[0].length <= 3) {
+        return { confident: false, reason: "artifact_detected" };
+    }
+
+    // Very short non-word (under 3 chars) — allow valid short responses
+    if (tl.length <= 3 && !/^(yes|no|ok|haa|ji|nhi|han|hā|नहीं|हाँ|हां)$/i.test(tl)) {
+        return { confident: false, reason: "too_short" };
     }
 
     return { confident: true, reason: "ok" };
