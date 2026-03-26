@@ -313,11 +313,16 @@ Runs 68 test scenarios covering:
 
 ## Contributing
 
-PRs welcome. Key areas:
-- More regional language FAQ templates
-- Additional Supreme Court judgments in RAG corpus
-- Better STT accuracy for noisy phone environments
-- Accessibility improvements for the web UI
+We'd love your help! See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
+
+**Quick wins:**
+- Add FAQ templates in your regional language
+- Add Supreme Court judgments to the RAG corpus
+- Add village/rural legal scenarios
+- Improve STT accuracy for noisy environments
+- UI accessibility and mobile improvements
+
+Fork → Branch → PR. That's it.
 
 ## License
 
