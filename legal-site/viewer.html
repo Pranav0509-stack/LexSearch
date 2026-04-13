@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Judgment Viewer — LexSearch</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+  <!-- PDF.js from CDN -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+</head>
+<body class="viewer-page">
+
+  <!-- ── Viewer Toolbar ── -->
+  <div class="viewer-toolbar">
+    <a href="javascript:history.back()" class="back-btn">← Back to Results</a>
+
+    <span class="case-title" id="case-title">Loading judgment…</span>
+
+    <div class="toolbar-actions">
+      <!-- Page controls -->
+      <div class="page-controls">
+        <button id="prev-page" title="Previous page" disabled>‹</button>
+        <span id="page-info">— / —</span>
+        <button id="next-page" title="Next page" disabled>›</button>
+      </div>
+
+      <!-- Zoom -->
+      <div class="page-controls">
+        <button id="zoom-out" title="Zoom out">−</button>
+        <span id="zoom-label">100%</span>
+        <button id="zoom-in"  title="Zoom in">+</button>
+      </div>
+
+      <!-- Download -->
+      <a id="download-btn" class="btn btn-download" href="#" download style="font-size:0.8rem;padding:0.4rem 0.85rem">
+        ⬇ Download PDF
+      </a>
+    </div>
+  </div>
+
+  <!-- ── PDF Canvas ── -->
+  <div id="pdf-canvas-container">
+    <div id="loading-msg" class="viewer-loading">
+      <div class="spinner" style="border-color:rgba(255,255,255,0.2);border-top-color:var(--gold)"></div>
+      <div>Loading PDF…</div>
+    </div>
+    <canvas id="pdf-canvas" style="display:none"></canvas>
+  </div>
+
+<script>
+(function () {
+  // ── Read URL params ────────────────────────────────────────────────────────
+  const params    = new URLSearchParams(window.location.search);
+  const s3Key     = params.get("key")   || "";
+  const caseTitle = params.get("title") || "Judgment";
+  const courtName = params.get("court") || "";
+
+  document.title = `${caseTitle} — LexSearch`;
+  document.getElementById("case-title").textContent =
+    courtName ? `${courtName} · ${caseTitle}` : caseTitle;
+
+  const pdfUrl     = `/pdf/${s3Key}`;
+  const downloadEl = document.getElementById("download-btn");
+  downloadEl.href  = `/pdf/${s3Key}?download=true`;
+
+  // ── PDF.js setup ──────────────────────────────────────────────────────────
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+  const canvas    = document.getElementById("pdf-canvas");
+  const ctx       = canvas.getContext("2d");
+  const loadingMsg = document.getElementById("loading-msg");
+
+  let pdfDoc      = null;
+  let currentPage = 1;
+  let scale       = 1.4;
+
+  const prevBtn   = document.getElementById("prev-page");
+  const nextBtn   = document.getElementById("next-page");
+  const pageInfo  = document.getElementById("page-info");
+  const zoomInBtn = document.getElementById("zoom-in");
+  const zoomOutBtn= document.getElementById("zoom-out");
+  const zoomLabel = document.getElementById("zoom-label");
+
+  async function renderPage(num) {
+    const page  = await pdfDoc.getPage(num);
+    const vp    = page.getViewport({ scale });
+    canvas.width  = vp.width;
+    canvas.height = vp.height;
+
+    await page.render({ canvasContext: ctx, viewport: vp }).promise;
+
+    pageInfo.textContent = `${num} / ${pdfDoc.numPages}`;
+    prevBtn.disabled = num <= 1;
+    nextBtn.disabled = num >= pdfDoc.numPages;
+  }
+
+  function updateZoomLabel() {
+    zoomLabel.textContent = Math.round(scale * 100 / 1.4 * 100) + "%";
+  }
+
+  // Load PDF
+  if (!s3Key) {
+    loadingMsg.innerHTML = "<div style='color:#ff8888'>Error: No PDF key provided.</div>";
+  } else {
+    pdfjsLib.getDocument(pdfUrl).promise
+      .then(doc => {
+        pdfDoc = doc;
+        loadingMsg.style.display = "none";
+        canvas.style.display     = "block";
+        renderPage(1);
+        updateZoomLabel();
+      })
+      .catch(err => {
+        loadingMsg.innerHTML = `<div style='color:#ff8888'>Failed to load PDF: ${err.message}</div>`;
+      });
+  }
+
+  // ── Controls ───────────────────────────────────────────────────────────────
+  prevBtn.addEventListener("click", () => {
+    if (currentPage > 1) { currentPage--; renderPage(currentPage); }
+  });
+
+  nextBtn.addEventListener("click", () => {
+    if (pdfDoc && currentPage < pdfDoc.numPages) { currentPage++; renderPage(currentPage); }
+  });
+
+  zoomInBtn.addEventListener("click", () => {
+    scale = Math.min(scale + 0.2, 4.0);
+    renderPage(currentPage);
+    updateZoomLabel();
+  });
+
+  zoomOutBtn.addEventListener("click", () => {
+    scale = Math.max(scale - 0.2, 0.4);
+    renderPage(currentPage);
+    updateZoomLabel();
+  });
+
+  // Keyboard navigation
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") nextBtn.click();
+    if (e.key === "ArrowLeft"  || e.key === "ArrowUp")   prevBtn.click();
+    if (e.key === "+" || e.key === "=") zoomInBtn.click();
+    if (e.key === "-")                  zoomOutBtn.click();
+  });
+
+})();
+</script>
+</body>
+</html>
