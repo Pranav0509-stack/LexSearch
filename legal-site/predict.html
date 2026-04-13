@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LexSearch — Case Predictor</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="logo">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-text">LexSearch</div>
+  </a>
+  <span class="header-made">Made for Shreya Didi</span>
+</header>
+
+<div class="predict-page">
+  <div class="predict-header">
+    <h1>Case Outcome Predictor</h1>
+    <p>ML-powered predictions based on historical data from Indian courts</p>
+    <a href="/" class="btn btn-download" style="margin-top:0.5rem">← Back to Search</a>
+  </div>
+
+  <div class="predict-form">
+    <div class="predict-form-row">
+      <div class="filter-group predict-field">
+        <label for="pred-court">High Court</label>
+        <select id="pred-court">
+          <option value="">Select Court</option>
+        </select>
+      </div>
+      <div class="filter-group predict-field">
+        <label for="pred-casetype">Case Type</label>
+        <select id="pred-casetype">
+          <option value="">Select Type</option>
+          <optgroup label="Writ / Constitutional">
+            <option value="WP">Writ Petition (WP)</option>
+            <option value="LPA">Letters Patent Appeal (LPA)</option>
+          </optgroup>
+          <optgroup label="Criminal">
+            <option value="CRL">Criminal (CRL)</option>
+            <option value="BA">Bail Application (BA)</option>
+            <option value="ABA">Anticipatory Bail (ABA)</option>
+            <option value="CRA">Criminal Appeal (CRA)</option>
+          </optgroup>
+          <optgroup label="Civil">
+            <option value="CS">Civil Suit (CS)</option>
+            <option value="APL">Appeal (APL)</option>
+            <option value="FA">First Appeal (FA)</option>
+            <option value="SA">Second Appeal (SA)</option>
+            <option value="REVN">Revision (REVN)</option>
+          </optgroup>
+          <optgroup label="Commercial / Tax">
+            <option value="ITA">Income Tax Appeal (ITA)</option>
+            <option value="CP">Company Petition (CP)</option>
+            <option value="MCA">Misc Civil Application (MCA)</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="IA">Interim Application (IA)</option>
+            <option value="MAC">Motor Accident (MAC)</option>
+            <option value="OMP">Arbitration (OMP)</option>
+          </optgroup>
+        </select>
+      </div>
+      <button class="search-btn predict-btn" id="predict-btn">Predict</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="predict-loading" class="state-screen" style="display:none">
+    <div class="spinner"></div>
+    <p>Running prediction model...</p>
+  </div>
+
+  <!-- Error -->
+  <div id="predict-error" class="error-toast" style="display:none"></div>
+
+  <!-- Results -->
+  <div id="predict-results" style="display:none">
+    <!-- Stat cards -->
+    <div class="predict-stats">
+      <div class="predict-stat-card outcome-card">
+        <div class="predict-stat-icon">⚖️</div>
+        <div class="predict-stat-label">Most Likely Outcome</div>
+        <div class="predict-stat-value" id="pred-outcome">—</div>
+        <div class="predict-stat-sub" id="pred-outcome-pct">—</div>
+      </div>
+      <div class="predict-stat-card duration-card">
+        <div class="predict-stat-icon">⏱️</div>
+        <div class="predict-stat-label">Estimated Duration</div>
+        <div class="predict-stat-value" id="pred-duration">—</div>
+        <div class="predict-stat-sub" id="pred-duration-sub">—</div>
+      </div>
+      <div class="predict-stat-card cost-card">
+        <div class="predict-stat-icon">💰</div>
+        <div class="predict-stat-label">Estimated Cost</div>
+        <div class="predict-stat-value" id="pred-cost">—</div>
+        <div class="predict-stat-sub" id="pred-cost-sub">—</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="predict-charts">
+      <div class="chart-card">
+        <h3>Outcome Probability</h3>
+        <canvas id="outcome-chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>What This Means</h3>
+        <div id="prediction-explanation" class="prediction-explanation"></div>
+      </div>
+    </div>
+
+    <div class="predict-disclaimer">
+      <strong>Disclaimer:</strong> These predictions are based on historical data patterns and should not be considered legal advice.
+      Actual outcomes depend on case-specific facts, evidence, legal arguments, and judicial discretion.
+      Consult a qualified lawyer for professional guidance.
+    </div>
+  </div>
+
+  <!-- Welcome -->
+  <div id="predict-welcome" class="state-screen">
+    <div class="icon">🔮</div>
+    <h3>Predict Your Case Outcome</h3>
+    <p>Select a court and case type to see predicted outcome, estimated duration, and costs based on analysis of 80,000+ historical judgments.</p>
+  </div>
+</div>
+
+<script src="predict.js"></script>
+</body>
+</html>

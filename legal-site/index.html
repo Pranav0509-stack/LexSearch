@@ -3,83 +3,123 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LexSearch — Indian High Court Judgments</title>
+  <title>LexSearch — Indian Court Judgments</title>
   <link rel="stylesheet" href="style.css" />
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
 </head>
 <body>
 
-<!-- Header -->
 <header class="site-header">
   <a href="/" class="logo">
     <span class="logo-icon">⚖️</span>
-    <div>
-      <div class="logo-text">LexSearch</div>
-    </div>
+    <div class="logo-text">LexSearch</div>
   </a>
-  <span class="header-sub">Indian High Court Judgments</span>
+  <span class="header-made">Made for Shreya Didi</span>
 </header>
 
-<!-- Main Layout -->
 <div class="app-layout">
-
-  <!-- Sidebar -->
   <aside class="sidebar">
+
+    <!-- Court Type Toggle -->
+    <div class="court-toggle">
+      <button class="toggle-btn active" data-mode="hc">High Courts</button>
+      <button class="toggle-btn" data-mode="sc">Supreme Court</button>
+    </div>
+
     <h2>Filters</h2>
 
-    <div class="filter-group">
-      <label for="court-select">High Court</label>
-      <select id="court-select">
-        <option value="">All Courts</option>
-      </select>
+    <!-- HC-only filters -->
+    <div id="hc-filters">
+      <div class="filter-group">
+        <label for="court-select">High Court</label>
+        <select id="court-select">
+          <option value="">All Courts</option>
+        </select>
+      </div>
+      <div class="filter-group">
+        <label for="bench-select">Bench</label>
+        <select id="bench-select" disabled>
+          <option value="">All Benches</option>
+        </select>
+      </div>
     </div>
 
-    <div class="filter-group">
-      <label for="bench-select">Bench</label>
-      <select id="bench-select" disabled>
-        <option value="">All Benches</option>
-      </select>
+    <!-- SC-only filters -->
+    <div id="sc-filters" style="display:none">
+      <div class="filter-group">
+        <label for="petitioner-input">Petitioner</label>
+        <input type="text" id="petitioner-input" placeholder="e.g. Union of India" />
+      </div>
+      <div class="filter-group">
+        <label for="respondent-input">Respondent</label>
+        <input type="text" id="respondent-input" placeholder="e.g. State of Maharashtra" />
+      </div>
+      <div class="filter-group">
+        <label for="citation-input">Citation</label>
+        <input type="text" id="citation-input" placeholder="e.g. 2023 INSC 1043" />
+      </div>
     </div>
 
+    <!-- Common filters -->
     <div class="filter-group">
       <label>Year</label>
       <input type="number" id="year-input" placeholder="e.g. 2023" min="1950" max="2025" />
     </div>
-
     <div class="filter-group">
-      <label for="keyword-input">Case Title / Party Name</label>
+      <label for="keyword-input">Case Title / Party</label>
       <input type="text" id="keyword-input" placeholder="e.g. Sharma vs State" autocomplete="off" />
     </div>
-
     <div class="filter-group">
-      <label for="cnr-input">CNR Number</label>
+      <label for="cnr-input">CNR / Case ID</label>
       <input type="text" id="cnr-input" placeholder="e.g. DLHC010015762022" autocomplete="off" />
     </div>
-
     <div class="filter-group">
-      <label for="judge-input">Judge Name</label>
+      <label for="judge-input">Judge</label>
       <input type="text" id="judge-input" placeholder="e.g. Justice Kumar" autocomplete="off" />
     </div>
-
     <div class="filter-group">
-      <label for="case-type-input">Case Type</label>
-      <select id="case-type-input">
+      <label for="casetype-input">Case Category</label>
+      <select id="casetype-input">
         <option value="">All Types</option>
-        <option value="CWP">Civil Writ Petition (CWP)</option>
-        <option value="CRL">Criminal (CRL)</option>
-        <option value="CRL.M.C">Criminal Misc (CRL.M.C)</option>
-        <option value="BAIL">Bail Application</option>
-        <option value="FAO">First Appeal (FAO)</option>
-        <option value="RFA">Regular First Appeal (RFA)</option>
-        <option value="RSA">Regular Second Appeal (RSA)</option>
-        <option value="LPA">Letters Patent Appeal (LPA)</option>
-        <option value="ITA">Income Tax Appeal (ITA)</option>
-        <option value="CS">Civil Suit (CS)</option>
-        <option value="WP">Writ Petition (WP)</option>
-        <option value="OMP">Original Motion Petition (OMP)</option>
+        <optgroup label="Criminal">
+          <option value="CRL">Criminal (CRL)</option>
+          <option value="BAIL">Bail Applications</option>
+          <option value="CRL.A">Criminal Appeal</option>
+          <option value="CRL.M.C">Criminal Misc</option>
+          <option value="CRL.REV">Criminal Revision</option>
+        </optgroup>
+        <optgroup label="Civil">
+          <option value="CS">Civil Suit</option>
+          <option value="RFA">Regular First Appeal</option>
+          <option value="RSA">Regular Second Appeal</option>
+          <option value="CS(COMM)">Commercial Suit</option>
+          <option value="EFA">Execution First Appeal</option>
+        </optgroup>
+        <optgroup label="Writ / Constitutional">
+          <option value="W.P.(C)">Writ Petition (Civil)</option>
+          <option value="W.P.(CRL)">Writ Petition (Criminal)</option>
+          <option value="LPA">Letters Patent Appeal</option>
+        </optgroup>
+        <optgroup label="Tax & Revenue">
+          <option value="ITA">Income Tax Appeal</option>
+          <option value="CUSAA">Customs Appeal</option>
+          <option value="CEAC">Central Excise Appeal</option>
+          <option value="SERTA">Service Tax Appeal</option>
+        </optgroup>
+        <optgroup label="Motor / Accident">
+          <option value="MAC.APP">Motor Accident Appeal</option>
+          <option value="FAO">First Appeal from Order</option>
+        </optgroup>
+        <optgroup label="Matrimonial / Family">
+          <option value="MAT.APP">Matrimonial Appeal</option>
+          <option value="CONT.CAS">Contempt Case</option>
+        </optgroup>
+        <optgroup label="Arbitration">
+          <option value="OMP">Original Motion Petition</option>
+          <option value="ARB.P">Arbitration Petition</option>
+        </optgroup>
       </select>
     </div>
-
     <div class="filter-group">
       <label for="disposal-input">Disposal</label>
       <select id="disposal-input">
@@ -87,54 +127,37 @@
         <option value="Disposed Off">Disposed Off</option>
         <option value="Allowed">Allowed</option>
         <option value="Dismissed">Dismissed</option>
-        <option value="Partly Allowed">Partly Allowed</option>
       </select>
     </div>
 
     <button class="search-btn" id="search-btn">Search</button>
     <button class="clear-btn" id="clear-btn">Clear</button>
 
-    <div class="sidebar-footer">
-      Made for Shreya Didi
-    </div>
+    <a href="/predict.html" class="predict-link">🔮 Case Predictor — Predict outcome, duration & cost</a>
   </aside>
 
-  <!-- Results -->
   <main class="main-content">
-
     <div id="error-container"></div>
-
     <div id="stats-bar" class="stats-bar" style="display:none">
       <span id="stats-text"></span>
       <span id="stats-time"></span>
     </div>
-
-    <!-- Welcome -->
     <div id="welcome-screen" class="state-screen">
       <div class="icon">⚖️</div>
-      <h3>Search Indian High Court Judgments</h3>
-      <p>Select a court and year, or search by case title, CNR, or judge name.</p>
+      <h3>Search Indian Court Judgments</h3>
+      <p>High Courts (16.7M+ cases) and Supreme Court (35K+ cases).</p>
     </div>
-
-    <!-- Loading -->
     <div id="loading-screen" class="state-screen" style="display:none">
       <div class="spinner"></div>
       <p>Searching...</p>
     </div>
-
-    <!-- Empty -->
     <div id="empty-screen" class="state-screen" style="display:none">
       <div class="icon">🔍</div>
       <h3>No results</h3>
       <p>Try different filters or broaden your search.</p>
     </div>
-
-    <!-- Results list -->
     <div id="results-grid" class="results-grid"></div>
-
-    <!-- Pagination -->
     <div id="pagination" class="pagination" style="display:none"></div>
-
   </main>
 </div>
 

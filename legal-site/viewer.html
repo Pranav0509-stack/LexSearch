@@ -32,10 +32,34 @@
         <button id="zoom-in"  title="Zoom in">+</button>
       </div>
 
+      <!-- AI Summarize -->
+      <button id="ai-summarize-btn" class="btn btn-summarize" style="font-size:0.8rem;padding:0.4rem 0.85rem">
+        AI Summary
+      </button>
+
       <!-- Download -->
       <a id="download-btn" class="btn btn-download" href="#" download style="font-size:0.8rem;padding:0.4rem 0.85rem">
         ⬇ Download PDF
       </a>
+    </div>
+  </div>
+
+  <!-- ── AI Panel ── -->
+  <div id="ai-panel" class="ai-panel" style="display:none">
+    <div class="ai-panel-header">
+      <h3>AI Analysis</h3>
+      <button id="ai-panel-close" class="ai-panel-close">&times;</button>
+    </div>
+    <div id="ai-panel-content" class="ai-panel-body">
+      <div class="summary-loading">Analyzing judgment with AI...</div>
+    </div>
+    <div class="ai-panel-qa">
+      <h4>Ask about this case</h4>
+      <div class="qa-input-row">
+        <input type="text" id="viewer-qa-input" class="qa-input" placeholder="e.g. What was the penalty?" />
+        <button id="viewer-qa-btn" class="btn btn-read qa-btn">Ask</button>
+      </div>
+      <div id="viewer-qa-answer" class="qa-answer" style="display:none"></div>
     </div>
   </div>
 
@@ -60,9 +84,19 @@
   document.getElementById("case-title").textContent =
     courtName ? `${courtName} · ${caseTitle}` : caseTitle;
 
-  const pdfUrl     = `/pdf/${s3Key}`;
+  const isSC       = params.get("sc") === "1";
+  const yearParam  = params.get("year") || "";
+  let pdfUrl, downloadHref;
+  if (isSC) {
+    const pdfName = decodeURIComponent(s3Key.split("/").pop());
+    pdfUrl = `/sc-pdf/${yearParam}/${pdfName}`;
+    downloadHref = `/sc-pdf/${yearParam}/${pdfName}?download=true`;
+  } else {
+    pdfUrl = `/pdf/${s3Key}`;
+    downloadHref = `/pdf/${s3Key}?download=true`;
+  }
   const downloadEl = document.getElementById("download-btn");
-  downloadEl.href  = `/pdf/${s3Key}?download=true`;
+  downloadEl.href  = downloadHref;
 
   // ── PDF.js setup ──────────────────────────────────────────────────────────
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -145,6 +179,98 @@
     if (e.key === "+" || e.key === "=") zoomInBtn.click();
     if (e.key === "-")                  zoomOutBtn.click();
   });
+
+  // ── AI Panel ──────────────────────────────────────────────────────────────
+  const aiBtn = document.getElementById("ai-summarize-btn");
+  const aiPanel = document.getElementById("ai-panel");
+  const aiContent = document.getElementById("ai-panel-content");
+  const aiClose = document.getElementById("ai-panel-close");
+  let aiLoaded = false;
+
+  function esc(s) {
+    return String(s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  }
+
+  function getReqBody() {
+    if (isSC) {
+      return { sc: true, year: parseInt(yearParam), pdf_name: decodeURIComponent(s3Key.split("/").pop()) };
+    }
+    return { s3_key: s3Key };
+  }
+
+  aiBtn.addEventListener("click", async () => {
+    aiPanel.style.display = "";
+    if (aiLoaded) return;
+
+    aiContent.innerHTML = '<div class="summary-loading">Analyzing judgment with AI...</div>';
+
+    try {
+      const res = await fetch("/ai/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(getReqBody()),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || "Summarization failed.");
+      }
+      const data = await res.json();
+      renderViewerSummary(data);
+      aiLoaded = true;
+    } catch (e) {
+      aiContent.innerHTML = `<div class="summary-error">${esc(e.message)}</div>`;
+    }
+  });
+
+  aiClose.addEventListener("click", () => { aiPanel.style.display = "none"; });
+
+  function renderViewerSummary(data) {
+    if (data.raw_summary) {
+      aiContent.innerHTML = `<p>${esc(data.raw_summary)}</p>`;
+      return;
+    }
+    let html = '';
+    if (data.facts) html += `<div class="summary-section"><h4>Facts</h4><p>${esc(data.facts)}</p></div>`;
+    if (data.issues && data.issues.length) html += `<div class="summary-section"><h4>Issues</h4><ul>${data.issues.map(i => `<li>${esc(i)}</li>`).join("")}</ul></div>`;
+    if (data.arguments) html += `<div class="summary-section"><h4>Arguments</h4><p>${esc(data.arguments)}</p></div>`;
+    if (data.held) html += `<div class="summary-section"><h4>Held</h4><p>${esc(data.held)}</p></div>`;
+    if (data.ratio) html += `<div class="summary-section"><h4>Ratio Decidendi</h4><p>${esc(data.ratio)}</p></div>`;
+    if (data.statutes && data.statutes.length) html += `<div class="summary-section"><h4>Statutes Cited</h4><div class="summary-tags">${data.statutes.map(s => `<span class="tag">${esc(s)}</span>`).join("")}</div></div>`;
+    if (data.result) html += `<div class="summary-section"><h4>Result</h4><span class="tag disposal">${esc(data.result)}</span></div>`;
+    aiContent.innerHTML = html;
+  }
+
+  // Q&A in viewer
+  const vqaBtn = document.getElementById("viewer-qa-btn");
+  const vqaInput = document.getElementById("viewer-qa-input");
+  const vqaAnswer = document.getElementById("viewer-qa-answer");
+
+  async function viewerAsk() {
+    const q = vqaInput.value.trim();
+    if (!q) return;
+    vqaBtn.disabled = true;
+    vqaBtn.textContent = "Thinking...";
+    vqaAnswer.style.display = "block";
+    vqaAnswer.innerHTML = "<em>Analyzing...</em>";
+
+    try {
+      const res = await fetch("/ai/ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...getReqBody(), question: q }),
+      });
+      if (!res.ok) throw new Error("Failed.");
+      const data = await res.json();
+      vqaAnswer.innerHTML = `<p>${esc(data.answer)}</p>`;
+    } catch (e) {
+      vqaAnswer.innerHTML = `<p class="summary-error">${esc(e.message)}</p>`;
+    }
+    vqaBtn.disabled = false;
+    vqaBtn.textContent = "Ask";
+  }
+
+  vqaBtn.addEventListener("click", viewerAsk);
+  vqaInput.addEventListener("keydown", e => { if (e.key === "Enter") viewerAsk(); });
 
 })();
 </script>
