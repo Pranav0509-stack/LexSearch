@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LexSearch — Legal Document Drafter</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="logo">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-text">LexSearch</div>
+  </a>
+  <nav class="header-nav">
+    <a href="/" class="nav-link">Search</a>
+    <a href="/converter.html" class="nav-link">IPC/BNS</a>
+    <a href="/drafter.html" class="nav-link active">Drafter</a>
+    <a href="/fir.html" class="nav-link">FIR</a>
+    <a href="/similar.html" class="nav-link">Similar</a>
+    <a href="/predict.html" class="nav-link">Predictor</a>
+  </nav>
+  <span class="header-made">Made for Shreya Didi</span>
+</header>
+
+<div class="drafter-page">
+  <div class="page-header">
+    <h1>Legal Document Drafter</h1>
+    <p>AI-powered legal document generation in proper Indian court format</p>
+  </div>
+
+  <!-- Step 1: Document Type -->
+  <div id="step-1">
+    <h2 class="step-label">Step 1: Select Document Type</h2>
+    <div class="doc-type-grid">
+      <div class="doc-type-card" data-type="bail_application">
+        <div class="doc-icon">🔓</div>
+        <h3>Bail Application</h3>
+        <p>Regular bail / anticipatory bail application</p>
+      </div>
+      <div class="doc-type-card" data-type="writ_petition">
+        <div class="doc-icon">📜</div>
+        <h3>Writ Petition</h3>
+        <p>Under Article 226/32 of the Constitution</p>
+      </div>
+      <div class="doc-type-card" data-type="rti_application">
+        <div class="doc-icon">🔍</div>
+        <h3>RTI Application</h3>
+        <p>Right to Information Act, 2005</p>
+      </div>
+      <div class="doc-type-card" data-type="legal_notice">
+        <div class="doc-icon">📧</div>
+        <h3>Legal Notice</h3>
+        <p>Demand notice under Section 80 CPC or other statutes</p>
+      </div>
+      <div class="doc-type-card" data-type="affidavit">
+        <div class="doc-icon">✍️</div>
+        <h3>Affidavit</h3>
+        <p>Sworn statement for court proceedings</p>
+      </div>
+      <div class="doc-type-card" data-type="complaint">
+        <div class="doc-icon">📋</div>
+        <h3>Criminal Complaint</h3>
+        <p>Complaint under Section 200 CrPC / Section 223 BNSS</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Step 2: Form -->
+  <div id="step-2" style="display:none">
+    <h2 class="step-label">Step 2: Fill Details <button class="back-btn" id="back-to-step1">← Change Type</button></h2>
+    <div class="drafter-form">
+      <div class="form-row">
+        <div class="filter-group">
+          <label for="d-party">Your Name / Petitioner</label>
+          <input type="text" id="d-party" placeholder="e.g. Ram Kumar" />
+        </div>
+        <div class="filter-group">
+          <label for="d-opposite">Opposite Party / Respondent</label>
+          <input type="text" id="d-opposite" placeholder="e.g. State of Maharashtra" />
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="filter-group">
+          <label for="d-court">Court / Authority</label>
+          <input type="text" id="d-court" placeholder="e.g. Sessions Court, Mumbai" />
+        </div>
+        <div class="filter-group">
+          <label for="d-caseno">Case Number (if any)</label>
+          <input type="text" id="d-caseno" placeholder="e.g. BA/1234/2024" />
+        </div>
+      </div>
+      <div class="filter-group">
+        <label for="d-facts">Facts of the Case</label>
+        <textarea id="d-facts" rows="5" placeholder="Describe the facts and circumstances..."></textarea>
+      </div>
+      <div class="filter-group">
+        <label for="d-relief">Relief Sought</label>
+        <textarea id="d-relief" rows="3" placeholder="What relief/order are you seeking?"></textarea>
+      </div>
+      <div class="filter-group" id="d-extra-group" style="display:none">
+        <label for="d-extra" id="d-extra-label">Additional Details</label>
+        <textarea id="d-extra" rows="3" placeholder=""></textarea>
+      </div>
+      <button class="search-btn" id="generate-btn">Generate Document</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="drafter-loading" class="state-screen" style="display:none">
+    <div class="spinner"></div>
+    <p>Generating legal document... (this may take 15-30 seconds)</p>
+  </div>
+
+  <!-- Error -->
+  <div id="drafter-error" class="error-toast" style="display:none"></div>
+
+  <!-- Step 3: Output -->
+  <div id="step-3" style="display:none">
+    <h2 class="step-label">Generated Document <button class="back-btn" id="back-to-step2">← Edit Details</button></h2>
+    <div class="draft-actions">
+      <button class="btn btn-download" id="copy-btn">Copy to Clipboard</button>
+      <button class="btn btn-download" id="download-btn">Download as .txt</button>
+    </div>
+    <div class="draft-output">
+      <pre class="draft-text" id="draft-text"></pre>
+    </div>
+    <div class="predict-disclaimer">
+      <strong>Disclaimer:</strong> This draft is AI-generated and should be reviewed by a qualified lawyer before filing.
+      It may contain errors or may not meet specific court requirements. Always consult a legal professional.
+    </div>
+  </div>
+</div>
+
+<script src="drafter.js"></script>
+</body>
+</html>

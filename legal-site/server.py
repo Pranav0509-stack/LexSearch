@@ -30,7 +30,7 @@ app = FastAPI(title="LexSearch")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -749,7 +749,7 @@ def _fetch_sc_pdf_bytes(year: int, pdf_name: str) -> bytes:
     raise HTTPException(404, f"PDF {pdf_name} not found in archive.")
 
 
-async def _call_groq(system_prompt: str, user_prompt: str) -> str:
+async def _call_groq(system_prompt: str, user_prompt: str, max_tokens: int = 2000) -> str:
     """Call Groq API."""
     if not GROQ_API_KEY:
         raise HTTPException(500, "GROQ_API_KEY not configured.")
@@ -764,7 +764,7 @@ async def _call_groq(system_prompt: str, user_prompt: str) -> str:
                     {"role": "user", "content": user_prompt},
                 ],
                 "temperature": 0.2,
-                "max_tokens": 2000,
+                "max_tokens": max_tokens,
             },
         )
         if resp.status_code != 200:
@@ -1066,9 +1066,12 @@ def _train_model():
 
 @app.on_event("startup")
 async def startup_train_model():
-    """Train ML model in background on startup."""
+    """Train ML model and similarity index in background on startup."""
     import threading
-    t = threading.Thread(target=_train_model, daemon=True)
+    def _startup_tasks():
+        _train_model()
+        _build_similarity_index()
+    t = threading.Thread(target=_startup_tasks, daemon=True)
     t.start()
 
 
@@ -1150,11 +1153,425 @@ def predict_case(
 
 
 # ---------------------------------------------------------------------------
+# IPC/BNS Converter
+# ---------------------------------------------------------------------------
+
+_ipc_bns_data: list[dict] = []
+
+def _load_mapping():
+    global _ipc_bns_data
+    mapping_path = Path(__file__).parent / "ipc_bns_mapping.json"
+    if mapping_path.exists():
+        _ipc_bns_data = json.loads(mapping_path.read_text())
+        logger.info(f"Loaded {len(_ipc_bns_data)} IPC/BNS mappings")
+
+_load_mapping()
+
+
+@app.get("/converter/search")
+def converter_search(
+    q: str = Query(default=""),
+    direction: str = Query(default="ipc_to_bns"),
+):
+    if not q:
+        return JSONResponse([])
+
+    q_lower = q.strip().lower()
+    q_upper = q.strip().upper()
+    results = []
+
+    for entry in _ipc_bns_data:
+        match = False
+        if direction == "ipc_to_bns":
+            if entry["ipc_section"].upper() == q_upper or q_lower in entry["ipc_section"].lower():
+                match = True
+        elif direction == "bns_to_ipc":
+            if entry["bns_section"].upper() == q_upper or q_lower in entry["bns_section"].lower():
+                match = True
+        else:  # both
+            if (entry["ipc_section"].upper() == q_upper or
+                entry["bns_section"].upper() == q_upper or
+                q_lower in entry["ipc_section"].lower() or
+                q_lower in entry["bns_section"].lower()):
+                match = True
+
+        # Also match on title/description keywords
+        if not match:
+            if (q_lower in entry["title"].lower() or
+                q_lower in entry["description"].lower() or
+                q_lower in entry["category"].lower()):
+                match = True
+
+        if match:
+            results.append(entry)
+
+    return JSONResponse(results)
+
+
+@app.post("/converter/explain")
+async def converter_explain(body: dict = Body(...)):
+    section = body.get("section", "")
+    act = body.get("act", "IPC")
+    title = body.get("title", "")
+    bns_section = body.get("bns_section", "")
+
+    system = """You are an Indian criminal law expert. Explain the given legal section in plain, simple language that a non-lawyer can understand. Include:
+1. What this section means in everyday language
+2. A practical example of when this section applies
+3. Key differences between the old IPC and new BNS version (if applicable)
+4. Common defenses available
+Keep it concise (200-300 words)."""
+
+    user = f"Explain {act} Section {section} ({title}). The corresponding BNS section is {bns_section}."
+
+    explanation = await _call_groq(system, user)
+    return JSONResponse({"explanation": explanation})
+
+
+# ---------------------------------------------------------------------------
+# Legal Document Drafter
+# ---------------------------------------------------------------------------
+
+DRAFT_TEMPLATES = {
+    "bail_application": """You are an expert Indian criminal lawyer. Draft a BAIL APPLICATION in proper Indian court format. Include:
+- IN THE COURT OF [appropriate court]
+- Cause title (Applicant vs State/Complainant)
+- Application under Section 439 CrPC / Section 483 BNSS
+- Index of the application
+- Facts of the case
+- Grounds for bail (no flight risk, cooperation, clean record, etc.)
+- Prayer clause
+- Verification
+Use formal legal language. Format with proper spacing and numbering.""",
+
+    "writ_petition": """You are an expert Indian constitutional lawyer. Draft a WRIT PETITION in proper High Court format. Include:
+- IN THE HIGH COURT OF [state] AT [bench]
+- Writ Petition (Civil/Criminal) No. ___ of 2024
+- Cause title
+- Memo of parties
+- Synopsis and List of Dates
+- Statement of Facts (numbered paragraphs)
+- Grounds (lettered sub-points)
+- Prayer (specific writs sought — mandamus/certiorari/prohibition/quo warranto/habeas corpus)
+- Verification
+Use formal constitutional law language.""",
+
+    "rti_application": """You are an RTI expert. Draft an RTI APPLICATION under the Right to Information Act, 2005. Include:
+- To: The Public Information Officer, [Department]
+- Subject: Application under RTI Act, 2005
+- Applicant details
+- List of specific information sought (numbered)
+- Declaration that the applicant is a citizen of India
+- Fee details (Rs. 10 postal order/DD)
+- Address for reply
+Keep it formal but clear.""",
+
+    "legal_notice": """You are a senior Indian lawyer. Draft a LEGAL NOTICE in proper format. Include:
+- LEGAL NOTICE
+- Through: [Advocate name], Advocate
+- Date
+- To: [Opposite party details]
+- Under: [relevant sections — e.g., Section 80 CPC, Section 138 NI Act]
+- WHEREAS clauses (background)
+- AND WHEREAS clauses (grievance)
+- NOW THEREFORE (demand)
+- Consequences of non-compliance
+- Signature block
+Use formal legal language with proper 'whereas' and 'hereinafter' style.""",
+
+    "affidavit": """You are an Indian lawyer. Draft an AFFIDAVIT in proper court format. Include:
+- IN THE COURT OF [court]
+- AFFIDAVIT
+- I, [name], S/o or D/o [parent], aged [age], R/o [address], do hereby solemnly affirm and state as under:
+- Numbered paragraphs (1, 2, 3...)
+- VERIFICATION: I, the above-named deponent, do hereby verify that the contents of paragraphs 1 to [N] are true and correct to my knowledge and belief...
+- DEPONENT signature
+- Place and Date
+Use formal affidavit language.""",
+
+    "complaint": """You are an Indian criminal lawyer. Draft a CRIMINAL COMPLAINT in proper format. Include:
+- IN THE COURT OF [Metropolitan/Judicial Magistrate]
+- Complaint Case No. ___ of 2024
+- Complaint under Section [relevant IPC/BNS sections]
+- Complainant details
+- Accused details
+- BRIEF FACTS (numbered paragraphs)
+- CAUSE OF ACTION
+- PRAYER (investigation, action against accused)
+- Verification
+- List of documents/witnesses
+Use formal legal language.""",
+}
+
+
+@app.post("/draft")
+async def generate_draft(body: dict = Body(...)):
+    doc_type = body.get("doc_type", "")
+    if doc_type not in DRAFT_TEMPLATES:
+        raise HTTPException(400, f"Unknown document type: {doc_type}")
+
+    system = DRAFT_TEMPLATES[doc_type]
+    user_parts = []
+    if body.get("party_name"):
+        user_parts.append(f"Applicant/Petitioner: {body['party_name']}")
+    if body.get("opposite_party"):
+        user_parts.append(f"Opposite Party/Respondent: {body['opposite_party']}")
+    if body.get("court"):
+        user_parts.append(f"Court/Authority: {body['court']}")
+    if body.get("case_number"):
+        user_parts.append(f"Case Number: {body['case_number']}")
+    if body.get("facts"):
+        user_parts.append(f"Facts: {body['facts']}")
+    if body.get("relief"):
+        user_parts.append(f"Relief Sought: {body['relief']}")
+    if body.get("additional"):
+        user_parts.append(f"Additional Details: {body['additional']}")
+
+    user_prompt = "\n".join(user_parts)
+    draft = await _call_groq(system, user_prompt, max_tokens=4000)
+
+    return JSONResponse({
+        "draft": draft,
+        "doc_type": doc_type,
+        "word_count": len(draft.split()),
+    })
+
+
+# ---------------------------------------------------------------------------
+# FIR Analyzer
+# ---------------------------------------------------------------------------
+
+FIR_SYSTEM = """You are an expert Indian criminal law analyst. Analyze the given FIR (First Information Report) text and return a structured JSON response with these keys:
+
+- "sections_charged": Array of objects, each with: "section" (string, e.g. "302"), "act" (string, "IPC" or "BNS"), "title" (string), "bailable" (boolean), "cognizable" (boolean), "max_punishment" (string)
+- "offense_summary": A 2-3 sentence summary of the alleged offense
+- "bail_analysis": Object with "likelihood" (string: "High", "Moderate", "Low", "Very Low") and "reasoning" (string, 2-3 sentences)
+- "severity": One of "low", "medium", "high", "very_high"
+- "timeline": Array of objects with "stage" (string), "timeframe" (string), "description" (string). Include stages like: FIR Registration, Investigation, Chargesheet, Trial, Judgment
+- "next_steps": Array of strings — practical advice for the accused/complainant
+
+Return ONLY valid JSON. No markdown, no explanation outside JSON."""
+
+
+@app.post("/fir/analyze")
+async def analyze_fir(body: dict = Body(...)):
+    text = body.get("text", "")
+    if not text or len(text.strip()) < 20:
+        raise HTTPException(400, "FIR text too short. Please provide the full FIR text.")
+
+    # Include a compact mapping reference for the AI
+    mapping_ref = "\n".join(
+        f"IPC {e['ipc_section']}→BNS {e['bns_section']}: {e['title']} ({'Bailable' if e['bailable'] else 'Non-Bailable'}, {e['punishment']})"
+        for e in _ipc_bns_data[:60]
+    )
+
+    user_prompt = f"IPC/BNS Reference:\n{mapping_ref}\n\n---\nFIR TEXT:\n{text[:5000]}"
+
+    result_text = await _call_groq(FIR_SYSTEM, user_prompt, max_tokens=3000)
+
+    # Parse JSON from response
+    try:
+        # Strip markdown code fences if present
+        cleaned = result_text.strip()
+        if cleaned.startswith("```"):
+            cleaned = cleaned.split("\n", 1)[1]
+            if cleaned.endswith("```"):
+                cleaned = cleaned[:-3]
+        result = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Try to extract JSON from the response
+        import re as _re
+        match = _re.search(r'\{[\s\S]*\}', result_text)
+        if match:
+            result = json.loads(match.group())
+        else:
+            raise HTTPException(502, "AI returned invalid response format.")
+
+    # Cross-reference sections with our mapping for accuracy
+    for sec in result.get("sections_charged", []):
+        sec_num = sec.get("section", "").strip()
+        for entry in _ipc_bns_data:
+            if entry["ipc_section"] == sec_num or entry["bns_section"] == sec_num:
+                sec["title"] = entry["title"]
+                sec["bailable"] = entry["bailable"]
+                sec["cognizable"] = entry["cognizable"]
+                sec["max_punishment"] = entry["punishment"]
+                break
+
+    return JSONResponse(result)
+
+
+@app.post("/fir/analyze-pdf")
+async def analyze_fir_pdf(file: bytes = Body(...)):
+    """Analyze FIR from uploaded PDF."""
+    from fastapi import UploadFile, File
+    # This endpoint handles raw file uploads
+    raise HTTPException(501, "PDF upload coming soon. Please paste FIR text instead.")
+
+
+# ---------------------------------------------------------------------------
+# Case Similarity Engine
+# ---------------------------------------------------------------------------
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
+import numpy as np
+
+_similarity_ready = False
+_tfidf_vectorizer = None
+_tfidf_matrix = None
+_similarity_corpus: list[dict] = []
+
+
+def _build_similarity_index():
+    """Build TF-IDF index from case titles. Run after ML model training."""
+    global _similarity_ready, _tfidf_vectorizer, _tfidf_matrix, _similarity_corpus
+
+    fs = get_fs()
+    all_entries = []
+
+    # Use same courts as ML training
+    index_courts = [
+        ("27_1", "newas", "Bombay High Court"),
+        ("27_1", "hcaurdb", "Bombay HC Aurangabad"),
+        ("29_3", "karnataka_bng_old", "Karnataka High Court"),
+        ("32_4", "highcourtofkerala", "Kerala High Court"),
+    ]
+
+    for court_code, bench, court_name in index_courts:
+        for year in [2021, 2022, 2023]:
+            path = f"s3://indian-high-court-judgments/metadata/parquet/year={year}/court={court_code}/bench={bench}/metadata.parquet"
+            try:
+                with fs.open(path, "rb") as f:
+                    df = pd.read_parquet(f, columns=["title", "judge", "disposal_nature", "pdf_link", "decision_date"])
+                for _, row in df.iterrows():
+                    title = str(row.get("title", "")).strip()
+                    if len(title) > 10:
+                        all_entries.append({
+                            "title": title,
+                            "court": court_code,
+                            "court_name": court_name,
+                            "bench": bench,
+                            "year": year,
+                            "judge": str(row.get("judge", "")),
+                            "disposal": str(row.get("disposal_nature", "")),
+                            "pdf_link": str(row.get("pdf_link", "")),
+                        })
+                logger.info(f"Similarity: Indexed {len(df)} titles from {court_name} {year}")
+            except Exception as e:
+                logger.debug(f"Similarity: Skip {path}: {e}")
+
+    if not all_entries:
+        logger.warning("Similarity: No data for index.")
+        return
+
+    _similarity_corpus = all_entries
+    titles = [e["title"] for e in all_entries]
+
+    _tfidf_vectorizer = TfidfVectorizer(
+        max_features=10000,
+        stop_words="english",
+        ngram_range=(1, 2),
+        min_df=2,
+    )
+    _tfidf_matrix = _tfidf_vectorizer.fit_transform(titles)
+    _similarity_ready = True
+
+    logger.info(f"Similarity: Index built with {len(all_entries)} cases, {_tfidf_matrix.shape[1]} features")
+
+
+@app.post("/similar")
+def find_similar(body: dict = Body(...)):
+    if not _similarity_ready:
+        raise HTTPException(503, "Similarity index is still building. Please try again in ~60 seconds.")
+
+    facts = body.get("facts", "").strip()
+    court = body.get("court", "")
+
+    if not facts or len(facts) < 10:
+        raise HTTPException(400, "Please provide more case details.")
+
+    # Transform query
+    query_vec = _tfidf_vectorizer.transform([facts])
+    scores = cosine_similarity(query_vec, _tfidf_matrix).flatten()
+
+    # Get top indices
+    if court:
+        # Filter by court first
+        valid_idx = [i for i, e in enumerate(_similarity_corpus) if e["court"] == court]
+        if not valid_idx:
+            valid_idx = list(range(len(_similarity_corpus)))
+        court_scores = [(i, scores[i]) for i in valid_idx]
+        court_scores.sort(key=lambda x: x[1], reverse=True)
+        top_indices = [i for i, _ in court_scores[:10]]
+    else:
+        top_indices = np.argsort(scores)[-10:][::-1]
+
+    results = []
+    for idx in top_indices:
+        s = float(scores[idx])
+        if s < 0.01:
+            continue
+        entry = _similarity_corpus[idx]
+        results.append({
+            "title": entry["title"],
+            "court": entry["court"],
+            "court_name": entry["court_name"],
+            "year": entry["year"],
+            "judge": entry["judge"],
+            "disposal": entry["disposal"],
+            "pdf_link": entry["pdf_link"],
+            "score": round(s, 4),
+        })
+
+    return JSONResponse({
+        "results": results,
+        "corpus_size": len(_similarity_corpus),
+    })
+
+
+@app.get("/similar/status")
+def similar_status():
+    return JSONResponse({"ready": _similarity_ready, "corpus_size": len(_similarity_corpus)})
+
+
+# ---------------------------------------------------------------------------
 # Static files
 # ---------------------------------------------------------------------------
 STATIC_DIR = Path(__file__).parent
 
 
+
+@app.get("/converter.html")
+async def serve_converter():
+    return FileResponse(STATIC_DIR / "converter.html", media_type="text/html")
+
+@app.get("/converter.js")
+async def serve_converter_js():
+    return FileResponse(STATIC_DIR / "converter.js", media_type="application/javascript")
+
+@app.get("/drafter.html")
+async def serve_drafter():
+    return FileResponse(STATIC_DIR / "drafter.html", media_type="text/html")
+
+@app.get("/drafter.js")
+async def serve_drafter_js():
+    return FileResponse(STATIC_DIR / "drafter.js", media_type="application/javascript")
+
+@app.get("/fir.html")
+async def serve_fir():
+    return FileResponse(STATIC_DIR / "fir.html", media_type="text/html")
+
+@app.get("/fir.js")
+async def serve_fir_js():
+    return FileResponse(STATIC_DIR / "fir.js", media_type="application/javascript")
+
+@app.get("/similar.html")
+async def serve_similar():
+    return FileResponse(STATIC_DIR / "similar.html", media_type="text/html")
+
+@app.get("/similar.js")
+async def serve_similar_js():
+    return FileResponse(STATIC_DIR / "similar.js", media_type="application/javascript")
 
 @app.get("/predict.html")
 async def serve_predict():

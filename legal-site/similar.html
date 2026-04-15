@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LexSearch — Find Similar Cases</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="logo">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-text">LexSearch</div>
+  </a>
+  <nav class="header-nav">
+    <a href="/" class="nav-link">Search</a>
+    <a href="/converter.html" class="nav-link">IPC/BNS</a>
+    <a href="/drafter.html" class="nav-link">Drafter</a>
+    <a href="/fir.html" class="nav-link">FIR</a>
+    <a href="/similar.html" class="nav-link active">Similar</a>
+    <a href="/predict.html" class="nav-link">Predictor</a>
+  </nav>
+  <span class="header-made">Made for Shreya Didi</span>
+</header>
+
+<div class="similar-page">
+  <div class="page-header">
+    <h1>Find Similar Cases</h1>
+    <p>Describe your case facts to find matching precedents from Indian courts</p>
+  </div>
+
+  <div class="similar-input-section">
+    <textarea id="similar-facts" rows="6" placeholder="Describe your case in a paragraph...&#10;&#10;Example: A tenant has been living in a rented property for 15 years. The landlord is trying to evict without proper notice. The rent agreement expired 5 years ago but the tenant continued paying rent regularly."></textarea>
+    <div class="similar-controls">
+      <select id="similar-court">
+        <option value="">All Courts</option>
+      </select>
+      <button class="search-btn" id="similar-search-btn">Find Similar Cases</button>
+    </div>
+  </div>
+
+  <!-- Loading -->
+  <div id="similar-loading" class="state-screen" style="display:none">
+    <div class="spinner"></div>
+    <p>Finding similar cases...</p>
+  </div>
+
+  <!-- Error -->
+  <div id="similar-error" class="error-toast" style="display:none"></div>
+
+  <!-- Welcome -->
+  <div id="similar-welcome" class="state-screen">
+    <div class="icon">🔗</div>
+    <h3>Find Matching Precedents</h3>
+    <p>Describe your case facts and we'll find the most similar cases from 400,000+ court judgments using AI-powered text similarity.</p>
+  </div>
+
+  <!-- Not ready -->
+  <div id="similar-notready" class="state-screen" style="display:none">
+    <div class="spinner"></div>
+    <h3>Building Similarity Index</h3>
+    <p>The similarity engine is loading case data. Please try again in ~60 seconds.</p>
+  </div>
+
+  <!-- Empty -->
+  <div id="similar-empty" class="state-screen" style="display:none">
+    <div class="icon">🔍</div>
+    <h3>No similar cases found</h3>
+    <p>Try describing your case differently or use more specific legal terms.</p>
+  </div>
+
+  <!-- Results -->
+  <div id="similar-stats" class="stats-bar" style="display:none">
+    <span id="similar-stats-text"></span>
+  </div>
+  <div id="similar-results"></div>
+</div>
+
+<script src="similar.js"></script>
+</body>
+</html>
