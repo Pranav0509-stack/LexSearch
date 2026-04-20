@@ -1,0 +1,50 @@
+<!doctype html>
+<html><head>
+<meta charset="utf-8">
+<title>Legal Notice</title>
+<style>
+ @page { size: A4; margin: 20mm; }
+ body { font-family: "Noto Sans", "Noto Sans Devanagari", sans-serif; font-size: 11pt; line-height: 1.55; }
+ .footer { font-size: 9pt; color: #555; border-top: 1px solid #ccc; margin-top: 24pt; padding-top: 8pt; }
+ .bold { font-weight: 600; }
+</style>
+</head><body>
+
+<p style="text-align: right;">Date: {{ slots.date }}</p>
+
+<p>To,<br>
+<span class="bold">{{ slots.recipient_name }}</span><br>
+{{ slots.recipient_address }}</p>
+
+<p><span class="bold">Subject:</span> {{ slots.subject }}</p>
+
+<p>Dear Sir/Madam,</p>
+
+<p>Under instructions from my client, <span class="bold">{{ slots.sender_name }}</span>
+(hereinafter "my Client"), resident of {{ slots.sender_address }},
+I hereby serve you with this legal notice on the following grounds:</p>
+
+<p>{{ slots.facts }}</p>
+
+<p>In view of the above, my Client hereby calls upon you to:</p>
+<ol>
+{% for demand in slots.demands %}
+  <li>{{ demand }}</li>
+{% endfor %}
+</ol>
+
+<p>Please treat this notice as final. Failing compliance within
+{{ slots.response_window_days }} days from receipt, my Client shall be constrained
+to initiate appropriate civil and/or criminal proceedings at your risk as to
+cost and consequence.</p>
+
+<p>Yours sincerely,<br>
+{{ slots.sender_name }}</p>
+
+<div class="footer">
+  Drafted with NyayaSathi — an AI legal-information and document-drafting service.
+  This document is not legal advice. For advice, consult a licensed advocate.
+  {% if slots.call_uuid %}<br>Call Ref: {{ slots.call_uuid }}{% endif %}
+</div>
+
+</body></html>
