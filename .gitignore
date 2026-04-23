@@ -2,6 +2,9 @@ node_modules/
 .env
 .DS_Store
 eval-report.json
+eval-engine.js
+generate_pdf.py
 .claude/
 *.wav
 *.mp3
+*.pdf
