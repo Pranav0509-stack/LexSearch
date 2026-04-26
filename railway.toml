@@ -1,0 +1,27 @@
+# Railway service config — backend (FastAPI).
+# Frontend ships as a separate Railway service from web/ (Next.js
+# auto-detect). Both share env vars; backend exposes BACKEND_ORIGIN
+# which the frontend points at via its own service URL.
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+startCommand = "uvicorn server:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
+
+# Sanhita defaults — override anything sensitive in the Railway dashboard
+# (Variables tab) so it stays out of the repo.
+[deploy.envs]
+LEXSEARCH_BM25_ENABLED = "true"
+LEXSEARCH_BM25_LAZY    = "true"
+LEXSEARCH_BM25_PATH    = "/data/bm25.pkl"
+LEXSEARCH_BM25_MAX_DOCS = "200000"
+GEMINI_MODEL  = "gemini-2.5-flash"
+LLM_TIMEOUT_S = "22"
+GROQ_MODEL    = "llama-3.3-70b-versatile"
+PYTHONUNBUFFERED = "1"

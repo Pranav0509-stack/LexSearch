@@ -1,0 +1,13 @@
+# Railway service config — frontend (Next.js).
+# Set BACKEND_ORIGIN to the Railway URL of the backend service in the
+# dashboard Variables tab.
+
+[build]
+builder = "NIXPACKS"
+buildCommand = "npm install && npm run build"
+
+[deploy]
+startCommand = "npm run start -- --port $PORT"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 3
