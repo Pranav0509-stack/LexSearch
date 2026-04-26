@@ -1,12 +1,25 @@
 /**
- * LexSearch – Frontend (HC + SC)
+ * Sanhita – Frontend (HC + SC)
  */
 (function () {
   "use strict";
 
   let currentPage = 1;
   let currentMode = "hc"; // "hc" or "sc"
+  let inFlight = false;   // prevents double-submit while a search is running
   const PAGE_SIZE = 50;
+  const REQUEST_TIMEOUT_MS = 15000;
+
+  // ── fetch with timeout ───────────────────────────────────────────────
+  async function fetchWithTimeout(url, opts = {}, ms = REQUEST_TIMEOUT_MS) {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), ms);
+    try {
+      return await fetch(url, { ...opts, signal: ctrl.signal });
+    } finally {
+      clearTimeout(t);
+    }
+  }
 
   // DOM
   const courtSelect   = document.getElementById("court-select");
@@ -49,7 +62,7 @@
   // Load courts
   async function loadCourts() {
     try {
-      const res = await fetch("/courts");
+      const res = await fetchWithTimeout("/courts", {}, 8000);
       courtsData = await res.json();
       courtSelect.innerHTML = '<option value="">All Courts</option>';
       courtsData.forEach(c => {
@@ -106,13 +119,54 @@
     return p;
   }
 
+  // Client-side filter validation. Returns a human-readable error string
+  // if the request would be rejected by the server, else null.
+  function validateFilters() {
+    if (currentMode === "sc") {
+      const any = [
+        petitionerInput.value, respondentInput.value, citationInput.value,
+        keywordInput.value, cnrInput.value, judgeInput.value, yearInput.value,
+      ].some(v => String(v || "").trim());
+      if (!any) {
+        return "Enter a petitioner, respondent, citation, or year to search the Supreme Court.";
+      }
+    } else {
+      const any = [
+        courtSelect.value, keywordInput.value, cnrInput.value,
+        judgeInput.value, yearInput.value,
+      ].some(v => String(v || "").trim());
+      if (!any) {
+        return "Pick a High Court, or enter a party name, CNR, judge, or year.";
+      }
+    }
+    return null;
+  }
+
+  function shakeButton() {
+    searchBtn.classList.remove("shake");
+    // force reflow so the animation restarts
+    // eslint-disable-next-line no-unused-expressions
+    void searchBtn.offsetWidth;
+    searchBtn.classList.add("shake");
+  }
+
   async function runSearch(page) {
+    if (inFlight) return; // ignore double-fire
+
+    const validationError = validateFilters();
+    if (validationError) {
+      showError(validationError);
+      shakeButton();
+      return;
+    }
+
+    inFlight = true;
     currentPage = page;
     showLoading();
     clearError();
     const t0 = Date.now();
     try {
-      const res = await fetch(`/search?${buildParams(page)}`);
+      const res = await fetchWithTimeout(`/search?${buildParams(page)}`);
       if (!res.ok) {
         const err = await res.json().catch(() => ({ detail: "Unknown error" }));
         throw new Error(err.detail || `HTTP ${res.status}`);
@@ -120,8 +174,13 @@
       const data = await res.json();
       renderResults(data.results, data.total, ((Date.now() - t0) / 1000).toFixed(1), page);
     } catch (e) {
-      showError(e.message);
+      const msg = e && e.name === "AbortError"
+        ? "The court archive is slow right now. Try again, or narrow your filters."
+        : (e && e.message) || "Something went wrong. Try again.";
+      showError(msg);
       hideLoading();
+    } finally {
+      inFlight = false;
     }
   }
 
@@ -190,7 +249,27 @@
         <a href="${downloadUrl}" class="btn btn-download" download>Download</a>
       </div>
     `;
+
+    // Probe the PDF with a HEAD request. If it 404s, mark the card
+    // unavailable instead of silently opening a broken viewer tab.
+    const probeUrl = isSC
+      ? `/sc-pdf/${r.year}/${encodeURIComponent(decodeURIComponent(r.s3_key.split("/").pop()))}`
+      : `/pdf/${r.s3_key}`;
+    fetchWithTimeout(probeUrl, { method: "HEAD" }, 8000)
+      .then(res => {
+        if (!res.ok) markCardUnavailable(card);
+      })
+      .catch(() => { /* network blip — let the user try anyway */ });
+
     return card;
+  }
+
+  function markCardUnavailable(card) {
+    card.classList.add("unavailable");
+    const actions = card.querySelector(".card-actions");
+    if (actions) {
+      actions.innerHTML = '<span class="unavailable-tag" title="This PDF is not in the public archive">PDF unavailable</span>';
+    }
   }
 
   function renderPagination(total, pg) {

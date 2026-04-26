@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sanhita — Pan-Asia Legal AI</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css?v=sanhita6" />
+</head>
+<body class="app-body">
+
+<!-- ═══════════════════════════════════ APP SHELL ═══════════════════════════════════ -->
+<div class="app-shell">
+
+  <!-- ── Left sidebar ─────────────────────────────────────────────────── -->
+  <aside class="app-sidebar">
+    <a href="/" class="side-brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+          <rect width="64" height="64" rx="10" fill="#0B1220"/>
+          <text x="32" y="46" font-family="Cormorant Garamond, Georgia, serif" font-size="40" font-weight="600" fill="#B8924A" text-anchor="middle" font-style="italic">S</text>
+          <circle cx="48" cy="18" r="2" fill="#B8924A"/>
+        </svg>
+      </span>
+      <span class="side-brand-text">Sanhita</span>
+    </a>
+
+    <button id="new-chat-btn" class="side-create">+ New</button>
+
+    <nav class="side-nav">
+      <button class="side-item active" data-mode="research"><span class="side-ic">◈</span>Assistant</button>
+      <button class="side-item" data-mode="vault"><span class="side-ic">❒</span>Vault</button>
+      <button class="side-item" data-mode="workflows"><span class="side-ic">⟁</span>Workflows</button>
+      <button class="side-item" data-mode="history"><span class="side-ic">↻</span>History</button>
+      <button class="side-item" data-mode="library"><span class="side-ic">☗</span>Library</button>
+      <button class="side-item" data-mode="guidance"><span class="side-ic">✦</span>Guidance</button>
+    </nav>
+
+    <div class="side-foot">
+      <span id="who-am-i" class="side-user"></span>
+      <a href="/api/logout" class="side-signout">Sign out</a>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════ ASSISTANT (default) ═══════════════════════════ -->
+  <main class="app-main ws-pane" data-pane="research">
+    <div class="asst-topbar">
+      <div class="asst-crumbs">
+        <button class="crumb" id="choose-vault-btn"><span class="tool-ic">❒</span> Choose vault</button>
+        <button class="crumb" id="client-matter-btn"><span class="tool-ic">⎙</span> Set client matter</button>
+      </div>
+      <div></div>
+    </div>
+
+    <div class="asst-center">
+      <div id="chat-log" class="chat-log"></div>
+
+      <!-- ── Harvey-style composer (dark theme ported from ai-prompt-box) ── -->
+      <form id="chat-form" class="composer-card dark">
+        <textarea id="chat-input" class="composer-text" rows="3"
+          placeholder="Ask Sanhita anything…"
+          maxlength="2000"></textarea>
+
+        <div class="composer-toolbar">
+          <div class="composer-tools-left">
+            <label class="tool-chip" title="Attach files">
+              <input type="file" id="comp-files" multiple hidden accept=".pdf,.docx,.txt"/>
+              <span class="tool-ic">＋</span> Files and sources
+            </label>
+            <button type="button" class="tool-chip" id="prompts-btn-in"><span class="tool-ic">⫶</span> Prompts</button>
+            <span class="tool-sep">│</span>
+            <button type="button" class="tool-chip" id="customize-btn"><span class="tool-ic">⚙</span> Customize</button>
+            <button type="button" class="tool-chip" id="improve-btn"><span class="tool-ic">✨</span> Improve</button>
+            <!-- Segmented toggles (ported from ai-prompt-box PromptInputBox) -->
+            <button type="button" class="tool-chip seg-search" id="seg-search-btn" title="Web search"><span class="tool-ic">🌐</span> Search</button>
+            <span class="seg-divider"></span>
+            <button type="button" class="tool-chip seg-think" id="seg-think-btn" title="Deep think"><span class="tool-ic">◎</span> Think</button>
+            <span class="seg-divider"></span>
+            <button type="button" class="tool-chip seg-canvas" id="seg-canvas-btn" title="Canvas mode"><span class="tool-ic">⊞</span> Canvas</button>
+            <div class="tool-chip has-menu" id="sources-chip" title="Sources" hidden>
+              <span class="tool-ic">⛨</span> Sources
+              <div class="tool-menu" id="sources-menu" hidden>
+                <div class="menu-section">Jurisdiction</div>
+                <label class="menu-row"><input type="radio" name="juris" value="IN" checked> 🇮🇳 India</label>
+                <label class="menu-row"><input type="radio" name="juris" value="SG"> 🇸🇬 Singapore</label>
+                <label class="menu-row"><input type="radio" name="juris" value="HK"> 🇭🇰 Hong Kong</label>
+                <label class="menu-row"><input type="radio" name="juris" value="MY"> 🇲🇾 Malaysia</label>
+                <label class="menu-row"><input type="radio" name="juris" value="AE"> 🇦🇪 UAE / DIFC</label>
+                <label class="menu-row"><input type="radio" name="juris" value="JP"> 🇯🇵 Japan</label>
+                <label class="menu-row"><input type="radio" name="juris" value="KR"> 🇰🇷 South Korea</label>
+                <label class="menu-row"><input type="radio" name="juris" value="PH"> 🇵🇭 Philippines</label>
+                <label class="menu-row"><input type="radio" name="juris" value="ID"> 🇮🇩 Indonesia</label>
+                <label class="menu-row"><input type="radio" name="juris" value="TH"> 🇹🇭 Thailand</label>
+                <label class="menu-row"><input type="radio" name="juris" value="VN"> 🇻🇳 Vietnam</label>
+                <label class="menu-row"><input type="radio" name="juris" value="BD"> 🇧🇩 Bangladesh</label>
+                <label class="menu-row"><input type="radio" name="juris" value="LK"> 🇱🇰 Sri Lanka</label>
+                <label class="menu-row"><input type="radio" name="juris" value="NP"> 🇳🇵 Nepal</label>
+                <label class="menu-row"><input type="radio" name="juris" value="AU"> 🇦🇺 Australia</label>
+                <label class="menu-row"><input type="radio" name="juris" value="GB"> 🇬🇧 United Kingdom</label>
+                <label class="menu-row"><input type="radio" name="juris" value="US"> 🇺🇸 United States</label>
+                <div class="menu-section">Add context</div>
+                <button type="button" class="menu-row menu-btn" data-action="websearch">🌐 Web search</button>
+                <button type="button" class="menu-row menu-btn" data-action="upload">☁ Upload files</button>
+                <button type="button" class="menu-row menu-btn" data-action="vault">❒ Add from Vault</button>
+                <button type="button" class="menu-row menu-btn" data-action="kb">☗ Knowledge base</button>
+              </div>
+            </div>
+          </div>
+          <div class="composer-tools-right">
+            <button type="button" class="tool-chip" id="deep-research-btn" title="Deep research — slower, wider corpus">
+              <span class="tool-ic">◎</span> Deep research
+            </button>
+            <button type="submit" class="send-btn pill" id="chat-send" title="Ask Sanhita">Ask Sanhita</button>
+          </div>
+        </div>
+        <div id="comp-attached" class="comp-attached"></div>
+      </form>
+
+      <!-- ── Source + jurisdiction dropdowns ── -->
+      <div class="connector-row">
+        <label class="jurisdiction-picker" for="sources-select" title="Databases Sanhita will search">
+          <span class="jp-ic" id="src-ic">🗂</span>
+          <span class="jp-label" id="src-label">Auto (best for region)</span>
+          <select id="sources-select" class="jp-select">
+            <option value="" data-ic="🗂" selected>Auto (best for region)</option>
+            <option value="indian_kanoon" data-ic="⚖">Indian Kanoon only</option>
+            <option value="ecourts" data-ic="🏛">eCourts India only</option>
+            <option value="egov_japan" data-ic="🇯🇵">e-Gov Japan Laws only</option>
+            <option value="web" data-ic="🌐">Web search only</option>
+            <option value="seed" data-ic="❒">Vault / landmark corpus</option>
+            <option value="indian_kanoon,ecourts,web" data-ic="🇮🇳">India: IK + eCourts + Web</option>
+            <option value="web,seed" data-ic="🌏">Pan-Asia: Web + Vault</option>
+          </select>
+          <span class="jp-caret">▾</span>
+        </label>
+
+        <label class="jurisdiction-picker" for="jurisdiction-select" title="Jurisdiction">
+          <span class="jp-ic" id="jp-flag">🇮🇳</span>
+          <span class="jp-label">Jurisdiction</span>
+          <select id="jurisdiction-select" class="jp-select">
+            <option value="IN" data-flag="🇮🇳" selected>India</option>
+            <option value="SG" data-flag="🇸🇬">Singapore</option>
+            <option value="HK" data-flag="🇭🇰">Hong Kong</option>
+            <option value="MY" data-flag="🇲🇾">Malaysia</option>
+            <option value="AE" data-flag="🇦🇪">UAE / DIFC</option>
+            <option value="JP" data-flag="🇯🇵">Japan</option>
+            <option value="KR" data-flag="🇰🇷">South Korea</option>
+            <option value="PH" data-flag="🇵🇭">Philippines</option>
+            <option value="ID" data-flag="🇮🇩">Indonesia</option>
+            <option value="TH" data-flag="🇹🇭">Thailand</option>
+            <option value="VN" data-flag="🇻🇳">Vietnam</option>
+            <option value="BD" data-flag="🇧🇩">Bangladesh</option>
+            <option value="LK" data-flag="🇱🇰">Sri Lanka</option>
+            <option value="NP" data-flag="🇳🇵">Nepal</option>
+            <option value="AU" data-flag="🇦🇺">Australia</option>
+            <option value="GB" data-flag="🇬🇧">United Kingdom</option>
+            <option value="US" data-flag="🇺🇸">United States</option>
+          </select>
+          <span class="jp-caret">▾</span>
+        </label>
+      </div>
+
+      <!-- ── Suggested prompts ── -->
+      <div class="suggest-row">
+        <button class="suggest-chip" data-q="Recent HC authority on anticipatory bail under BNSS §482.">Anticipatory bail under BNSS §482</button>
+        <button class="suggest-chip" data-q="Singapore law position on enforceability of oppressive minority shareholder claims under §216 Companies Act.">SG §216 oppression remedy</button>
+        <button class="suggest-chip" data-q="How do DIFC Courts treat choice-of-law clauses pointing to English law?">DIFC choice-of-law</button>
+        <button class="suggest-chip" data-q="Compare arbitration seat enforcement between India (§34 A&C Act) and Singapore (IAA).">India vs Singapore arbitration</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════ VAULT ═══════════════════════════ -->
+  <main class="app-main ws-pane ws-split" data-pane="vault" hidden>
+    <div class="ws-col-left">
+      <h2 class="ws-title">Chamber Vault</h2>
+      <p class="ws-sub">Upload briefs, contracts, judgments. Ask across them. PDF / DOCX / TXT, ≤25 MB.</p>
+      <form id="vault-upload-form" class="vault-upload">
+        <input type="file" id="vault-file" accept=".pdf,.docx,.txt" />
+        <button type="submit" class="btn-primary">Upload</button>
+      </form>
+      <div id="vault-upload-status" class="ws-status"></div>
+      <div class="ws-section-label">Documents</div>
+      <ul id="vault-doc-list" class="vault-doc-list"></ul>
+    </div>
+    <div class="ws-col-main">
+      <div id="vault-chat-log" class="chat-log">
+        <div class="chat-empty">
+          <h2>Ask across your uploaded record.</h2>
+          <p>Answers cite chunks from your documents only.</p>
+        </div>
+      </div>
+      <form id="vault-chat-form" class="composer-card small">
+        <textarea id="vault-chat-input" class="composer-text" rows="2" placeholder="What does the contract say about indemnity caps?" maxlength="2000"></textarea>
+        <div class="composer-toolbar">
+          <div></div>
+          <button type="submit" class="send-btn">→</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <!-- ═══════════════════════════ WORKFLOWS (Draft/Review/Translate/Citator) ═══════════════════════════ -->
+  <main class="app-main ws-pane" data-pane="workflows" hidden>
+    <div class="wf-topbar">
+      <h2 class="ws-title">Workflows</h2>
+      <p class="ws-sub">Pre-built legal playbooks. Tap to run.</p>
+    </div>
+    <div class="wf-grid">
+      <button class="wf-card" data-wf="draft">
+        <div class="wf-card-ic">✍</div>
+        <div class="wf-card-name">Draft</div>
+        <div class="wf-card-desc">Court-ready Indian templates — anticipatory bail, §138 NI Act, Writ 226, commercial plaint.</div>
+      </button>
+      <button class="wf-card" data-wf="redline">
+        <div class="wf-card-ic">❙</div>
+        <div class="wf-card-name">Redline</div>
+        <div class="wf-card-desc">Clause-level redline with Apply/Dismiss suggestions and Indian statutory notes.</div>
+      </button>
+      <button class="wf-card" data-wf="reps_warranties">
+        <div class="wf-card-ic">✓</div>
+        <div class="wf-card-name">Reps & Warranties</div>
+        <div class="wf-card-desc">Extract representations and warranties from an SPA/APA; flag India-specific gaps.</div>
+      </button>
+      <button class="wf-card" data-wf="chronology">
+        <div class="wf-card-ic">⏱</div>
+        <div class="wf-card-name">Generate Chronology</div>
+        <div class="wf-card-desc">Build a dated chronology of events from briefs, notices, and orders.</div>
+      </button>
+      <button class="wf-card" data-wf="risks">
+        <div class="wf-card-ic">⚠</div>
+        <div class="wf-card-name">Assess Risks</div>
+        <div class="wf-card-desc">Litigation / regulatory / enforcement risk scan with RBI, SEBI, CCI, GST flags.</div>
+      </button>
+      <button class="wf-card" data-wf="interview">
+        <div class="wf-card-ic">☏</div>
+        <div class="wf-card-name">Summarize Interview</div>
+        <div class="wf-card-desc">Summarize a client/witness interview transcript into issue-wise notes.</div>
+      </button>
+      <button class="wf-card" data-wf="extract_terms">
+        <div class="wf-card-ic">≡</div>
+        <div class="wf-card-name">Extract Terms</div>
+        <div class="wf-card-desc">Extract defined terms, parties, dates, amounts, governing law, dispute clause.</div>
+      </button>
+      <button class="wf-card" data-wf="support_argument">
+        <div class="wf-card-ic">◆</div>
+        <div class="wf-card-name">Support Argument</div>
+        <div class="wf-card-desc">Find SC/HC authority supporting a proposition, with pinpoint paragraph cites.</div>
+      </button>
+      <button class="wf-card" data-wf="client_alert">
+        <div class="wf-card-ic">✉</div>
+        <div class="wf-card-name">Draft Client Alert</div>
+        <div class="wf-card-desc">Client-ready alert on a new judgment, notification, or circular.</div>
+      </button>
+      <button class="wf-card" data-wf="closing_checklist">
+        <div class="wf-card-ic">☑</div>
+        <div class="wf-card-name">Closing Checklist</div>
+        <div class="wf-card-desc">Conditions precedent + post-completion checklist for an Indian transaction.</div>
+      </button>
+      <button class="wf-card" data-wf="interim_memo">
+        <div class="wf-card-ic">▤</div>
+        <div class="wf-card-name">Interim Memo</div>
+        <div class="wf-card-desc">Short internal memo on a discrete point of Indian law, ≤1 page.</div>
+      </button>
+      <button class="wf-card" data-wf="translate">
+        <div class="wf-card-ic">↔</div>
+        <div class="wf-card-name">Translate</div>
+        <div class="wf-card-desc">English ↔ Hindi legal translation. Case names and citations verbatim.</div>
+      </button>
+      <button class="wf-card" data-wf="citator">
+        <div class="wf-card-ic">⟐</div>
+        <div class="wf-card-name">Citator</div>
+        <div class="wf-card-desc">Holding, statutes, cases cited, treatment signals from a judgment.</div>
+      </button>
+      <button class="wf-card wf-card-new">
+        <div class="wf-card-ic">+</div>
+        <div class="wf-card-name">Create workflow</div>
+        <div class="wf-card-desc">Compose your own multi-step playbook.</div>
+      </button>
+    </div>
+
+    <!-- Workflow detail panes (swapped into by wf-card click) -->
+    <div id="wf-pane-draft" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title">Draft</h2>
+          <label class="ws-label">Template</label>
+          <select id="draft-template" class="ws-select"></select>
+          <div class="ws-section-label">Facts</div>
+          <div id="draft-facts" class="draft-facts">
+            <input type="text" placeholder="Field name (e.g. petitioner)" class="draft-fact-key" />
+            <input type="text" placeholder="Value" class="draft-fact-val" />
+            <button type="button" id="draft-add-row" class="btn-ghost">+ row</button>
+          </div>
+          <button id="draft-generate" class="btn-primary btn-block">Generate draft</button>
+        </div>
+        <div class="ws-col-main">
+          <div id="draft-output" class="ws-output"><p class="ws-placeholder">Pick a template, add facts. The draft appears here.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="wf-pane-review" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title">Contract Review</h2>
+          <p class="ws-sub">Paste clauses one per box.</p>
+          <div id="review-clauses">
+            <textarea class="review-clause" placeholder="Clause 1 — Indemnity…"></textarea>
+            <textarea class="review-clause" placeholder="Clause 2 — Governing law…"></textarea>
+          </div>
+          <button type="button" id="review-add" class="btn-ghost">+ another clause</button>
+          <button id="review-go" class="btn-primary btn-block">Review</button>
+        </div>
+        <div class="ws-col-main">
+          <div id="review-output" class="ws-output"><p class="ws-placeholder">Risk grades, issues, rewrites will appear here.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="wf-pane-translate" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title">Translate</h2>
+          <label class="ws-label">Direction</label>
+          <select id="tx-direction" class="ws-select">
+            <option value="en->hi">English → Hindi</option>
+            <option value="hi->en">Hindi → English</option>
+          </select>
+          <textarea id="tx-input" class="tx-input" placeholder="Paste source text…" rows="14"></textarea>
+          <button id="tx-go" class="btn-primary btn-block">Translate</button>
+        </div>
+        <div class="ws-col-main">
+          <div id="tx-output" class="ws-output"><p class="ws-placeholder">Translation appears here.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Redline: two-pane with suggestions list + Apply/Dismiss -->
+    <div id="wf-pane-redline" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split redline-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title">Redline</h2>
+          <p class="ws-sub">Paste a contract or clauses. Sanhita proposes redlines with reasons. Apply or Dismiss each.</p>
+          <textarea id="rl-input" class="tx-input" rows="18" placeholder="Paste contract text…"></textarea>
+          <button id="rl-go" class="btn-primary btn-block">Run redline</button>
+        </div>
+        <div class="ws-col-main">
+          <div class="rl-panel">
+            <div class="rl-summary-head">
+              <span class="rl-icon">≡</span> Summary of suggestions
+              <span class="rl-count" id="rl-count"></span>
+            </div>
+            <div id="rl-summary" class="rl-summary"><p class="ws-placeholder">Run redline to see suggestions.</p></div>
+            <div id="rl-list" class="rl-list"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Generic workflow pane (reused by chronology, risks, interview, extract_terms, support_argument, client_alert, closing_checklist, interim_memo, reps_warranties) -->
+    <div id="wf-pane-generic" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title" id="gen-title">Workflow</h2>
+          <p class="ws-sub" id="gen-sub"></p>
+          <textarea id="gen-input" class="tx-input" rows="18" placeholder="Paste source text…"></textarea>
+          <button id="gen-go" class="btn-primary btn-block">Run</button>
+        </div>
+        <div class="ws-col-main">
+          <div id="gen-output" class="ws-output"><p class="ws-placeholder">Output will appear here.</p></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="wf-pane-citator" class="wf-pane" hidden>
+      <button class="wf-back">← Workflows</button>
+      <div class="ws-split">
+        <div class="ws-col-left">
+          <h2 class="ws-title">Citator</h2>
+          <p class="ws-sub">Paste a judgment excerpt.</p>
+          <label class="ws-label">Case title</label>
+          <input type="text" id="cit-title" class="ws-input" placeholder="e.g. Vishaka v. State of Rajasthan, (1997) 6 SCC 241" />
+          <label class="ws-label">Excerpt</label>
+          <textarea id="cit-excerpt" class="tx-input" rows="14" placeholder="Paste judgment text…"></textarea>
+          <button id="cit-go" class="btn-primary btn-block">Run citator</button>
+        </div>
+        <div class="ws-col-main">
+          <div id="cit-output" class="ws-output"><p class="ws-placeholder">Holding, statutes, cases, treatment signals.</p></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- History / Library / Guidance — simple shells -->
+  <main class="app-main ws-pane ws-stub" data-pane="history" hidden>
+    <h2 class="ws-title">History</h2>
+    <p class="ws-sub">Your past matters and conversations.</p>
+    <ul id="thread-list" class="thread-list"></ul>
+  </main>
+  <main class="app-main ws-pane ws-stub" data-pane="library" hidden>
+    <h2 class="ws-title">Library</h2>
+    <p class="ws-sub">Saved authorities and playbooks.</p>
+    <p class="ws-placeholder">Nothing saved yet. Bookmark a citation from any answer to add it here.</p>
+  </main>
+  <main class="app-main ws-pane ws-stub" data-pane="guidance" hidden>
+    <h2 class="ws-title">Guidance</h2>
+    <p class="ws-sub">How Sanhita works — grounding, citations, and refusal logic.</p>
+    <div class="ws-output">
+      <h3>Six-gate validator</h3>
+      <p>Every answer passes through <strong>cite_present, cite_resolves, no_banned_phrases, grounding_floor, scope_check, section_check</strong>. Answers failing hard gates are refused with closest cases shown instead.</p>
+      <h3>Jurisdictions covered</h3>
+      <p>India (primary — 17M+ HC+SC judgments), Singapore, Hong Kong, Malaysia, UAE/DIFC, Japan, Korea, Philippines, Indonesia, Thailand, Vietnam, Bangladesh, Pakistan, Sri Lanka.</p>
+      <h3>Provider stack</h3>
+      <p>Claude Sonnet 4.5 (primary) → Groq Llama 3.3 70B → Gemini 2.5 Pro → Cloudflare 8B. Per-provider circuit breakers open on 3 failures / 60s.</p>
+    </div>
+  </main>
+
+</div>
+
+<script src="/brief.js"></script>
+<script src="/workspaces.js?v=sanhita6"></script>
+<script src="/app-shell.js?v=sanhita6"></script>
+</body>
+</html>

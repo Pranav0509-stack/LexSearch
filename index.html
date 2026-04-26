@@ -3,119 +3,412 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>LexSearch — Indian Court Judgments</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+  <title>Sanhita — Professional Research for Indian Law</title>
+  <meta name="description" content="Search 16.7 million Indian court judgments. Built for advocates, chambers, and in-house counsel." />
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css?v=sanhita1" />
 </head>
 <body>
 
-<header class="site-header">
-  <a href="/" class="logo">
-    <span class="logo-icon">⚖️</span>
-    <div class="logo-text">LexSearch</div>
-  </a>
-  <span class="header-made">Made for Shreya Didi</span>
-</header>
+<!-- ───────────────────── Top navigation ───────────────────── -->
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark">
+        <!-- Inline the mark so the nav renders even before /assets resolves -->
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <rect width="64" height="64" rx="10" fill="#0B1220"/>
+          <text x="32" y="46" font-family="Cormorant Garamond, Georgia, serif" font-size="40" font-weight="600" fill="#B8924A" text-anchor="middle" font-style="italic">S</text>
+          <circle cx="48" cy="18" r="2" fill="#B8924A"/>
+        </svg>
+      </span>
+      Sanhita<span class="brand-deva" aria-hidden="true">सं</span>
+    </a>
 
-<div class="app-layout">
-  <aside class="sidebar">
-
-    <!-- Court Type Toggle -->
-    <div class="court-toggle">
-      <button class="toggle-btn active" data-mode="hc">High Courts</button>
-      <button class="toggle-btn" data-mode="sc">Supreme Court</button>
+    <div class="nav-links">
+      <a href="#product">Research</a>
+      <a href="#brief-cta">Brief</a>
+      <a href="#jobs">Use cases</a>
+      <a href="#security">Security</a>
+      <a href="#founder">About</a>
     </div>
 
-    <h2>Filters</h2>
+    <div class="nav-spacer"></div>
+    <a href="/login" class="nav-cta ghost">Sign in</a>
+    <a href="#access" class="nav-cta" id="nav-request-access">Request access</a>
+  </div>
+</nav>
 
-    <!-- HC-only filters -->
-    <div id="hc-filters">
+<!-- ───────────────────── Hero ───────────────────── -->
+<section class="hero">
+  <h1>Practice at the speed of the bar.</h1>
+  <p class="hero-sub">
+    Search 16.7 million Indian court judgments, verify every citation against the
+    underlying PDF, and keep every matter current — built for advocates, chambers,
+    and in-house counsel.
+  </p>
+  <div class="hero-ctas">
+    <a href="#product" class="btn-primary">Start a search</a>
+    <a href="#access" class="btn-ghost">Request access to Brief</a>
+  </div>
+</section>
+
+<!-- ───────────────────── Brief CTA strip ───────────────────── -->
+<section class="brief-cta" id="brief-cta">
+  <div class="brief-cta-inner">
+    <div class="brief-cta-copy">
+      <div class="section-eyebrow">New · Invite-only</div>
+      <h2>Introducing <span class="gold">Sanhita Brief</span>.</h2>
+      <p>
+        A grounded research assistant trained on the Indian record. Ask a
+        question in plain English, get a cited answer — every claim linked
+        to the underlying judgment, every judgment one click away.
+      </p>
+      <ul class="brief-bullets">
+        <li>Answers grounded in 16.7M+ judgments — no fabricated case names.</li>
+        <li>Threaded matters. Follow-ups that remember what you asked.</li>
+        <li>BNS / BNSS / BSA aware — flags superseded provisions.</li>
+      </ul>
+      <div class="brief-cta-actions">
+        <a href="#access" class="btn-primary">Request access</a>
+        <a href="/login" class="btn-ghost">Already have a code? Sign in</a>
+      </div>
+    </div>
+    <div class="brief-cta-preview" aria-hidden="true">
+      <div class="preview-chat">
+        <div class="preview-msg user">When does a writ of mandamus lie against a private body?</div>
+        <div class="preview-msg assistant">
+          A writ of mandamus is ordinarily against a public authority, but the
+          Supreme Court has held it lies against a private body performing a
+          <em>public duty</em> <sup class="cite-chip">[1]</sup>. The test is
+          the nature of the function, not the identity of the body
+          <sup class="cite-chip">[2]</sup>.
+          <br/><br/>
+          <strong>Practice note:</strong> plead the public-duty element with
+          specificity; a bare "public importance" won't carry.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────── Three-up jobs ───────────────────── -->
+<section class="section" id="jobs">
+  <div class="section-eyebrow">Built for the Indian bar</div>
+  <h2 class="section-title">The daily work of a litigator, made faster.</h2>
+  <p class="section-lede">
+    Three things every practising advocate does each week — each grounded in a
+    corpus covering all 25 High Courts and the Supreme Court of India.
+  </p>
+
+  <div class="jobs-grid">
+    <div class="job-card">
+      <div class="job-card-title">Brief preparation</div>
+      <p class="job-card-body">
+        Find the on-point authority across the Supreme Court and every High
+        Court in seconds. Filter by bench, judge, year, or section of an Act.
+      </p>
+    </div>
+    <div class="job-card">
+      <div class="job-card-title">Citation verification</div>
+      <p class="job-card-body">
+        Every pin-cite opens the original PDF from the court's own archive.
+        No fabricated case names, no paraphrased paragraphs — the ruling itself.
+      </p>
+    </div>
+    <div class="job-card">
+      <div class="job-card-title">Opposing-counsel research</div>
+      <p class="job-card-body">
+        Search by petitioner, respondent, or counsel to see how a matter has
+        been argued — and how the bench has ruled — across years of the record.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────── Customer strip (placeholder) ───────────────────── -->
+<section class="customers">
+  <div class="customers-inner">
+    <div class="customers-label">In invite-only beta</div>
+    <div class="customers-tag">Early access with practising advocates across Delhi, Bombay, and Madras.</div>
+  </div>
+</section>
+
+<!-- ───────────────────── Security ───────────────────── -->
+<section class="section" id="security">
+  <div class="section-eyebrow">Trust &amp; Security</div>
+  <h2 class="section-title">Enterprise-grade posture. Indian data residency.</h2>
+  <p class="section-lede">
+    A legal research product is only useful if your queries and matters stay
+    private. Ours are.
+  </p>
+  <div class="security-grid">
+    <div class="pillar">
+      <div class="pillar-title">No training on your data</div>
+      <p class="pillar-body">
+        Your queries, documents, and matters are never used to train a model —
+        contractually enforced with every LLM vendor we call.
+      </p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-title">Audited &amp; logged</div>
+      <p class="pillar-body">
+        Every search, download, and export is recorded for your firm's admin.
+        SAML SSO and role-based access on the Firm plan.
+      </p>
+    </div>
+    <div class="pillar">
+      <div class="pillar-title">Hosted in India</div>
+      <p class="pillar-body">
+        Mumbai region, DPDP Act 2023-aligned. Keep client-privileged material
+        inside the country, with deletion on demand.
+      </p>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────────── Product / app ───────────────────── -->
+<section class="app-section" id="product">
+  <div class="section-eyebrow">Try it now</div>
+  <h2 class="section-title">Search the Indian record.</h2>
+  <p class="section-lede">
+    Pick a court, narrow by filters, and read the judgment in-browser — the
+    free research tier, always on.
+  </p>
+
+  <div class="app-layout">
+    <aside class="sidebar">
+
+      <!-- Court Type Toggle -->
+      <div class="court-toggle">
+        <button class="toggle-btn active" data-mode="hc">High Courts</button>
+        <button class="toggle-btn" data-mode="sc">Supreme Court</button>
+      </div>
+
+      <h2>Filters</h2>
+
+      <!-- HC-only filters -->
+      <div id="hc-filters">
+        <div class="filter-group">
+          <label for="court-select">High Court</label>
+          <select id="court-select">
+            <option value="">All Courts</option>
+          </select>
+        </div>
+        <div class="filter-group">
+          <label for="bench-select">Bench</label>
+          <select id="bench-select" disabled>
+            <option value="">All Benches</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- SC-only filters -->
+      <div id="sc-filters" style="display:none">
+        <div class="filter-group">
+          <label for="petitioner-input">Petitioner</label>
+          <input type="text" id="petitioner-input" placeholder="e.g. Union of India" />
+        </div>
+        <div class="filter-group">
+          <label for="respondent-input">Respondent</label>
+          <input type="text" id="respondent-input" placeholder="e.g. State of Maharashtra" />
+        </div>
+        <div class="filter-group">
+          <label for="citation-input">Citation</label>
+          <input type="text" id="citation-input" placeholder="e.g. 2023 INSC 1043" />
+        </div>
+      </div>
+
+      <!-- Common filters -->
       <div class="filter-group">
-        <label for="court-select">High Court</label>
-        <select id="court-select">
-          <option value="">All Courts</option>
+        <label for="year-input">Year</label>
+        <input type="number" id="year-input" placeholder="e.g. 2023" min="1950" max="2026" />
+      </div>
+      <div class="filter-group">
+        <label for="keyword-input">Case title / party</label>
+        <input type="text" id="keyword-input" placeholder="e.g. Sharma vs State" autocomplete="off" />
+      </div>
+      <div class="filter-group">
+        <label for="cnr-input">CNR / case ID</label>
+        <input type="text" id="cnr-input" placeholder="e.g. DLHC010015762022" autocomplete="off" />
+      </div>
+      <div class="filter-group">
+        <label for="judge-input">Judge</label>
+        <input type="text" id="judge-input" placeholder="e.g. Justice Kumar" autocomplete="off" />
+      </div>
+      <div class="filter-group">
+        <label for="disposal-input">Disposal</label>
+        <select id="disposal-input">
+          <option value="">Any</option>
+          <option value="Disposed Off">Disposed Off</option>
+          <option value="Allowed">Allowed</option>
+          <option value="Dismissed">Dismissed</option>
         </select>
       </div>
-      <div class="filter-group">
-        <label for="bench-select">Bench</label>
-        <select id="bench-select" disabled>
-          <option value="">All Benches</option>
-        </select>
+
+      <button class="search-btn" id="search-btn">Search</button>
+      <button class="clear-btn" id="clear-btn">Clear filters</button>
+    </aside>
+
+    <main class="main-content">
+      <div id="error-container"></div>
+      <div id="stats-bar" class="stats-bar" style="display:none">
+        <span id="stats-text"></span>
+        <span id="stats-time"></span>
       </div>
-    </div>
-
-    <!-- SC-only filters -->
-    <div id="sc-filters" style="display:none">
-      <div class="filter-group">
-        <label for="petitioner-input">Petitioner</label>
-        <input type="text" id="petitioner-input" placeholder="e.g. Union of India" />
+      <div id="welcome-screen" class="state-screen">
+        <h3>Begin with a court, a party, or a citation.</h3>
+        <p>16.7M+ High Court cases and 35K+ Supreme Court cases indexed.</p>
       </div>
-      <div class="filter-group">
-        <label for="respondent-input">Respondent</label>
-        <input type="text" id="respondent-input" placeholder="e.g. State of Maharashtra" />
+      <div id="loading-screen" class="state-screen" style="display:none">
+        <div class="spinner"></div>
+        <p>Searching the archive…</p>
       </div>
-      <div class="filter-group">
-        <label for="citation-input">Citation</label>
-        <input type="text" id="citation-input" placeholder="e.g. 2023 INSC 1043" />
+      <div id="empty-screen" class="state-screen" style="display:none">
+        <h3>No matching judgments.</h3>
+        <p>Try broadening a filter, or check the spelling of a party's name.</p>
       </div>
-    </div>
+      <div id="results-grid" class="results-grid"></div>
+      <div id="pagination" class="pagination" style="display:none"></div>
+    </main>
+  </div>
+</section>
 
-    <!-- Common filters -->
-    <div class="filter-group">
-      <label>Year</label>
-      <input type="number" id="year-input" placeholder="e.g. 2023" min="1950" max="2025" />
+<!-- ───────────────────── Founder note ───────────────────── -->
+<section class="founder" id="founder">
+  <div class="founder-inner">
+    <blockquote class="founder-quote">
+      "A junior reading for a hearing should not have to choose between a ₹40,000
+      database and a free site with advertisements. Indian law is public. The
+      tools to practise it well should be, too."
+    </blockquote>
+    <div class="founder-sig">
+      Pranav Pandey
+      <small>Founder, Sanhita</small>
     </div>
-    <div class="filter-group">
-      <label for="keyword-input">Case Title / Party</label>
-      <input type="text" id="keyword-input" placeholder="e.g. Sharma vs State" autocomplete="off" />
-    </div>
-    <div class="filter-group">
-      <label for="cnr-input">CNR / Case ID</label>
-      <input type="text" id="cnr-input" placeholder="e.g. DLHC010015762022" autocomplete="off" />
-    </div>
-    <div class="filter-group">
-      <label for="judge-input">Judge</label>
-      <input type="text" id="judge-input" placeholder="e.g. Justice Kumar" autocomplete="off" />
-    </div>
-    <div class="filter-group">
-      <label for="disposal-input">Disposal</label>
-      <select id="disposal-input">
-        <option value="">Any</option>
-        <option value="Disposed Off">Disposed Off</option>
-        <option value="Allowed">Allowed</option>
-        <option value="Dismissed">Dismissed</option>
-      </select>
-    </div>
+  </div>
+</section>
 
-    <button class="search-btn" id="search-btn">Search</button>
-    <button class="clear-btn" id="clear-btn">Clear</button>
-  </aside>
+<!-- ───────────────────── Access request ───────────────────── -->
+<section class="access-section" id="access">
+  <div class="access-inner">
+    <div class="section-eyebrow">Invite-only beta</div>
+    <h2 class="section-title">Request access for your chambers.</h2>
+    <p class="section-lede">
+      We're onboarding a small cohort of practising advocates and in-house
+      teams each week. Tell us who you are — we get back within 48 hours.
+    </p>
 
-  <main class="main-content">
-    <div id="error-container"></div>
-    <div id="stats-bar" class="stats-bar" style="display:none">
-      <span id="stats-text"></span>
-      <span id="stats-time"></span>
-    </div>
-    <div id="welcome-screen" class="state-screen">
-      <div class="icon">⚖️</div>
-      <h3>Search Indian Court Judgments</h3>
-      <p>High Courts (16.7M+ cases) and Supreme Court (35K+ cases).</p>
-    </div>
-    <div id="loading-screen" class="state-screen" style="display:none">
-      <div class="spinner"></div>
-      <p>Searching...</p>
-    </div>
-    <div id="empty-screen" class="state-screen" style="display:none">
-      <div class="icon">🔍</div>
-      <h3>No results</h3>
-      <p>Try different filters or broaden your search.</p>
-    </div>
-    <div id="results-grid" class="results-grid"></div>
-    <div id="pagination" class="pagination" style="display:none"></div>
-  </main>
-</div>
+    <form id="access-form" class="access-form" autocomplete="off">
+      <div class="access-grid">
+        <div class="field">
+          <label for="af-name">Full name *</label>
+          <input type="text" id="af-name" name="name" required maxlength="120" />
+        </div>
+        <div class="field">
+          <label for="af-email">Email *</label>
+          <input type="email" id="af-email" name="email" required maxlength="160" />
+        </div>
+        <div class="field">
+          <label for="af-role">Role</label>
+          <select id="af-role" name="role">
+            <option value="">Select…</option>
+            <option>Advocate (litigating)</option>
+            <option>Senior Advocate</option>
+            <option>In-house counsel</option>
+            <option>Law firm associate</option>
+            <option>Partner</option>
+            <option>Judicial officer</option>
+            <option>Academic / researcher</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="af-firm">Firm / chamber</label>
+          <input type="text" id="af-firm" name="firm" maxlength="160" />
+        </div>
+        <div class="field">
+          <label for="af-barno">Bar council enrolment</label>
+          <input type="text" id="af-barno" name="bar_no" placeholder="e.g. D/1234/2015" maxlength="60" />
+        </div>
+        <div class="field field-wide">
+          <label for="af-note">What would you use Brief for?</label>
+          <textarea id="af-note" name="note" rows="3" maxlength="1000"
+            placeholder="e.g. anticipatory-bail research for a criminal practice; M&A diligence; consumer-law briefs…"></textarea>
+        </div>
+      </div>
+      <div class="access-actions">
+        <button type="submit" id="af-submit" class="btn-primary">Request access</button>
+        <span id="af-status" class="access-status"></span>
+      </div>
+      <p class="access-fineprint">
+        By requesting access you agree we may email you once to follow up.
+        We won't add you to any list. DPDP Act 2023 posture.
+      </p>
+    </form>
+  </div>
+</section>
 
-<script src="app.js"></script>
+<script>
+(function () {
+  const form = document.getElementById('access-form');
+  const btn = document.getElementById('af-submit');
+  const status = document.getElementById('af-status');
+  if (!form) return;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    status.textContent = '';
+    status.className = 'access-status';
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    const body = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      role: form.role.value,
+      firm: form.firm.value.trim(),
+      bar_no: form.bar_no.value.trim(),
+      note: form.note.value.trim(),
+    };
+    try {
+      const resp = await fetch('/api/access-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        status.textContent = data.detail || 'Could not submit. Try again.';
+        status.classList.add('err');
+        btn.disabled = false;
+        btn.textContent = 'Request access';
+        return;
+      }
+      status.textContent = 'Thank you. We will be in touch within 48 hours.';
+      status.classList.add('ok');
+      form.reset();
+      btn.textContent = 'Submitted';
+    } catch (_) {
+      status.textContent = 'Network error. Try again.';
+      status.classList.add('err');
+      btn.disabled = false;
+      btn.textContent = 'Request access';
+    }
+  });
+})();
+</script>
+
+<!-- ───────────────────── Footer ───────────────────── -->
+<footer class="site-footer">
+  <div class="site-footer-inner">
+    <div>© Sanhita · Judgments sourced from public archives under CC-BY-4.0.</div>
+    <div>
+      <a href="https://github.com/vanga/indian-high-court-judgments" target="_blank" rel="noopener">Dataset</a>
+      &nbsp;·&nbsp;
+      <a href="mailto:pranavpandey.pr@gmail.com">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<script src="/app.js?v=sanhita1"></script>
 </body>
 </html>
