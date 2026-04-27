@@ -27,6 +27,7 @@ import {
   FileDown,
   Sparkles,
   Scale,
+  LayoutDashboard,
 } from "lucide-react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { renderMarkdown } from "./markdown";
@@ -36,6 +37,7 @@ import HistoryPane from "./history-pane";
 import LibraryPane from "./library-pane";
 import CourtSearchPane from "./court-search-pane";
 import SettingsPane from "./settings-pane";
+import DashboardPane from "./dashboard-pane";
 import ClientsPane from "./clients-pane";
 
 // Sanhita serves three jurisdictions: India, Singapore, Hong Kong.
@@ -99,7 +101,8 @@ type Mode =
   | "history"
   | "library"
   | "clients"
-  | "settings";
+  | "settings"
+  | "dashboard";
 
 interface LanguageOpt {
   code: string;
@@ -530,6 +533,7 @@ export default function AppPage() {
           <SideItem icon={<HistoryIcon size={16} />} label="History" active={mode === "history"} onClick={() => { setMode("history"); setSidebarOpen(false); }} />
           <SideItem icon={<LibraryIcon size={16} />} label="Library" active={mode === "library"} onClick={() => { setMode("library"); setSidebarOpen(false); }} />
           <SideItem icon={<SettingsIcon size={16} />} label="Settings" active={mode === "settings"} onClick={() => { setMode("settings"); setSidebarOpen(false); }} />
+          <SideItem icon={<LayoutDashboard size={16} />} label="Dashboard" active={mode === "dashboard"} onClick={() => { setMode("dashboard"); setSidebarOpen(false); }} />
         </nav>
 
         {/* Spacer pushes footer to bottom — past threads now live in History pane */}
@@ -744,6 +748,22 @@ export default function AppPage() {
               } catch {
                 /* connector status is decorative */
               }
+            }}
+          />
+        )}
+        {mode === "dashboard" && (
+          <DashboardPane
+            // "Ask Sanhita" hands the assistant a snapshot of the current
+            // dashboard state so the next answer is grounded in real
+            // numbers ("you have 1,135 cases indexed; 2 admins online").
+            onAskSanhita={async (seedPrompt) => {
+              const tid = activeThread || (await newThread());
+              if (!tid) return;
+              setMode("assistant");
+              setMessages((prev) => [
+                ...prev,
+                { role: "assistant", content: seedPrompt },
+              ]);
             }}
           />
         )}

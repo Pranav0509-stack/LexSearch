@@ -82,6 +82,68 @@ export default function CourtSearchPane({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [openCase, setOpenCase] = useState<CaseDoc | null>(null);
+  // Compare mode — when on, each card shows a checkbox and the user can
+  // pick 2-4 cases. The action bar at the bottom of the pane fetches
+  // each selected case's full text and pushes a "compare these N cases"
+  // prompt into the Assistant.
+  const [compareMode, setCompareMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [comparing, setComparing] = useState(false);
+
+  const toggleSelect = useCallback((case_id: string) => {
+    setSelectedIds((prev) => {
+      if (prev.includes(case_id)) return prev.filter((x) => x !== case_id);
+      if (prev.length >= 4) return prev;       // hard cap — keeps the prompt sane
+      return [...prev, case_id];
+    });
+  }, []);
+
+  // Pull each selected case's full body, stitch them into one rich
+  // context block, and hand off to the Assistant pane for the actual
+  // analysis. We do the fetch here (not in the parent) so the caller
+  // only ever sees a finished payload.
+  const compareInAssistant = useCallback(async () => {
+    if (!onUseInChat || selectedIds.length < 2) return;
+    setComparing(true);
+    try {
+      const docs = await Promise.all(
+        selectedIds.map(async (id) => {
+          const r = await fetch(`/api/cases/${encodeURIComponent(id)}`, {
+            credentials: "same-origin",
+          });
+          if (!r.ok) return null;
+          return (await r.json()) as CaseDoc;
+        })
+      );
+      const valid = docs.filter((d): d is CaseDoc => !!d);
+      if (valid.length < 2) {
+        setError("Could not load all selected cases. Try again.");
+        return;
+      }
+      const body_md = valid
+        .map((d, i) => {
+          const meta: string[] = [];
+          if (d.court) meta.push(d.court);
+          if (d.year) meta.push(String(d.year));
+          if (d.citation) meta.push(d.citation);
+          const head = `### Case ${i + 1}: ${d.title || d.case_id}`;
+          const sub = meta.length ? `_${meta.join(" · ")}_` : "";
+          const body = (d.text || d.excerpt || "").slice(0, 1800);
+          return [head, sub, "", body].filter(Boolean).join("\n");
+        })
+        .join("\n\n---\n\n");
+      onUseInChat({
+        case_id: `compare-${selectedIds.join("+")}`,
+        title: `Compare ${valid.length} cases`,
+        body_md: `Compare and analyze these ${valid.length} cases. Identify the legal questions each addresses, the holdings, points of agreement, and points of divergence.\n\n${body_md}`,
+        jurisdiction: valid[0]?.jurisdiction || "",
+      });
+      setSelectedIds([]);
+      setCompareMode(false);
+    } finally {
+      setComparing(false);
+    }
+  }, [onUseInChat, selectedIds]);
 
   const runSearch = useCallback(async () => {
     if (tab === "search" && !q.trim()) {

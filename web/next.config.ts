@@ -12,6 +12,9 @@ const nextConfig: NextConfig = {
       // Static PDF passthrough so source cards can deep-link to a judgment.
       { source: "/pdf/:path*", destination: `${BACKEND}/pdf/:path*` },
       { source: "/sc-pdf/:path*", destination: `${BACKEND}/sc-pdf/:path*` },
+      // Socket.io polling + websocket transport — same FastAPI process
+      // serves /socket.io/* via the python-socketio ASGI mount.
+      { source: "/socket.io/:path*", destination: `${BACKEND}/socket.io/:path*` },
     ];
   },
 };

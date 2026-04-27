@@ -42,6 +42,7 @@ INGESTORS: dict[str, dict[str, int | str | None]] = {
     "hk_ylchan_list":      {"limit": 1000,  "module": "scripts.ingestors.hk_ylchan_list"},
     "sg_codelah":          {"limit": 1000,  "module": "scripts.ingestors.sg_codelah"},
     "sg_lacuna":           {"limit": 8000,  "module": "scripts.ingestors.sg_lacuna"},
+    "india_seed_promote":  {"limit": None,  "module": "scripts.ingestors.india_seed_promote"},
     "india_openjustice":   {"limit": 15000, "module": "scripts.ingestors.india_openjustice"},
     "india_vanga_hc":      {"limit": 80000, "module": "scripts.ingestors.india_vanga_hc"},
 }

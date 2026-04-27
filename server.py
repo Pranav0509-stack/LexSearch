@@ -555,6 +555,15 @@ def _startup_load_index() -> None:
     except Exception as e:
         logger.error("auth.init_db failed: %s", e)
 
+    # Phase 3: dashboard schema (dash_activity, dash_settings) lives on
+    # whichever DB DATABASE_URL points at — Postgres in prod, SQLite
+    # otherwise. Best-effort: a missing psycopg/Postgres can't block boot.
+    try:
+        import db_adapter  # type: ignore
+        db_adapter.init_dashboard_schema()
+    except Exception as e:  # noqa: BLE001
+        logger.warning("dashboard schema init failed (non-fatal): %s", e)
+
     if BM25_ENABLED and not BM25_LAZY:
         _ensure_bm25()
     elif BM25_ENABLED:
@@ -655,7 +664,7 @@ def health():
         "bm25_enabled": BM25_ENABLED,
         "bm25_loaded": idx is not None,
         "bm25_loading": _bm25_loading,
-        "bm25_doc_count": (len(idx.docs) if idx is not None else 0),
+        "bm25_doc_count": (len(idx) if idx is not None else 0),
         "bm25_loaded_at": _bm25_loaded_at,
         "bm25_load_error": _bm25_load_error,
     }
@@ -1541,6 +1550,7 @@ def api_settings_set_key(
     if body.name not in valid_names:
         raise HTTPException(400, f"Unknown connector: {body.name}")
     auth.set_connector_key(body.name, body.key, user_id=user["id"], note=body.note or "")
+    _dash_log(user.get("email"), "set_key", target=body.name)
     return {"ok": True, "name": body.name}
 
 
@@ -1549,9 +1559,193 @@ def api_settings_delete_key(
     name: str,
     ls_session: Optional[str] = Cookie(default=None),
 ):
-    _require_user(ls_session)
+    actor = _require_user(ls_session)
     ok = auth.delete_connector_key(name)
+    if ok:
+        _dash_log(actor.get("email"), "delete_key", target=name)
     return {"ok": ok, "name": name}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# DASHBOARD — in-house admin pane. Lives at /app inside the same shell
+# as Assistant / Court Search etc. Endpoints below back the React
+# `DashboardPane`. Every mutation also fans out via Socket.io so two
+# admins watching the same screen stay in sync.
+# ─────────────────────────────────────────────────────────────────────────
+
+
+def _dash_log(actor: str | None, action: str, target: str | None = None,
+              payload: Optional[dict[str, Any]] = None) -> None:
+    """Append to dash_activity and broadcast over socketio. Best-effort —
+    a logging failure must never break the underlying mutation."""
+    import json as _json
+    try:
+        import db_adapter  # type: ignore
+        now = int(time.time())
+        row = {
+            "actor": actor or "system",
+            "action": action,
+            "target": target,
+            "payload": _json.dumps(payload or {}, ensure_ascii=False),
+            "created_at": now,
+        }
+        with db_adapter.db() as conn:
+            db_adapter.execute(
+                conn,
+                "INSERT INTO dash_activity (actor, action, target, payload, created_at) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (row["actor"], row["action"], row["target"], row["payload"], row["created_at"]),
+            )
+        try:
+            import realtime  # type: ignore
+            realtime.broadcast("activity:append", row)
+        except Exception:  # noqa: BLE001
+            pass
+    except Exception as e:  # noqa: BLE001
+        logger.warning("_dash_log failed: %s", e)
+
+
+@app.get("/api/dashboard/stats")
+def api_dashboard_stats(ls_session: Optional[str] = Cookie(default=None)):
+    """High-level numbers shown on the dashboard's Stats widget — total
+    users, threads, messages, library docs, BM25 corpus size, breakdown
+    by jurisdiction. Cheap aggregate queries, no scans."""
+    _require_user(ls_session)
+    out: dict[str, Any] = {"users": 0, "threads": 0, "messages": 0, "library": 0}
+    try:
+        with auth.db() as conn:
+            for col, sql in (
+                ("users",    "SELECT COUNT(*) FROM access_codes WHERE revoked_at IS NULL"),
+                ("threads",  "SELECT COUNT(*) FROM threads"),
+                ("messages", "SELECT COUNT(*) FROM messages"),
+                ("library",  "SELECT COUNT(*) FROM library_docs"),
+            ):
+                try:
+                    out[col] = int(conn.execute(sql).fetchone()[0])
+                except Exception:  # noqa: BLE001  (table may not exist yet)
+                    out[col] = 0
+    except Exception as e:  # noqa: BLE001
+        logger.warning("dashboard.stats: auth.db failed: %s", e)
+
+    # BM25 / corpus stats — read straight off the loaded index.
+    idx = _ensure_bm25() if _RETRIEVAL_AVAILABLE else None
+    if idx is not None:
+        out["bm25"] = idx.stats()
+    else:
+        out["bm25"] = {"total": 0, "by_jurisdiction": {}, "by_source": {}}
+    return out
+
+
+@app.get("/api/dashboard/users")
+def api_dashboard_users(ls_session: Optional[str] = Cookie(default=None)):
+    """User list — name, email, when they were issued an access code,
+    last-seen via most-recent message authored. No plaintext code here."""
+    _require_user(ls_session)
+    rows: list[dict[str, Any]] = []
+    try:
+        with auth.db() as conn:
+            cur = conn.execute(
+                """SELECT
+                       ac.id, ac.email, ac.name, ac.created_at, ac.revoked_at,
+                       (SELECT MAX(m.created_at) FROM messages m
+                          JOIN threads t ON t.id = m.thread_id
+                         WHERE t.user_id = ac.id) AS last_seen,
+                       (SELECT COUNT(*) FROM threads t WHERE t.user_id = ac.id) AS thread_count
+                     FROM access_codes ac
+                    ORDER BY ac.created_at DESC
+                    LIMIT 200"""
+            )
+            for r in cur.fetchall():
+                rows.append({
+                    "id": r["id"],
+                    "email": r["email"],
+                    "name": r["name"],
+                    "created_at": r["created_at"],
+                    "revoked_at": r["revoked_at"],
+                    "last_seen": r["last_seen"],
+                    "thread_count": r["thread_count"] or 0,
+                })
+    except Exception as e:  # noqa: BLE001
+        logger.warning("dashboard.users failed: %s", e)
+    return {"users": rows}
+
+
+@app.post("/api/dashboard/users/{user_id}/revoke")
+def api_dashboard_revoke_user(user_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    actor = _require_user(ls_session)
+    now = int(time.time())
+    with auth.db() as conn:
+        conn.execute(
+            "UPDATE access_codes SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
+            (now, user_id),
+        )
+    _dash_log(actor.get("email"), "revoke_access", target=str(user_id),
+              payload={"user_id": user_id})
+    return {"ok": True, "user_id": user_id, "revoked_at": now}
+
+
+@app.get("/api/dashboard/activity")
+def api_dashboard_activity(
+    limit: int = Query(default=50, ge=1, le=200),
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    rows: list[dict[str, Any]] = []
+    try:
+        import db_adapter  # type: ignore
+        with db_adapter.db() as conn:
+            rows = db_adapter.fetch_all(
+                conn,
+                "SELECT id, actor, action, target, payload, created_at "
+                "FROM dash_activity ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("dashboard.activity failed: %s", e)
+    return {"activity": rows}
+
+
+@app.get("/api/dashboard/system")
+def api_dashboard_system(ls_session: Optional[str] = Cookie(default=None)):
+    """One-page health snapshot: DB mode, BM25 status, LLM router state,
+    web search reachability. Used for the System widget."""
+    _require_user(ls_session)
+    out: dict[str, Any] = {}
+
+    # DB
+    try:
+        import db_adapter  # type: ignore
+        out["db"] = db_adapter.status()
+    except Exception as e:  # noqa: BLE001
+        out["db"] = {"ok": False, "error": str(e)}
+
+    # BM25
+    idx = _ensure_bm25() if _RETRIEVAL_AVAILABLE else None
+    out["bm25"] = {
+        "available": _RETRIEVAL_AVAILABLE,
+        "enabled": BM25_ENABLED,
+        "loaded": idx is not None,
+        "loading": _bm25_loading,
+        "doc_count": (len(idx) if idx is not None else 0),
+        "load_error": _bm25_load_error,
+    }
+
+    # LLM router — providers with creds set
+    out["llm"] = {
+        "gemini":     bool((os.environ.get("GEMINI_API_KEY") or "").strip()),
+        "anthropic":  bool((os.environ.get("ANTHROPIC_API_KEY") or "").strip()),
+        "groq":       bool((os.environ.get("GROQ_API_KEY") or "").strip()),
+        "cloudflare": bool((os.environ.get("CF_API_TOKEN") or "").strip()),
+    }
+
+    # Web search providers — keys present?
+    out["web"] = {
+        "tavily": bool((os.environ.get("TAVILY_API_KEY") or "").strip()),
+        "serper": bool((os.environ.get("SERPER_API_KEY") or "").strip()),
+        "ddg":    True,
+    }
+
+    return out
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -2342,3 +2536,18 @@ async def serve_index(ls_session: Optional[str] = Cookie(default=None)):
     if uid is None or auth.get_user(uid) is None:
         return RedirectResponse(url="/login", status_code=302)
     return RedirectResponse(url="/app", status_code=302)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# ASGI surface — wrap FastAPI with the Socket.io app so /socket.io/* and
+# every other route are served by the same uvicorn process. Launch
+# entrypoint becomes `server:socketio_app` instead of `server:app`.
+# A bare `server:app` import path still works for code that imports
+# the FastAPI instance directly (tests, scripts).
+# ─────────────────────────────────────────────────────────────────────────
+try:
+    import realtime  # type: ignore
+    socketio_app = realtime.asgi_app(app)
+except Exception as _rt_err:  # noqa: BLE001
+    logger.warning("realtime mount failed; running without socket.io: %s", _rt_err)
+    socketio_app = app
