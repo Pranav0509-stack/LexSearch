@@ -10,36 +10,37 @@ import { io, Socket } from "socket.io-client";
 
 let socket: Socket | null = null;
 
-// Resolve the socket.io endpoint:
-//   • If NEXT_PUBLIC_REALTIME_ORIGIN is set, use it (prod / staging override).
-//   • In the browser, default to <currentScheme>://<currentHost>:8080 — i.e.
-//     hit the FastAPI backend directly. The Next.js dev rewrite handles
-//     polling but mangles the WebSocket upgrade, so going direct in dev is
-//     more reliable. Cookies still flow because the API origin set them.
-function realtimeOrigin(): string {
+// Resolve the socket.io endpoint. Default is same-origin so a single
+// public URL (Cloudflare Tunnel, Railway, etc.) covers both the HTTP
+// API and /socket.io. The realtime client uses `transports: ["polling",
+// "websocket"]` which lets us tolerate proxy hops that don't honour
+// the WebSocket upgrade (Next dev being one of them).
+//
+// Override with NEXT_PUBLIC_REALTIME_ORIGIN if the realtime layer
+// lives on a separate domain (e.g. Fly.io for socket fan-out).
+function realtimeOrigin(): string | undefined {
   const env = process.env.NEXT_PUBLIC_REALTIME_ORIGIN;
   if (env) return env;
-  if (typeof window !== "undefined") {
-    const { protocol, hostname } = window.location;
-    return `${protocol}//${hostname}:8080`;
-  }
-  return "http://localhost:8080";
+  // Returning undefined tells socket.io-client to use window.location.
+  return undefined;
 }
 
 export function getSocket(): Socket {
   if (socket) return socket;
-  socket = io(realtimeOrigin(), {
+  const origin = realtimeOrigin();
+  // Polling first so the tunnel/proxy (which may not honour WebSocket
+  // upgrade) still delivers events. socket.io upgrades to WS when
+  // available.
+  const opts = {
     path: "/socket.io",
-    transports: ["websocket", "polling"],
-    // false because the server uses cors_allowed_origins="*" which
-    // implicitly disables credentials; mismatched flags cause the
-    // browser to drop the polling response.
+    transports: ["polling", "websocket"] as ("polling" | "websocket")[],
     withCredentials: false,
     autoConnect: true,
     reconnection: true,
     reconnectionDelay: 1000,
     reconnectionDelayMax: 5000,
-  });
+  };
+  socket = origin ? io(origin, opts) : io(opts);
   return socket;
 }
 

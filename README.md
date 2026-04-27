@@ -3,8 +3,10 @@
 > AI legal research assistant for advocates in **India, Singapore, and Hong Kong**.
 > Grounded answers with case citations · live court-case database (1,135 cases ingested from open GitHub datasets) · drafting · 33 languages · realtime in-house dashboard.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Pranav0509-stack/sanhita)
 [![Deploy on Railway](https://railway.app/button.svg)](https://railway.app/new/template?template=https%3A%2F%2Fgithub.com%2FPranav0509-stack%2Fsanhita)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FPranav0509-stack%2Fsanhita&root-directory=web&env=BACKEND_ORIGIN&envDescription=URL%20of%20the%20FastAPI%20backend%20deployed%20on%20Railway%2FRender)
+
+> **Quickest demo path:** click the **Deploy to Render** button → sign in with GitHub → Render reads `render.yaml`, spins up both backend (FastAPI + Socket.io) and frontend (Next.js) services with a 5GB persistent disk for the BM25 index → Render asks you for `GEMINI_API_KEY` → wait ~3 minutes → public HTTPS URL ready. The `BACKEND_ORIGIN` for the frontend is filled in automatically by Render from the backend service.
 
 ---
 
