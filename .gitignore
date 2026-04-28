@@ -2,9 +2,17 @@ node_modules/
 .env
 .DS_Store
 eval-report.json
-eval-engine.js
 generate_pdf.py
 .claude/
 *.wav
 *.mp3
 *.pdf
+# Exception: the master plan PDF *is* committed and is the source of truth.
+!docs/MASTER-PLAN.pdf
+
+# Case + session persistence — real PII, never commit.
+data/cases/
+data/sessions/
+data/safety-events/
+data/phone-index.json
+

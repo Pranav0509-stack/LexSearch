@@ -34,6 +34,12 @@ const {
     generateSessionId, sanitizeForLLM, timer,
 } = require("./security.js");
 const { applyRules, stripMarkdown } = require("./rules-engine.js");
+const caseStore = require("./case-store.js");
+const intent = require("./intent-classifier.js");
+const slots = require("./slot-templates.js");
+const { extractAndUpdate } = require("./entity-extractor.js");
+const distress = require("./distress-detector.js");
+const lawyerMatch = require("./lawyer-match.js");
 
 const app = express();
 
@@ -299,27 +305,27 @@ DO NOT think out loud. DO NOT start with "Okay", "Let me", "The user", or any re
 
 CRITICAL: Your output goes DIRECTLY to a Text-to-Speech engine. Write ONLY plain spoken English sentences. NO Devanagari. NO markdown. NO bullets. NO asterisks. NO numbered lists. NO digits — write all numbers as words (say "one hundred thirty-eight" not "138").
 
-STYLE: You are a brilliant, experienced Supreme Court lawyer who genuinely cares. You speak with authority AND warmth. You give SPECIFIC, ACTIONABLE advice — not vague generalities. You name exact Acts, Sections, Courts, Forms, Helplines. You tell them the exact steps like a GPS for their legal journey.
+STYLE: Think of yourself as a calm, experienced friend who happens to be a great lawyer. The person calling you is scared or confused. Talk to them like a human — warm, patient, reassuring. Use simple words. Short sentences. No legal jargon unless you immediately explain it. Avoid cold phrases like "procedural violation" or "limitation period" — say "it's past the deadline" or "the police didn't follow the rule." You name exact Acts, Sections, Courts, Forms, Helplines so they know what to do next, but you wrap them in plain language, not a lecture.
 
 LEGAL REFERENCES:
 ${rag || "No specific legal reference found. Direct caller to NALSA helpline fifteen-one-hundred for a free lawyer. Do not cite any section or act number."}
 
 HOW TO RESPOND:
-First, one line of empathy — show you understand their exact pain.
-Then give the STRONGEST legal weapon they have — name the Act, Section, and the landmark Supreme Court judgment if you know it.
-Then give them a STEP-BY-STEP action plan: (a) where to go physically, (b) what document to file, (c) any critical deadline they must know, (d) the helpline or website.
-If the caller's situation is unclear or you need more details to give proper advice, ask ONE specific follow-up question. But if they already explained their full problem clearly, give the complete answer directly — do NOT force a question at the end.
+Start with one warm line — "I understand, this must be stressful" or "Don't worry, you have rights here." Make them feel heard.
+Then tell them clearly what the law says on their side — the Act, Section, or case — in a sentence a non-lawyer can understand.
+Then give them the next two or three concrete steps — where to go, what to file, what to ask for.
+End with a reassuring line. Only ask a follow-up question if you genuinely cannot answer without more info — and when you do, make it a SPECIFIC, USEFUL question like "Did the police refuse to write it down?" — not a generic "tell me more." Do NOT ask a question every turn. Most of the time, just answer.
 
 HARD RULES:
-- MAX 90 words. This is a phone call — pack maximum value in minimum words.
+- MAX 90 words. This is a phone call — keep it tight.
+- Tone: warm, comforting, human. NEVER robotic or lecturing.
 - ONLY Indian law questions. Non-legal: "I can only help with legal matters. Please tell me your legal problem."
-- Be SPECIFIC: say "file Form A at District Consumer Commission within two years" not "you can complain."
-- Cite the specific Act, Section, AND the relevant Court or Authority.
+- Be SPECIFIC with actions: "file Form A at District Consumer Commission within two years."
 - ALWAYS mention NALSA fifteen-one-hundred for free lawyer.
-- Do NOT ask unnecessary questions. If the person has given you enough context, just answer fully.
+- Ask a follow-up question ONLY when truly needed — and only a relevant one. Default: no question.
 - NEVER use Devanagari script or Hindi words.
 - Write numbers as words: "Section one hundred thirty-eight" not "Section 138".
-- CRITICAL: ONLY cite Acts and Sections from the LEGAL REFERENCES above. If the reference doesn't cover their issue, say so honestly and direct them to NALSA.`,
+- ONLY cite Acts and Sections from the LEGAL REFERENCES above. If the reference doesn't cover their issue, say so honestly and direct them to NALSA.`,
 
     "hi-IN": (rag) => `आप न्यायसाथी हैं — भारत की मुफ़्त कानूनी हेल्पलाइन। आप फ़ोन पर बात कर रहे हैं।
 
@@ -332,23 +338,25 @@ HARD RULES:
 - फ़ोन नंबर भी हिंदी में: "एक पाँच एक शून्य शून्य" (15100)
 - कोई मार्कडाउन, बुलेट, तारा चिह्न, या सूची नहीं। सीधे बोलचाल वाले वाक्य लिखें।
 
-अंदाज़: आप एक अनुभवी वकील हैं जो गाँव के लोगों से बात कर रहे हैं। सरल, साफ़ हिंदी बोलें। छोटे वाक्य। हर बात आसान शब्दों में। जैसे कोई बड़ा भाई समझा रहा हो।
+अंदाज़: आप एक समझदार बड़े भाई या दीदी हैं जो वकील भी हैं। सामने वाला परेशान है, डरा हुआ है। उससे इंसान की तरह बात कीजिए — प्यार से, धीरे से, हिम्मत देते हुए। आसान शब्द। छोटे वाक्य। कानूनी भाषा तब ही बोलिए जब साथ में आसान शब्दों में समझा दें। "प्रक्रियात्मक उल्लंघन" जैसे भारी शब्द नहीं — बस बोलिए "पुलिस ने नियम तोड़ा है" या "समय निकल गया है।" धारा और अधिनियम बताना ज़रूरी है ताकि अगला कदम साफ़ हो, लेकिन भाषा सरल रखें — भाषण मत दीजिए।
 
 कानूनी संदर्भ:
 ${rag || "कोई विशेष कानूनी संदर्भ नहीं मिला। कॉलर को नालसा हेल्पलाइन एक पाँच एक शून्य शून्य पर फ़ोन करने को बोलें। कोई धारा या अधिनियम न बताएं।"}
 
 जवाब कैसे दें:
-पहले एक लाइन सहानुभूति — "मैं आपकी परेशानी समझ रहा हूँ।"
-फिर सबसे ज़रूरी कानूनी जानकारी — कौन सा अधिनियम, कौन सी धारा।
-फिर क्या करना है — कहाँ जाना है, क्या लिखवाना है, कितने दिन में करना है।
-आख़िर में नालसा हेल्पलाइन "एक पाँच एक शून्य शून्य" ज़रूर बताएं।
-अगर बात पूरी तरह साफ़ नहीं है तो एक सवाल पूछें। लेकिन अगर बात साफ़ है तो सीधे जवाब दें।
+पहले एक गर्मजोशी वाली लाइन — "मैं आपकी परेशानी समझ रहा हूँ, घबराइए मत" या "चिंता मत कीजिए, आपके पास अधिकार हैं।" उन्हें लगे कि कोई सुन रहा है।
+फिर साफ़ बताइए क़ानून क्या कहता है — कौन सा अधिनियम, कौन सी धारा — पर आसान शब्दों में।
+फिर दो-तीन ठोस कदम — कहाँ जाना है, क्या लिखवाना है, क्या माँगना है।
+आख़िर में हिम्मत देने वाली एक लाइन। नालसा "एक पाँच एक शून्य शून्य" ज़रूर बताएं।
+सवाल सिर्फ़ तब पूछें जब सच में ज़रूरी हो — और पूछें तो ठीक काम का सवाल, जैसे "क्या पुलिस ने लिखने से मना किया था?" — सामान्य "और बताइए" नहीं। हर बार सवाल मत पूछिए। ज़्यादातर सीधे जवाब दीजिए।
 
 सख्त नियम:
 - अधिकतम नब्बे शब्द। फ़ोन पर बात है — कम बोलें, काम की बात बोलें।
+- लहजा गर्म, सहारा देने वाला, इंसानी। रोबोट की तरह या भाषण की तरह नहीं।
 - सिर्फ़ कानूनी सवालों का जवाब दें। बाकी: "मैं सिर्फ़ कानूनी मामलों में मदद करता हूँ।"
 - साफ़ बताएं: "ज़िला उपभोक्ता आयोग में दो साल के अंदर शिकायत दर्ज करें"
 - नालसा "एक पाँच एक शून्य शून्य" हमेशा बताएं — मुफ़्त वकील मिलेगा।
+- सवाल तब ही पूछें जब वाक़ई ज़रूरी हो। आम तौर पर सीधे जवाब दें।
 - एक भी अंग्रेज़ी शब्द मत लिखें। पूरा जवाब देवनागरी में हो।
 - केवल वही धारा और अधिनियम बताएं जो ऊपर कानूनी संदर्भ में दिए हैं।`,
 };
@@ -370,24 +378,26 @@ ABSOLUTE RULE: Your ENTIRE response must be in ${langName} using its native scri
 
 DO NOT think out loud. DO NOT start with "Okay" or "Let me" or any reasoning. Start DIRECTLY with your empathetic response in ${langName}.
 
-STYLE: You are a brilliant Supreme Court lawyer who genuinely cares. Give SPECIFIC, ACTIONABLE advice — name exact Acts, Sections, Courts, Forms, Helplines, and deadlines.
+STYLE: Think of yourself as a calm, caring older sibling who is also a great lawyer. The caller is scared or confused — talk to them like a human. Warm, patient, simple words. Short sentences. No heavy legal jargon. Still name the exact Acts, Sections, Courts, Forms, Helplines so they know what to do — but wrap it in plain language, never a lecture.
 
 LEGAL REFERENCES:
 ${ragContext || "No specific legal reference found. Direct caller to NALSA 15100 for a free lawyer. Do not cite any section or act number."}
 
 HOW TO RESPOND:
-First empathize — one line showing you understand their pain.
-Then give the STRONGEST legal weapon — Act, Section, landmark judgment.
-Then STEP-BY-STEP action plan: where to go, what to file, deadline, helpline/website.
-If the situation needs clarification, ask ONE follow-up question. If they already explained clearly, give the full answer directly.
+Start with one warm line — let them feel heard.
+Then tell them clearly what the law says on their side, in simple words.
+Then two or three concrete steps — where to go, what to file, what to ask for.
+End with a reassuring line. Only ask a follow-up question if you truly cannot answer without more info — and when you do, make it SPECIFIC and useful, not generic. Do NOT ask a question every turn.
 
 HARD RULES:
-- MAX 90 words. Phone call — pack maximum value in minimum words.
+- MAX 90 words. Phone call — keep it tight.
+- Tone: warm, comforting, human. Never robotic or lecturing.
 - ENTIRE response in ${langName} native script. ZERO English words.
 - ONLY Indian law questions. Non-legal: politely refuse in ${langName}.
 - Be SPECIFIC: name the Court, Form, deadline, helpline.
 - Cite specific Act + Section from LEGAL REFERENCES only. If unsure, direct to NALSA 15100.
 - ALWAYS mention NALSA 15100 for free lawyer.
+- Ask a follow-up only when truly needed — default to no question.
 - NO markdown, bullets, asterisks.`;
 }
 
@@ -616,40 +626,46 @@ function responseCacheSet(key, reply, model, ragContext) {
 // ═══════════════════════════════════════════════════════════
 const FAQ_TEMPLATES = {
     "hi-IN": [
-        { patterns: ["fir", "kaise", "darj", "police", "thana", "एफआईआर", "एफ़आईआर", "एफ़", "दर्ज", "थाना", "थाने"], answer: "एफ़ आई आर दर्ज करने के लिए नज़दीकी थाने में जाइए। बी एन एस एस धारा एक सौ तिहत्तर के तहत पुलिस एफ़ आई आर दर्ज करने से मना नहीं कर सकती। अगर मना करे तो एस पी को लिखित शिकायत भेजें। ज़ीरो एफ़ आई आर किसी भी थाने में दर्ज हो सकती है। ललिता कुमारी बनाम उत्तर प्रदेश में उच्चतम न्यायालय ने एफ़ आई आर अनिवार्य बताई। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। क्या आपकी एफ़ आई आर मना की गई है?" },
-        { patterns: ["cheque", "bounce", "check", "dishonour", "चेक", "बाउंस", "बाउन्स"], answer: "चेक बाउंस पर परक्राम्य लिखत अधिनियम की धारा एक सौ अड़तीस लागू होती है। बाउंस के बाद तीस दिन के अंदर कानूनी नोटिस भेजिए। पंद्रह दिन में पैसे न आएं तो मजिस्ट्रेट अदालत में शिकायत दर्ज करें। दो साल तक की सज़ा और चेक की रकम से दोगुना जुर्माना हो सकता है। शिकायत बाउंस के तीस दिन बाद और एक महीने के अंदर करनी होती है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। चेक कितने का है?" },
-        { patterns: ["online", "fraud", "scam", "upi", "cyber", "phishing", "otp", "ऑनलाइन", "धोखाधड़ी", "धोखा", "साइबर", "फ्रॉड"], answer: "ऑनलाइन धोखाधड़ी में तुरंत एक नौ तीन शून्य पर फ़ोन करें, यह राष्ट्रीय साइबर अपराध हेल्पलाइन है, पैसे फ्रीज़ हो सकते हैं। साइबरक्राइम डॉट जी ओ वी डॉट इन पर शिकायत दर्ज करें। आई टी अधिनियम धारा छिहत्तर डी और बी एन एस धारा तीन सौ अठारह के तहत एफ़ आई आर दर्ज करें। बैंक को तुरंत सूचित करें। कितने पैसे गए हैं?" },
-        { patterns: ["domestic", "violence", "marpit", "pati", "sasural", "घरेलू", "हिंसा", "मारपीट", "पति", "ससुराल"], answer: "घरेलू हिंसा में सबसे पहले महिला हेल्पलाइन एक आठ एक पर फ़ोन करें। घरेलू हिंसा अधिनियम दो हज़ार पाँच और बी एन एस धारा पचासी के तहत आपको सुरक्षा मिलेगी। नज़दीकी संरक्षण अधिकारी से मिलें। मजिस्ट्रेट अदालत में सुरक्षा आदेश और भरण-पोषण की अर्ज़ी दें। एफ़ आई आर भी दर्ज करवाएं। आपको शेल्टर होम में रहने का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। क्या आप सुरक्षित जगह पर हैं?" },
-        { patterns: ["salary", "vetan", "naukri", "job", "termination", "fired", "वेतन", "नौकरी", "तनख्वाह", "सैलरी", "निकाला", "पगार", "मिली"], answer: "वेतन या नौकरी की समस्या के लिए श्रम आयुक्त को शिकायत दें, हेल्पलाइन एक चार चार तीन चार पर फ़ोन करें। वेतन न मिले तो श्रम अदालत में केस करें। गलत तरीके से निकाला गया है तो औद्योगिक विवाद अधिनियम धारा पच्चीस एफ़ के तहत हर साल के लिए पंद्रह दिन का वेतन मुआवज़ा मिलेगा। पाँच साल की नौकरी के बाद ग्रेच्युटी का अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। कितने दिन से वेतन नहीं मिला?" },
-        { patterns: ["consumer", "complaint", "product", "service", "refund", "उपभोक्ता", "शिकायत", "रिफंड", "सामान", "सर्विस"], answer: "उपभोक्ता शिकायत के लिए उपभोक्ता संरक्षण अधिनियम दो हज़ार उन्नीस लागू होता है। एक आठ शून्य शून्य एक एक चार शून्य शून्य शून्य पर फ़ोन करें, यह मुफ़्त हेल्पलाइन है। ज़िला उपभोक्ता आयोग में एक करोड़ तक की शिकायत दर्ज हो सकती है। ई-दाखिल डॉट एन आई सी डॉट इन पर ऑनलाइन शिकायत करें। दो साल के अंदर शिकायत करनी होती है। शिकायत किस बारे में है?" },
-        { patterns: ["bail", "giraftari", "arrest", "jail", "ज़मानत", "जमानत", "गिरफ्तारी", "गिरफ़्तारी", "जेल"], answer: "ज़मानत और गिरफ्तारी के बारे में बताता हूँ। ज़मानती अपराध में थाने पर ही ज़मानत का अधिकार है। ग़ैर-ज़मानती अपराध में सत्र अदालत या उच्च न्यायालय में अर्ज़ी दें। अग्रिम ज़मानत बी एन एस एस धारा चार सौ बयासी के तहत मिलती है। अगर साठ या नब्बे दिन में आरोप पत्र न दाखिल हो तो ज़मानत का अधिकार है। गिरफ्तारी में परिवार को सूचित करना पुलिस की ज़िम्मेदारी है। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें। किस मामले में गिरफ्तारी हुई?" },
-        { patterns: ["rti", "information", "suchna", "आरटीआई", "सूचना", "जानकारी"], answer: "सूचना का अधिकार अधिनियम दो हज़ार पाँच के तहत आप किसी भी सरकारी कार्यालय से जानकारी माँग सकते हैं। दस रुपये की फीस के साथ आवेदन दें। तीस दिन में जवाब अनिवार्य है। जवाब न मिले तो पहली अपील तीस दिन में और सूचना आयोग में नब्बे दिन में करें। ऑनलाइन आर टी आई डॉट जी ओ वी डॉट इन पर लगा सकते हैं। गरीबी रेखा से नीचे वालों को फीस माफ़ है। किस विभाग से जानकारी चाहिए?" },
-        { patterns: ["property", "zameen", "registry", "makaan", "flat", "builder", "संपत्ति", "ज़मीन", "जमीन", "रजिस्ट्री", "मकान", "फ्लैट", "बिल्डर", "किराया", "किरायेदार"], answer: "संपत्ति विवाद में बिल्डर ने देरी की है तो रेरा प्राधिकरण में शिकायत करें। ज़मीन का विवाद है तो राजस्व अदालत या दीवानी अदालत में केस करें। रजिस्ट्री के लिए उप-पंजीयक कार्यालय जाएं। नामांतरण के लिए तहसील कार्यालय में आवेदन दें। अतिक्रमण है तो एस डी एम या ज़िला कलेक्टर को शिकायत करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। किस तरह का संपत्ति विवाद है?" },
-        { patterns: ["divorce", "talaq", "shaadi", "तलाक", "तलाक़", "शादी", "विवाह"], answer: "तलाक के लिए हिंदू विवाह अधिनियम धारा तेरह लागू होती है। आपसी सहमति से तलाक धारा तेरह बी के तहत होता है, छह महीने का इंतज़ार करना पड़ता है। एकतरफा तलाक क्रूरता, परित्याग या सात साल से लापता होने पर मिलता है। तीन तलाक़ अब अपराध है, तीन साल की सज़ा है। भरण-पोषण का अधिकार धारा एक सौ पच्चीस के तहत है। परिवार अदालत में याचिका दाखिल करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या दोनों पक्ष सहमत हैं?" },
+        { patterns: ["fir", "kaise", "darj", "police", "thana", "एफआईआर", "एफ़आईआर", "एफ़", "दर्ज", "थाना", "थाने"], answer: "घबराइए मत, मैं समझ रहा हूँ। एफ़ आई आर लिखवाना आपका अधिकार है। नज़दीकी थाने जाइए, बी एन एस एस धारा एक सौ तिहत्तर के तहत पुलिस मना नहीं कर सकती। अगर मना करे तो एस पी को लिखित शिकायत भेज दीजिए, ज़ीरो एफ़ आई आर किसी भी थाने में दर्ज होती है। उच्चतम न्यायालय ने ललिता कुमारी केस में यह साफ़ कहा है। मुफ़्त वकील चाहिए तो नालसा एक पाँच एक शून्य शून्य पर फ़ोन कीजिए। आप अकेले नहीं हैं।" },
+        { patterns: ["cheque", "bounce", "check", "dishonour", "चेक", "बाउंस", "बाउन्स"], answer: "चिंता मत कीजिए, चेक बाउंस में कानून आपके साथ है। बाउंस के तीस दिन के अंदर सामने वाले को कानूनी नोटिस भेजिए। पंद्रह दिन में पैसे न आएं तो मजिस्ट्रेट अदालत में शिकायत दर्ज कर दीजिए। परक्राम्य लिखत अधिनियम धारा एक सौ अड़तीस के तहत दो साल तक की सज़ा और चेक की रकम से दोगुना जुर्माना हो सकता है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। कागज़ात संभाल कर रखिए।" },
+        { patterns: ["online", "fraud", "scam", "upi", "cyber", "phishing", "otp", "ऑनलाइन", "धोखाधड़ी", "धोखा", "साइबर", "फ्रॉड"], answer: "घबराइए मत, जल्दी करेंगे तो पैसे वापस आ सकते हैं। सबसे पहले एक नौ तीन शून्य पर फ़ोन कीजिए, यह राष्ट्रीय साइबर हेल्पलाइन है, पैसे फ्रीज़ हो सकते हैं। साइबरक्राइम डॉट जी ओ वी डॉट इन पर शिकायत दर्ज कीजिए। बैंक को तुरंत बताइए खाता बंद करवाइए। एफ़ आई आर आई टी अधिनियम धारा छिहत्तर डी और बी एन एस धारा तीन सौ अठारह के तहत होगी। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["domestic", "violence", "marpit", "pati", "sasural", "घरेलू", "हिंसा", "मारपीट", "पति", "ससुराल"], answer: "मैं आपकी तकलीफ़ समझ रहा हूँ। आप अकेली नहीं हैं, कानून पूरी तरह आपके साथ है। पहले महिला हेल्पलाइन एक आठ एक पर फ़ोन कीजिए, चौबीस घंटे मदद मिलेगी। घरेलू हिंसा अधिनियम दो हज़ार पाँच के तहत सुरक्षा आदेश और भरण-पोषण दोनों माँग सकती हैं, नज़दीकी संरक्षण अधिकारी से मिलिए। शेल्टर होम में रहने का भी आपका अधिकार है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त महिला वकील मिलेगी। अभी क्या आप सुरक्षित जगह पर हैं?" },
+        { patterns: ["salary", "vetan", "naukri", "job", "termination", "fired", "वेतन", "नौकरी", "तनख्वाह", "सैलरी", "निकाला", "पगार", "मिली"], answer: "तकलीफ़ समझ रहा हूँ, मेहनत का पैसा रुका है तो गुस्सा आना स्वाभाविक है। श्रम आयुक्त के पास शिकायत दीजिए, हेल्पलाइन एक चार चार तीन चार है। वेतन न मिले तो श्रम अदालत में केस कीजिए। गलत तरीके से निकाले गए हैं तो औद्योगिक विवाद अधिनियम धारा पच्चीस एफ़ के तहत हर साल के लिए पंद्रह दिन का वेतन मुआवज़ा मिलता है, पाँच साल बाद ग्रेच्युटी भी। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["consumer", "complaint", "product", "service", "refund", "उपभोक्ता", "शिकायत", "रिफंड", "सामान", "सर्विस"], answer: "चिंता मत कीजिए, उपभोक्ता संरक्षण अधिनियम दो हज़ार उन्नीस पूरी तरह आपके साथ है। मुफ़्त हेल्पलाइन एक आठ शून्य शून्य एक एक चार शून्य शून्य शून्य पर फ़ोन कीजिए। ज़िला उपभोक्ता आयोग में एक करोड़ तक की शिकायत दर्ज हो सकती है, ई-दाखिल डॉट एन आई सी डॉट इन पर ऑनलाइन भी कर सकते हैं। समय सीमा दो साल है। बिल और व्हाट्सऐप चैट जैसे सबूत संभाल कर रखिए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["bail", "giraftari", "arrest", "jail", "ज़मानत", "जमानत", "गिरफ्तारी", "गिरफ़्तारी", "जेल"], answer: "घबराइए मत, आपके अधिकार पूरी तरह सुरक्षित हैं। ज़मानती अपराध में थाने पर ही ज़मानत का हक़ है। ग़ैर-ज़मानती अपराध हो तो सत्र अदालत या उच्च न्यायालय में अर्ज़ी दीजिए। अग्रिम ज़मानत बी एन एस एस धारा चार सौ बयासी के तहत पहले ही मिल सकती है। अगर साठ या नब्बे दिन में आरोप पत्र न दाखिल हो तो ज़मानत का पक्का अधिकार है। डी के बसु फैसले के तहत गिरफ्तारी में परिवार को बताना पुलिस की ज़िम्मेदारी है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील तुरंत।" },
+        { patterns: ["rti", "information", "suchna", "आरटीआई", "सूचना", "जानकारी"], answer: "सूचना माँगना आपका अधिकार है, डरने की कोई बात नहीं। सूचना का अधिकार अधिनियम दो हज़ार पाँच के तहत दस रुपये की फीस के साथ किसी भी सरकारी दफ़्तर से जानकारी माँग सकते हैं। तीस दिन में जवाब देना ज़रूरी है। जवाब न आए तो पहली अपील तीस दिन में, और सूचना आयोग में नब्बे दिन में। ऑनलाइन आर टी आई डॉट जी ओ वी डॉट इन पर लगा सकते हैं। बी पी एल को फीस माफ़ है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त मदद।" },
+        { patterns: ["property", "zameen", "registry", "makaan", "flat", "builder", "संपत्ति", "ज़मीन", "जमीन", "रजिस्ट्री", "मकान", "फ्लैट", "बिल्डर", "किराया", "किरायेदार"], answer: "तकलीफ़ समझ रहा हूँ, संपत्ति के मामले बड़े तनाव वाले होते हैं। बिल्डर ने देरी की है तो रेरा प्राधिकरण में शिकायत कीजिए, यहाँ बिल्डर पर सख़्ती होती है। ज़मीन का विवाद है तो राजस्व या दीवानी अदालत में जाइए। अतिक्रमण हुआ है तो एस डी एम या ज़िला कलेक्टर को लिखित शिकायत। रजिस्ट्री और नामांतरण उप-पंजीयक और तहसील कार्यालय में होते हैं। सारे कागज़ात संभाल कर रखिए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["divorce", "talaq", "shaadi", "तलाक", "तलाक़", "शादी", "विवाह"], answer: "मैं समझ रहा हूँ, यह समय भारी होता है। हिंदू विवाह अधिनियम धारा तेरह के तहत तलाक का आपका अधिकार है। दोनों सहमत हैं तो धारा तेरह बी के तहत आपसी सहमति से तलाक छह महीने में हो जाता है। एकतरफा तलाक क्रूरता, परित्याग या सात साल से लापता होने पर मिलता है। तीन तलाक़ अब अपराध है, तीन साल की सज़ा है। भरण-पोषण का अधिकार धारा एक सौ पच्चीस में है। परिवार अदालत में याचिका दाखिल कीजिए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
         // ─── Village / Rural Specific FAQs ───
-        { patterns: ["ज़मीन", "जमीन", "कब्ज़ा", "कब्जा", "zameen", "kabza", "भूमि", "ताकतवर", "ज़बरदस्ती"], answer: "मैं आपकी परेशानी समझ रहा हूँ। ज़मीन पर अवैध कब्ज़ा हुआ है तो सबसे पहले तहसीलदार या एस डी एम को लिखित शिकायत दें। बी एन एस धारा तीन सौ तीस के तहत अतिक्रमण अपराध है, एफ़ आई आर दर्ज करवाएं। दीवानी अदालत में कब्ज़ा वापसी का दावा करें। ज़मीन के कागज़ात जैसे खतौनी, रजिस्ट्री साथ रखें। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। क्या आपके पास ज़मीन के कागज़ात हैं?" },
-        { patterns: ["जाति", "जात", "दलित", "ऊँची", "छुआछूत", "भेदभाव", "मारा", "पीटा", "caste", "dalit", "atrocity"], answer: "मैं आपकी परेशानी समझ रहा हूँ। जातिगत हिंसा या भेदभाव पर अनुसूचित जाति और जनजाति अत्याचार निवारण अधिनियम लागू होता है। इसमें तुरंत एफ़ आई आर दर्ज होनी चाहिए, पुलिस मना नहीं कर सकती। अगर थाने में नहीं सुनते तो ज़िला मजिस्ट्रेट या एस पी को सीधे शिकायत दें। मुआवज़ा भी मिलता है। नालसा एक पाँच एक शून्य शून्य पर फ़ोन करें, मुफ़्त वकील मिलेगा। किस तरह की हिंसा हुई है?" },
-        { patterns: ["मनरेगा", "नरेगा", "मजदूरी", "काम", "मज़दूरी", "mnrega", "nrega", "wages", "रोज़गार"], answer: "मनरेगा में काम माँगने का आपका अधिकार है। काम माँगने के पंद्रह दिन में काम न मिले तो बेरोज़गारी भत्ता मिलेगा। मज़दूरी पंद्रह दिन में खाते में आनी चाहिए, देर हो तो ब्याज़ मिलेगा। ग्राम पंचायत सचिव से लिखित में काम माँगें। शिकायत के लिए ज़िला कार्यक्रम अधिकारी या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर फ़ोन करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। कितने दिन से पैसा नहीं आया?" },
-        { patterns: ["राशन", "कार्ड", "राशन कार्ड", "ration", "card", "अनाज", "गेहूँ", "चावल", "बीपीएल"], answer: "राशन कार्ड बनवाने के लिए खाद्य विभाग के कार्यालय में या ऑनलाइन आवेदन करें। राष्ट्रीय खाद्य सुरक्षा अधिनियम के तहत गरीब परिवार को पाँच किलो अनाज प्रति व्यक्ति हर महीने मिलना चाहिए। राशन डीलर अनाज न दे तो ज़िला खाद्य अधिकारी को शिकायत करें। शिकायत हेल्पलाइन एक नौ शून्य शून्य या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर फ़ोन करें। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या राशन कार्ड है आपके पास?" },
-        { patterns: ["पंचायत", "सरपंच", "प्रधान", "ग्राम", "गाँव", "panchayat", "sarpanch", "gram"], answer: "पंचायत से जुड़ी शिकायत के लिए ज़िला पंचायत अधिकारी या ज़िला मजिस्ट्रेट को लिखित शिकायत दें। सरपंच या प्रधान गलत काम कर रहा है तो अविश्वास प्रस्ताव ला सकते हैं। पंचायत के फंड में घपला है तो भ्रष्टाचार निवारण अधिनियम के तहत शिकायत करें। आर टी आई लगाकर पंचायत के सभी खर्चों का हिसाब माँग सकते हैं। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। क्या समस्या है पंचायत में?" },
-        { patterns: ["झूठा", "झूठी", "फर्ज़ी", "false", "fake", "फँसाया", "केस"], answer: "झूठे केस में सबसे पहले अग्रिम ज़मानत के लिए वकील से मिलें। बी एन एस एस धारा चार सौ बयासी के तहत अदालत में अग्रिम ज़मानत की अर्ज़ी दें। झूठी एफ़ आई आर को रद्द करवाने के लिए उच्च न्यायालय में याचिका दायर करें। डी के बसु बनाम पश्चिम बंगाल के फ़ैसले के तहत गिरफ्तारी में आपके अधिकार सुरक्षित हैं। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा। किस तरह का झूठा केस है?" },
+        { patterns: ["ज़मीन", "जमीन", "कब्ज़ा", "कब्जा", "zameen", "kabza", "भूमि", "ताकतवर", "ज़बरदस्ती"], answer: "आपकी तकलीफ़ समझ रहा हूँ, ज़मीन छिनने का डर बहुत बड़ा होता है। पहले तहसीलदार या एस डी एम को लिखित शिकायत दीजिए। बी एन एस धारा तीन सौ तीस के तहत अतिक्रमण अपराध है, थाने में एफ़ आई आर दर्ज करवाइए, पुलिस मना नहीं कर सकती। साथ ही दीवानी अदालत में कब्ज़ा वापसी का दावा ठोकिए। खतौनी, रजिस्ट्री, भू नक्शा जैसे सारे कागज़ संभाल कर रखिए, यही आपकी ताक़त हैं। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील मिलेगा।" },
+        { patterns: ["जाति", "जात", "दलित", "ऊँची", "छुआछूत", "भेदभाव", "मारा", "पीटा", "caste", "dalit", "atrocity"], answer: "जो हुआ वह ग़लत है, और कानून पूरी तरह आपके साथ है। अनुसूचित जाति और जनजाति अत्याचार निवारण अधिनियम के तहत पुलिस को तुरंत एफ़ आई आर दर्ज करनी ही पड़ेगी, मना करने का हक़ उन्हें नहीं है। थाने में न सुनें तो सीधे ज़िला मजिस्ट्रेट या एस पी को लिखित शिकायत भेजिए। इस कानून में पीड़ित को सरकार से मुआवज़ा भी मिलता है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील तुरंत मिलेगा। आप अकेले नहीं हैं।" },
+        { patterns: ["मनरेगा", "नरेगा", "मजदूरी", "काम", "मज़दूरी", "mnrega", "nrega", "wages", "रोज़गार"], answer: "मेहनत का पैसा रुका है तो परेशानी समझ में आती है, पर आपका हक़ साफ़ है। मनरेगा में काम माँगने का अधिकार कानूनी है। पंद्रह दिन में काम न मिले तो बेरोज़गारी भत्ता मिलना चाहिए। मज़दूरी पंद्रह दिन में खाते में आनी ज़रूरी है, देर पर ब्याज़ मिलता है। ग्राम पंचायत सचिव से लिखित में काम माँगिए, रसीद लीजिए। शिकायत ज़िला कार्यक्रम अधिकारी को या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["राशन", "कार्ड", "राशन कार्ड", "ration", "card", "अनाज", "गेहूँ", "चावल", "बीपीएल"], answer: "चिंता मत कीजिए, राशन आपका अधिकार है। राष्ट्रीय खाद्य सुरक्षा अधिनियम के तहत हर ग़रीब परिवार को हर व्यक्ति के हिसाब से पाँच किलो अनाज हर महीने मिलना चाहिए। कार्ड नहीं है तो खाद्य विभाग के दफ़्तर में या ऑनलाइन आवेदन कीजिए। डीलर अनाज न दे तो ज़िला खाद्य अधिकारी को शिकायत, हेल्पलाइन एक नौ शून्य शून्य या एक आठ शून्य शून्य एक एक एक शून्य शून्य पर। राशन डायरी में हर एंट्री लिखवाइए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त मदद।" },
+        { patterns: ["पंचायत", "सरपंच", "प्रधान", "ग्राम", "गाँव", "panchayat", "sarpanch", "gram"], answer: "घबराइए मत, गाँव की सत्ता के ख़िलाफ़ भी कानून पूरी तरह आपके साथ है। ज़िला पंचायत अधिकारी या ज़िला मजिस्ट्रेट को लिखित शिकायत दीजिए। सरपंच फंड में घपला कर रहा है तो भ्रष्टाचार निवारण अधिनियम के तहत शिकायत करें, जाँच होगी। आर टी आई लगा कर पंचायत के हर खर्चे का हिसाब माँग सकते हैं, यह आपका हक़ है। ज़रूरत पड़े तो अविश्वास प्रस्ताव लाकर सरपंच हटाया भी जा सकता है। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
+        { patterns: ["झूठा", "झूठी", "फर्ज़ी", "false", "fake", "फँसाया", "केस"], answer: "घबराइए मत, झूठे केस से कानून आपको बचा सकता है। सबसे पहले वकील से मिल कर अग्रिम ज़मानत की अर्ज़ी तैयार करवाइए, बी एन एस एस धारा चार सौ बयासी के तहत यह सत्र अदालत या उच्च न्यायालय में लगती है। झूठी एफ़ आई आर रद्द करवाने के लिए उच्च न्यायालय में याचिका दायर कीजिए। डी के बसु फैसले के तहत गिरफ्तारी में आपके अधिकार पूरी तरह सुरक्षित हैं, परिवार को बताना पुलिस की ज़िम्मेदारी है। नालसा एक पाँच एक शून्य शून्य पर तुरंत मुफ़्त वकील।" },
+        // ─── Motor Vehicle / Accident FAQs ───
+        { patterns: ["एक्सीडेंट", "एक्सिडेंट", "दुर्घटना", "टक्कर", "गाड़ी", "बाइक", "कार", "ट्रक", "accident", "hit", "road"], answer: "घबराइए मत, मैं साथ हूँ। सबसे पहले अगर कोई घायल है तो एक एक दो पर तुरंत फ़ोन कीजिए। घायल को अस्पताल पहुँचाना ज़रूरी है, मोटर वाहन अधिनियम धारा एक सौ चौंतीस कहती है मदद करनी ही होगी। फिर नज़दीकी थाने में एफ़ आई आर दर्ज करवाइए। मुआवज़े के लिए मोटर दुर्घटना दावा अधिकरण में मोटर वाहन अधिनियम धारा एक सौ छियासठ के तहत अर्ज़ी दीजिए, बीमा कंपनी को भी बता दीजिए। लाइसेंस, गाड़ी के कागज़, मेडिकल रिपोर्ट संभाल कर रखिए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील। अभी बताइए कोई घायल तो नहीं है?" },
+        { patterns: ["हिट एंड रन", "भागना", "भाग गया", "hit and run", "चालान", "ट्रैफिक", "traffic"], answer: "मैं समझ रहा हूँ, हिट एंड रन में बहुत घबराहट होती है, पर कानून आपके साथ है। गाड़ी का नंबर याद हो तो तुरंत थाने में बताइए। मोटर वाहन अधिनियम धारा एक सौ इकसठ के तहत सरकार से मुआवज़ा मिलता है, मौत पर दो लाख और गंभीर चोट पर पचास हज़ार तक। सोलेशियम फंड की अर्ज़ी ज़िला मजिस्ट्रेट को दीजिए। बी एन एस धारा एक सौ छह के तहत एफ़ आई आर भी ज़रूर दर्ज कराइए। मेडिकल पेपर संभालिए। नालसा एक पाँच एक शून्य शून्य पर मुफ़्त वकील।" },
     ],
     "en-IN": [
-        { patterns: ["fir", "police", "register", "lodge", "complaint", "file", "how"], answer: "To file an FIR, go to your nearest police station. Under BNSS Section 173, the police must register your FIR for any cognizable offence, they cannot refuse. If they refuse, send a written complaint to the SP by registered post. You can also file a Zero FIR at any police station regardless of jurisdiction. The Supreme Court in Lalita Kumari versus Uttar Pradesh made FIR registration mandatory. Call NALSA helpline 15100 for a free lawyer. Has your FIR been refused?" },
-        { patterns: ["consumer", "complaint", "defective", "product", "refund", "service"], answer: "For a consumer complaint, you can call the toll-free helpline 1800-11-4000 or file online at the consumer helpline website. File your complaint at the District Consumer Disputes Commission for claims up to one crore rupees. The time limit is two years from the date of the problem. The Supreme Court has said that delay or deficiency in service is compensable. Call NALSA 15100 for a free lawyer. What product or service is the complaint about?" },
-        { patterns: ["cheque", "bounce", "dishonour", "check"], answer: "For a cheque bounce case, first send a legal notice within 30 days of the bounce memo. If the person does not pay within 15 days of receiving your notice, file a complaint in Magistrate Court under NI Act Section 138. The punishment can be up to two years in jail plus twice the cheque amount as fine. You must file within one month after the 15 day notice period expires. Call NALSA 15100 for free legal aid. What is the cheque amount?" },
-        { patterns: ["online", "fraud", "cyber", "scam", "upi"], answer: "For online fraud, act immediately. Call 1930, the National Cyber Crime Helpline, your money can be frozen before the fraudster withdraws it. Also report on the cyber crime website. You can file an FIR under IT Act Section 66D and BNS Section 318. Notify your bank immediately to block your account. How much money was lost?" },
-        { patterns: ["domestic", "violence", "husband", "abuse"], answer: "For domestic violence, first call the Women Helpline at 181, they are available 24 hours. You are protected under the Domestic Violence Act 2005 and BNS Section 85. Meet your nearest Protection Officer and file for a Protection Order and maintenance in Magistrate Court. You can also file an FIR under BNS Section 85 for cruelty. You have the right to stay at a shelter home. Call NALSA 15100 for a free lawyer. Are you in a safe place right now?" },
-        { patterns: ["salary", "job", "fired", "termination", "wages", "paid", "not"], answer: "For salary or job problems, first complain to the Labour Commissioner, call helpline 14434. If your salary has not been paid, file a case in Labour Court. If you were wrongfully terminated, you can get retrenchment compensation under the Industrial Disputes Act, that is 15 days salary for each year you worked. After five years of service, you are entitled to gratuity. Call NALSA 15100 for a free lawyer. How long has your salary been pending?" },
-        { patterns: ["property", "land", "rent", "flat", "builder", "tenant", "problem", "issue", "deposit"], answer: "For property disputes, if a builder has delayed your project, file a complaint with the RERA authority. For land disputes, go to the Revenue Court or Civil Court. For registration, visit the Sub-Registrar office. If there is encroachment, complain to the SDM or District Collector. For tenant issues, the Rent Control Act protects both landlord and tenant rights. Call NALSA 15100 for a free lawyer. What kind of property issue are you facing?" },
-        { patterns: ["divorce", "separation", "marriage"], answer: "For divorce, under the Hindu Marriage Act Section 13, you can file for divorce. If both husband and wife agree, mutual consent divorce under Section 13B takes about six months. For one-sided divorce, grounds include cruelty, desertion, or missing for seven years. Triple talaq is now a criminal offence with up to three years punishment. You have the right to maintenance under Section 125. File your petition in Family Court. Call NALSA 15100 for a free lawyer. Do both parties agree to the divorce?" },
+        { patterns: ["fir", "police", "register", "lodge", "complaint", "file", "how"], answer: "Don't worry, I'll walk you through this. Go to your nearest police station — under BNSS Section 173, the police cannot refuse to register your FIR for a cognizable offence. If they do refuse, send a written complaint to the SP by registered post. You can also file a Zero FIR at any station, regardless of where it happened. The Supreme Court made this crystal clear in Lalita Kumari. For a free lawyer, call NALSA on 15100. You're not alone in this." },
+        { patterns: ["consumer", "complaint", "defective", "product", "refund", "service"], answer: "You have strong rights here, don't worry. Call the toll-free consumer helpline 1800-11-4000 or file online at e-daakhil. The District Consumer Disputes Commission handles claims up to one crore, and the time limit is two years from the problem. The Consumer Protection Act 2019 and the Supreme Court both say that delay or deficiency in service is compensable. Keep bills and WhatsApp messages safe as evidence. Call NALSA 15100 for a free lawyer." },
+        { patterns: ["cheque", "bounce", "dishonour", "check"], answer: "Don't worry, the law is firmly on your side here. Send a legal notice within 30 days of the bounce memo. If the other person doesn't pay within 15 days of the notice, file a complaint in Magistrate Court under NI Act Section 138. The punishment can be up to two years in jail plus twice the cheque amount as fine. You must file within one month after the 15-day notice period expires. Keep the cheque and bounce memo safe. Call NALSA 15100 for free legal aid." },
+        { patterns: ["online", "fraud", "cyber", "scam", "upi"], answer: "Don't panic — act fast and we can recover money. Call 1930, the National Cyber Crime Helpline, right away. They can freeze funds before the fraudster withdraws. Also report on the cyber crime portal. Notify your bank immediately to block the account. An FIR can be filed under IT Act Section 66D and BNS Section 318. Save every screenshot, message, and transaction SMS — those are evidence. Call NALSA 15100 for a free lawyer. Speed matters in fraud cases." },
+        { patterns: ["domestic", "violence", "husband", "abuse"], answer: "I'm so sorry you're going through this. You are not alone, and the law fully protects you. Call the Women Helpline on 181 — they're available 24 hours. Under the Domestic Violence Act 2005, you can get a Protection Order, maintenance, and residence rights from the Magistrate Court. Meet your nearest Protection Officer. You have the right to a shelter home. An FIR under BNS Section 85 is also an option. NALSA 15100 provides a free woman lawyer. Right now — are you in a safe place?" },
+        { patterns: ["salary", "job", "fired", "termination", "wages", "paid", "not"], answer: "I understand — it's frustrating when hard-earned money is held back. Complain to the Labour Commissioner, helpline 14434. If your salary is pending, file in Labour Court. Wrongful termination? The Industrial Disputes Act gives you 15 days' salary per year as retrenchment compensation. After five years of service, gratuity is also your right. Keep your offer letter, salary slips, and bank statements ready as evidence. Call NALSA 15100 for a free lawyer." },
+        { patterns: ["property", "land", "rent", "flat", "builder", "tenant", "problem", "issue", "deposit"], answer: "I understand — property matters are stressful. If a builder has delayed, file with the RERA authority — they are strict on builders. For land disputes, go to Revenue Court or Civil Court. For encroachment, write to the SDM or District Collector. For registration, the Sub-Registrar office handles it. Tenant or landlord issues are covered by the Rent Control Act — both sides have rights. Keep every paper safe: registry, agreement, mutation, receipts. Call NALSA 15100 for a free lawyer." },
+        { patterns: ["divorce", "separation", "marriage"], answer: "I understand this is a heavy time. Under the Hindu Marriage Act Section 13, you have a clear right to file for divorce. If both agree, mutual-consent divorce under Section 13B takes about six months. Otherwise grounds include cruelty, desertion, or seven years of separation. Triple talaq is now a criminal offence with up to three years' punishment. Maintenance is protected under Section 125. Petition goes in Family Court. Call NALSA 15100 for a free lawyer — they also help with mediation." },
         // Village / Rural FAQs
-        { patterns: ["land", "grab", "encroach", "kabza", "zameen", "occupy"], answer: "For land grabbing or encroachment, first file a written complaint with the Tehsildar or SDM. Under BNS Section 330, encroachment is a criminal offence, so file an FIR at the police station. You can also file a civil suit for possession recovery in Civil Court. Keep your land documents like khatauni, registry, and mutation records safe. Call NALSA 15100 for a free lawyer. Do you have your land documents?" },
-        { patterns: ["caste", "dalit", "atrocity", "discrimination", "untouchability"], answer: "For caste violence or discrimination, the SC ST Prevention of Atrocities Act gives you strong protection. The police must immediately register an FIR, they cannot refuse. If the police station does not help, complain directly to the District Magistrate or SP. You are also entitled to compensation from the government. Call NALSA 15100 for a free lawyer. What kind of violence or discrimination happened?" },
-        { patterns: ["nrega", "mnrega", "mgnrega", "wages", "work", "employment", "guarantee"], answer: "Under MGNREGA, you have the right to demand work. If work is not given within 15 days, you are entitled to unemployment allowance. Wages must be paid within 15 days into your bank account, and delay attracts interest. Submit a written demand for work to the Gram Panchayat Secretary. To complain, contact the District Programme Officer or call 1800-111-0100. Call NALSA 15100 for a free lawyer. How long have wages been pending?" },
-        { patterns: ["ration", "card", "food", "grain", "bpl", "antyodaya"], answer: "Under the National Food Security Act, every poor family is entitled to five kilograms of food grain per person per month at subsidised rates. If you do not have a ration card, apply at the Food Department office or online. If the ration dealer is not giving your grain, complain to the District Food Officer. Call the helpline 1900 or 1800-111-0100. Call NALSA 15100 for a free lawyer. Do you have a ration card?" },
-        { patterns: ["panchayat", "sarpanch", "village", "gram", "pradhan"], answer: "For panchayat complaints, write to the District Panchayat Officer or District Magistrate. If the Sarpanch or Pradhan is misusing funds, you can file a corruption complaint under the Prevention of Corruption Act. You can use RTI to get full details of all panchayat spending. A no-confidence motion can also remove a corrupt Sarpanch. Call NALSA 15100 for a free lawyer. What is the problem with the panchayat?" },
-        { patterns: ["false", "fake", "wrongful", "framed", "trap"], answer: "If you have been framed in a false case, immediately contact a lawyer for anticipatory bail under BNSS Section 482. File an application in Sessions Court or High Court. To get a false FIR quashed, file a petition in the High Court. Under the DK Basu guidelines, you have rights during arrest, including informing your family. Call NALSA 15100 for a free lawyer immediately. What kind of false case has been filed?" },
+        { patterns: ["land", "grab", "encroach", "kabza", "zameen", "occupy"], answer: "I understand — land disputes are terrifying. You have strong remedies. File a written complaint with the Tehsildar or SDM. Under BNS Section 330, encroachment is a criminal offence — the police must register an FIR, they cannot refuse. Also file a civil suit for possession recovery in Civil Court. Keep every document — khatauni, registry, mutation, bhu-naksha. These are your strength. Call NALSA 15100 for a free lawyer. You're not powerless here." },
+        { patterns: ["caste", "dalit", "atrocity", "discrimination", "untouchability"], answer: "What happened is wrong, and the law stands firmly with you. The SC/ST Prevention of Atrocities Act forces the police to immediately register an FIR — they have no right to refuse. If the police station doesn't help, complain directly to the District Magistrate or SP. The law also gives victims compensation from the government. Call NALSA 15100 for a free lawyer, right away. You are not alone in this." },
+        { patterns: ["nrega", "mnrega", "mgnrega", "wages", "work", "employment", "guarantee"], answer: "I understand — unpaid labour is painful, but your rights are clear. Under MGNREGA you have a legal right to demand work. If work isn't given in 15 days, unemployment allowance is due. Wages must reach your bank in 15 days, and delay means interest. Submit your demand in writing to the Gram Panchayat Secretary — and keep the receipt. Complain to the District Programme Officer or call 1800-111-0100. Call NALSA 15100 for a free lawyer." },
+        { patterns: ["ration", "card", "food", "grain", "bpl", "antyodaya"], answer: "Don't worry — ration is your legal right. Under the National Food Security Act, every poor family gets five kilograms of grain per person per month at subsidised rates. If you don't have a card, apply at the Food Department office or online. If the dealer refuses to give your grain, complain to the District Food Officer. Helplines: 1900 or 1800-111-0100. Always make the dealer write every entry in your ration diary. Call NALSA 15100 for free help." },
+        { patterns: ["panchayat", "sarpanch", "village", "gram", "pradhan"], answer: "Don't be afraid — the law protects citizens against local power too. Write to the District Panchayat Officer or District Magistrate. If the Sarpanch is misusing funds, a complaint under the Prevention of Corruption Act can trigger investigation. Use RTI to get every detail of panchayat spending — that's your right. If needed, a no-confidence motion can remove a corrupt Sarpanch. Keep all evidence safely. Call NALSA 15100 for a free lawyer." },
+        { patterns: ["false", "fake", "wrongful", "framed", "trap"], answer: "Don't panic — the law has safeguards for exactly this. Contact a lawyer immediately for anticipatory bail under BNSS Section 482; the application goes to Sessions Court or High Court. To quash a false FIR, file a petition in the High Court. Under the DK Basu guidelines, your rights during arrest are fully protected — the police must inform your family. Call NALSA 15100 for a free lawyer right away." },
+        // Motor Vehicle / Accident FAQs
+        { patterns: ["accident", "crash", "collision", "vehicle", "car", "bike", "truck", "road"], answer: "Take a breath — I'll walk you through this. If anyone is injured, call 112 right now — that's the first priority. Motor Vehicles Act Section 134 makes it mandatory to help the injured. Then file an FIR at the nearest police station. For compensation, file a claim in the Motor Accident Claims Tribunal under Motor Vehicles Act Section 166, and notify the insurance company. Keep the driver's licence, vehicle papers, and medical reports safe. Call NALSA 15100 for a free lawyer. First — is anyone hurt?" },
+        { patterns: ["hit and run", "fled", "ran away", "absconded"], answer: "I understand — hit and run is terrifying, but the law will help you. If you remember the vehicle number, tell the police immediately. Under Motor Vehicles Act Section 161, the government pays compensation to hit and run victims through the Solatium Scheme — up to two lakh for death, fifty thousand for grievous injury. File the compensation application with the District Magistrate. File an FIR under BNS Section 106 for causing death by negligence. Keep all medical papers. Call NALSA 15100 for a free lawyer." },
     ],
 };
 
@@ -683,28 +699,162 @@ function matchFAQ(msg, lang) {
 
 // ═══════════════════════════════════════════════════════════
 //  SESSION MEMORY — Server-side conversation tracking
+//
+//  ONE source of truth, used by /api/ask, /api/ask-stream, and the phone
+//  flow. The web UI persists `sessionId` in localStorage so a refresh keeps
+//  the conversation alive. The phone flow keys by `phone || sessionId`.
+//
+//  History is bounded: the most recent 6 turns (3 user + 3 assistant) live
+//  verbatim in `session.history`. Anything older gets compressed into
+//  `session.summary` — a one-line "what we've talked about so far" string —
+//  so the prompt stays under ~1,500 tokens no matter how long the call goes.
+//  This is what kept turn-3 from imploding.
 // ═══════════════════════════════════════════════════════════
-const webSessions = new Map(); // sessionId → { history: [], lang, lastActive }
+const webSessions = new Map(); // sessionId → { history, lang, summary, case, lastActive }
 const SESSION_TTL = 30 * 60 * 1000; // 30 min
-const SESSION_MAX_TURNS = 6; // 3 user + 3 assistant
+const SESSION_MAX_TURNS = 6; // 3 user + 3 assistant kept verbatim
 
-function getOrCreateSession(sessionId) {
+function getOrCreateSession(sessionId, opts = {}) {
+    // Hot path: in-memory hit. Don't touch disk.
     if (sessionId && webSessions.has(sessionId)) {
         const s = webSessions.get(sessionId);
         s.lastActive = Date.now();
-        return { session: s, sessionId };
+        return { session: s, sessionId, isReturning: false };
     }
-    const newId = generateSessionId("ws");
-    const s = { history: [], lang: "hi-IN", lastActive: Date.now() };
+    const newId = sessionId || generateSessionId("ws");
+
+    // Cold path: try to attach to a persisted case (refresh, callback, etc.)
+    let attached = null;
+    try {
+        attached = caseStore.attachSessionToCase({
+            sessionId: newId,
+            phone: opts.phone || null,
+            lang: opts.lang || "hi-IN",
+        });
+    } catch (e) {
+        console.warn("[SESSION] case attach failed:", e.message);
+    }
+    const c = attached?.case || null;
+
+    const s = {
+        history: c?.history?.slice(-SESSION_MAX_TURNS * 2) || [],
+        lang: c?.lang || opts.lang || "hi-IN",
+        summary: c?.summary || "",
+        case: c,                                  // live case object — mutated in place
+        lastUserMsg: "",
+        lastActive: Date.now(),
+        turnCount: c?.history ? Math.floor(c.history.length / 2) : 0,
+        isReturning: !!attached?.isReturning,
+    };
     webSessions.set(newId, s);
-    return { session: s, sessionId: newId };
+    return { session: s, sessionId: newId, isReturning: s.isReturning };
 }
 
-function appendToSession(session, userMsg, assistantReply) {
+// Compress the oldest pair of turns into the running summary string before
+// they're dropped from `history`. Cheap text-only compression — no LLM call.
+// Phase C will upgrade this to a Gemini-Flash JSON-mode summary.
+function compressOldestPair(session) {
+    const oldUser = session.history[0]?.u === 1 ? session.history[0].t : "";
+    const oldAss  = session.history[1]?.u === 0 ? session.history[1].t : "";
+    if (!oldUser && !oldAss) return;
+    // Keep it terse — the summary is for the LLM, not the user.
+    const userPart = oldUser ? `user: ${oldUser.slice(0, 140)}` : "";
+    const assPart  = oldAss  ? `you advised: ${oldAss.slice(0, 160)}` : "";
+    const fragment = [userPart, assPart].filter(Boolean).join(" — ");
+    session.summary = session.summary
+        ? `${session.summary} | ${fragment}`
+        : fragment;
+    // Cap the summary itself so it can't grow unboundedly on very long calls.
+    if (session.summary.length > 800) {
+        session.summary = "…" + session.summary.slice(-780);
+    }
+}
+
+function appendToSession(session, userMsg, assistantReply, meta = {}) {
     session.history.push({ u: 1, t: userMsg });
     session.history.push({ u: 0, t: assistantReply });
-    if (session.history.length > SESSION_MAX_TURNS * 2) {
-        session.history = session.history.slice(-SESSION_MAX_TURNS * 2);
+    session.lastUserMsg = userMsg;
+    session.turnCount = (session.turnCount || 0) + 1;
+    // Trim oldest turns into the running summary, two at a time.
+    while (session.history.length > SESSION_MAX_TURNS * 2) {
+        compressOldestPair(session);
+        session.history = session.history.slice(2);
+    }
+
+    if (!session.case) return;
+
+    // Phase C.1: classify case type from keywords. No LLM cost. Sticky
+    // (won't flip on a single ambiguous turn — see intent-classifier.js).
+    try {
+        const cls = intent.classify(userMsg, session.case.type);
+        if (cls.type && cls.type !== "unknown" && cls.confidence >= 0.2) {
+            if (cls.type !== session.case.type) {
+                session.case.type = cls.type;
+                console.log(`[CASE] ${session.case.id.slice(-12)} → type=${cls.type} (conf=${cls.confidence.toFixed(2)})`);
+            }
+        }
+    } catch (e) { console.warn("[CASE] classify failed:", e.message); }
+
+    // Phase E: lawyer-handoff trigger. Three independent signals can flip
+    // needs_lawyer to true; once true, it stays true (the slot-aware system
+    // prompt then nudges the LLM to offer a verified lawyer).
+    try {
+        const c = session.case;
+        if (!c.needs_lawyer) {
+            const lower = (userMsg || "").toLowerCase();
+            // Signal 1: explicit user request.
+            const askedForLawyer = [
+                "वकील", "वकेल", "lawyer", "advocate", "legal aid",
+                "मुझे वकील", "वकील चाहिए", "किसी वकील", "वकील से बात",
+                "i want a lawyer", "find me a lawyer", "talk to a lawyer",
+            ].some(t => lower.includes(t.toLowerCase()));
+            // Signal 2: case became complex enough (3+ user turns + a real type).
+            const conversationDeep = (c.history?.filter(m => m.u === 1)?.length || 0) >= 3
+                && c.type && c.type !== "unknown";
+            // Signal 3: high urgency (already set by extractor or distress).
+            const highUrgency = c.urgency === "critical" || c.urgency === "high";
+            if (askedForLawyer || conversationDeep || highUrgency) {
+                c.needs_lawyer = true;
+                console.log(`[CASE] ${c.id.slice(-12)} needs_lawyer=true (asked=${askedForLawyer} deep=${conversationDeep} urg=${highUrgency})`);
+            }
+        }
+    } catch (e) { console.warn("[CASE] lawyer-trigger failed:", e.message); }
+
+    // Persist the user-facing transcript synchronously. Cheap (file write).
+    // NOTE: do NOT overwrite case.summary from session.summary — they serve
+    // different purposes. case.summary is owned by the entity extractor
+    // (LLM-curated topical summary). session.summary is the cheap text
+    // compression of trimmed-out turns. The extractor's work would be lost
+    // every turn if we copied session.summary onto it.
+    session.case.lang = session.lang || session.case.lang;
+    try {
+        caseStore.persistTurn(session.case, {
+            userMsg,
+            assistantReply,
+            model: meta.model,
+        });
+    } catch (e) { console.warn("[SESSION] persistTurn failed:", e.message); }
+
+    // Phase C.3: fire-and-forget Gemini JSON extractor. Updates entities,
+    // facts, summary, urgency, needs_lawyer in the live case object. The
+    // *next* turn's prompt will include whatever this learned.
+    // Skip for trivial messages (≤2 words) — not worth the API call.
+    if (userMsg && userMsg.trim().split(/\s+/).length >= 2) {
+        const liveCase = session.case;
+        const recent = session.history.slice(-8);
+        const tag = liveCase.id.slice(-12);
+        extractAndUpdate(liveCase, { userMsg, assistantReply, recentHistory: recent })
+            .then(({ ok, changed }) => {
+                if (ok && changed) {
+                    try { caseStore.saveCase(liveCase); } catch { }
+                    console.log(`[EXTRACT] ${tag} ✓ entities=${Object.keys(liveCase.entities||{}).length} urg=${liveCase.urgency} lawyer=${liveCase.needs_lawyer}`);
+                } else if (ok && !changed) {
+                    console.log(`[EXTRACT] ${tag} no-change`);
+                } else {
+                    console.log(`[EXTRACT] ${tag} skipped (gemini failed/aborted)`);
+                }
+            })
+            .catch(e => console.warn(`[EXTRACT] ${tag} ERROR ${e.message}`));
     }
 }
 
@@ -715,6 +865,100 @@ setInterval(() => {
         if (now - s.lastActive > SESSION_TTL) webSessions.delete(id);
     }
 }, 5 * 60 * 1000);
+
+// ═══════════════════════════════════════════════════════════
+//  SMART FALLBACK — never serve generic "तकनीकी समस्या" again
+//
+//  When all LLM providers fail, instead of the cold technical-error string:
+//   1. Try to match the user's last message to an FAQ template (this is the
+//      same matcher the hot path uses, just at the bottom of the cascade).
+//   2. If nothing matches, return a warm "tell me a bit more" prompt that
+//      asks the right next question instead of apologising.
+//  The user shouldn't be able to tell the LLM failed.
+// ═══════════════════════════════════════════════════════════
+const SOFT_FALLBACK = {
+    "hi-IN": "मैं आपकी बात पूरी तरह समझना चाहता हूँ — थोड़ा और बताइए, क्या मामला एफ़ आई आर का है, किसी एक्सीडेंट का, पैसे या नौकरी का, या परिवार का? जो भी हो, मैं आपके साथ हूँ।",
+    "en-IN": "I want to make sure I understand you fully — tell me a little more. Is this about an FIR, an accident, money or your job, or family? Whatever it is, I'm here with you.",
+    "bn-IN": "আমি আপনাকে ঠিকমতো বুঝতে চাই — একটু বিস্তারিত বলুন। কি ব্যাপারটা FIR, দুর্ঘটনা, টাকা বা চাকরি, নাকি পরিবার সংক্রান্ত? যা-ই হোক, আমি আপনার পাশে আছি।",
+    "te-IN": "మీరు చెప్పేది నాకు పూర్తిగా అర్థం కావాలి — కొంచెం ఎక్కువ చెప్పండి. విషయం FIR, ప్రమాదం, డబ్బు లేదా ఉద్యోగం, లేక కుటుంబానికి సంబంధించినదా? ఏదైనా సరే, నేను మీతో ఉన్నాను.",
+    "ta-IN": "நீங்கள் சொல்வதை முழுமையாகப் புரிந்துகொள்ள விரும்புகிறேன் — கொஞ்சம் கூடுதலாகச் சொல்லுங்கள். விஷயம் FIR, விபத்து, பணம் அல்லது வேலை, அல்லது குடும்பம் தொடர்பானதா? எதுவாக இருந்தாலும், நான் உங்களுடன் இருக்கிறேன்.",
+    "mr-IN": "मला तुमचं नीट समजून घ्यायचं आहे — थोडं अजून सांगा. प्रकरण FIR, अपघात, पैसे किंवा नोकरी, की कुटुंबाशी संबंधित आहे? काहीही असो, मी तुमच्यासोबत आहे.",
+    "gu-IN": "મારે તમારી વાત બરાબર સમજવી છે — થોડું વધારે કહો. વાત FIR, અકસ્માત, પૈસા કે નોકરી, કે પરિવારની છે? ગમે તે હોય, હું તમારી સાથે છું.",
+    "kn-IN": "ನಾನು ನಿಮ್ಮನ್ನು ಸಂಪೂರ್ಣವಾಗಿ ಅರ್ಥಮಾಡಿಕೊಳ್ಳಲು ಬಯಸುತ್ತೇನೆ — ಸ್ವಲ್ಪ ಇನ್ನಷ್ಟು ಹೇಳಿ. ವಿಷಯ FIR, ಅಪಘಾತ, ಹಣ ಅಥವಾ ಕೆಲಸ, ಅಥವಾ ಕುಟುಂಬದ ಬಗ್ಗೆಯೇ? ಏನಾದರೂ ಸರಿ, ನಾನು ನಿಮ್ಮ ಜೊತೆಯಲ್ಲಿದ್ದೇನೆ.",
+    "ml-IN": "എനിക്ക് നിങ്ങളെ ശരിക്കും മനസിലാക്കണം — കുറച്ച് കൂടി പറയൂ. കാര്യം FIR, അപകടം, പണം അല്ലെങ്കിൽ ജോലി, അതോ കുടുംബമോ? എന്തായാലും, ഞാൻ നിങ്ങളോടൊപ്പമുണ്ട്.",
+    "pa-IN": "ਮੈਂ ਤੁਹਾਡੀ ਗੱਲ ਚੰਗੀ ਤਰ੍ਹਾਂ ਸਮਝਣਾ ਚਾਹੁੰਦਾ ਹਾਂ — ਥੋੜ੍ਹਾ ਹੋਰ ਦੱਸੋ। ਮਾਮਲਾ FIR, ਹਾਦਸਾ, ਪੈਸੇ ਜਾਂ ਨੌਕਰੀ, ਜਾਂ ਪਰਿਵਾਰ ਨਾਲ ਸਬੰਧਤ ਹੈ? ਜੋ ਵੀ ਹੋਵੇ, ਮੈਂ ਤੁਹਾਡੇ ਨਾਲ ਹਾਂ।",
+    "od-IN": "ମୁଁ ଆପଣଙ୍କୁ ଭଲ ଭାବରେ ବୁଝିବାକୁ ଚାହୁଁଛି — ଅଳ୍ପ ଅଧିକ କୁହନ୍ତୁ। କଥା FIR, ଦୁର୍ଘଟଣା, ଟଙ୍କା କିମ୍ବା ଚାକିରି, କିମ୍ବା ପରିବାର ସଙ୍ଗେ? ଯାହା ବି ହେଉ, ମୁଁ ଆପଣଙ୍କ ସଙ୍ଗରେ ଅଛି।",
+};
+
+/**
+ * Build the system prompt for an LLM turn. Combines the language-specific
+ * base prompt with (a) the running summary of older turns, and (b) the
+ * slot-aware "Case so far / Still need to learn" block from the case state.
+ * Centralized so /api/ask and /api/ask-stream stay in sync.
+ */
+function buildSystemPrompt(lang, ragContext, session) {
+    let content = getLangPrompt(lang, ragContext || "");
+    // Prefer the LLM-curated case summary when available; fall back to the
+    // cheap text-compression summary from session.summary (used for very
+    // long calls where the extractor hasn't caught up).
+    const caseSummary = session?.case?.summary;
+    const txtSummary = session?.summary;
+    const summary = (caseSummary && caseSummary.length >= 8) ? caseSummary : txtSummary;
+    if (summary) {
+        content += `\n\nEarlier in this conversation: ${summary}\nReference these facts naturally — do NOT re-ask what you already know.`;
+    }
+    if (session?.case) {
+        const c = session.case;
+        const hasState = c.type || (c.entities && Object.keys(c.entities).length);
+        if (hasState) {
+            content += `\n\n${slots.renderCaseContext(c.type || "unknown", c.entities || {})}`;
+            if (c.urgency && c.urgency !== "medium") {
+                content += `\nUrgency: ${c.urgency}.`;
+            }
+            if (c.needs_lawyer) {
+                content += `\nThe caller has signaled they want a human lawyer — when natural, offer to connect them to a verified one.`;
+            }
+            console.log(`[PROMPT] case=${c.id?.slice(-12)} type=${c.type} slots=${Object.keys(c.entities||{}).length} sum=${c.summary?.length||0}c`);
+        }
+        // Phase F: returning-caller note. Only meaningful on the first turn
+        // of a resumed session (turnCount === 0 here = no new turns yet on
+        // *this* session, but the case has prior history from a past one).
+        const priorTurns = Math.floor((c.history?.length || 0) / 2);
+        if (session.isReturning && priorTurns >= 1) {
+            content += `\n\nReturning caller: this person has talked with you before about this case. Greet them warmly by acknowledging the context (e.g. "अच्छा हुआ आपने वापस फ़ोन किया — पिछली बार हमने ${c.type || "आपके मामले"} पर बात की थी, क्या उसके बाद कुछ हुआ?"). Do not re-ask everything; pick up where you left off.`;
+        }
+    }
+    return content;
+}
+
+function getSmartFallback(lang, userMsg, session) {
+    // First pass: try the FAQ matcher on the current user message.
+    // It already covers FIR, accident, fraud, salary, property, divorce, DV,
+    // bail, RTI, ration, panchayat, false case, caste atrocity, MNREGA, etc.
+    if (userMsg) {
+        const m = matchFAQ(userMsg, lang);
+        if (m) return m.answer;
+    }
+    // Second pass: walk the conversation history backwards. This handles
+    // mid-conversation follow-ups like "kya karein?", "haan", "kaunse kagaz
+    // chahiye?" — where the topic was set turns ago. We scan every prior
+    // user turn so the case context survives short responses.
+    if (session?.history?.length) {
+        for (let i = session.history.length - 1; i >= 0; i--) {
+            const m = session.history[i];
+            if (m.u !== 1 || !m.t || m.t === userMsg) continue;
+            const hit = matchFAQ(m.t, lang);
+            if (hit) return hit.answer;
+        }
+    }
+    // Also try the running summary string — it concatenates older user msgs.
+    if (session?.summary) {
+        const hit = matchFAQ(session.summary, lang);
+        if (hit) return hit.answer;
+    }
+    // Last resort: warm prompt that opens the conversation rather than closing it.
+    return SOFT_FALLBACK[lang] || SOFT_FALLBACK["hi-IN"];
+}
 
 // ═══════════════════════════════════════════════════════════
 //  TTS HELPER — with voice engine normalization
@@ -803,8 +1047,8 @@ app.post("/api/stt", upload.single("audio"), async (req, res) => {
 //  2. MAIN /api/ask — RAG + AI + Parallel TTS
 // ═══════════════════════════════════════════════════════════
 app.post("/api/ask", async (req, res) => {
-    const { history = [], message, lang = "hi-IN", speaker, sessionId: reqSessionId } = req.body;
-    const { session, sessionId } = getOrCreateSession(reqSessionId);
+    const { message, lang = "hi-IN", speaker, sessionId: reqSessionId, phone: reqPhone } = req.body;
+    const { session, sessionId, isReturning } = getOrCreateSession(reqSessionId, { phone: reqPhone, lang });
     session.lang = lang;
     const msg = sanitize(message, 500);
     if (!msg) return res.status(400).json({ error: "No message" });
@@ -826,6 +1070,40 @@ app.post("/api/ask", async (req, res) => {
         return res.json({ reply: refusal, model: "guardrail", blocked: true, audioChunks, ms: 0 });
     }
 
+    // DISTRESS DETECTION (Phase D) — runs before FAQ/cache/LLM. On a critical
+    // signal (suicide ideation, active violence, child danger, threat to life)
+    // we bypass the entire LLM cascade and serve a pre-written safety message
+    // with the right helpline. Sub-millisecond. The user can never wait on
+    // Gemini for "वो मार रहा है" — that fails too often.
+    const distressCheck = distress.detect(msg, lang);
+    if (distressCheck.level === "critical") {
+        console.log(`[SAFETY] ${distressCheck.reason} matched="${distressCheck.matched}" → bypass`);
+        const reply = distressCheck.prepend;
+        // Persist into the case so urgency / needs_lawyer flip immediately.
+        if (session.case) {
+            session.case.urgency = "critical";
+            session.case.needs_lawyer = true;
+            session.case.distress_level = Math.max(session.case.distress_level || 0, distress.levelToScore("critical"));
+        }
+        appendToSession(session, msg, reply, { model: "safety-bypass" });
+        const ttsT0 = Date.now();
+        const segments = segmentForTTS(reply);
+        const ttsResults = await Promise.allSettled(segments.map(chunk => generateTTS(chunk, lang, speaker)));
+        const audioChunks = ttsResults.filter(r => r.status === "fulfilled" && r.value).map(r => r.value);
+        return res.json({
+            reply, model: "safety-bypass", sessionId, audioChunks,
+            ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - ttsT0,
+            segments: segments.length, safety: distressCheck.reason,
+            helplines: distressCheck.helplines,
+            caseId: session.case?.id, isReturning,
+        });
+    }
+    if (distressCheck.level === "high" && session.case) {
+        // High distress doesn't bypass the LLM, but it bumps the case state
+        // so the slot-aware prompt can soften the tone.
+        session.case.distress_level = Math.max(session.case.distress_level || 0, distress.levelToScore("high"));
+    }
+
     // FAQ CHECK — instant pre-built answer, skip LLM entirely
     const faqMatch = matchFAQ(msg, lang);
     if (faqMatch) {
@@ -834,11 +1112,12 @@ app.post("/api/ask", async (req, res) => {
         const segments = segmentForTTS(faqMatch.answer);
         const ttsResults = await Promise.allSettled(segments.map(chunk => generateTTS(chunk, lang, speaker)));
         const audioChunks = ttsResults.filter(r => r.status === "fulfilled" && r.value).map(r => r.value);
-        appendToSession(session, msg, faqMatch.answer);
+        appendToSession(session, msg, faqMatch.answer, { model: "faq-template" });
         return res.json({
             reply: faqMatch.answer, model: "faq-template", sessionId, audioChunks,
             ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - ttsT0,
             ragContext: true, segments: segments.length, faq: true,
+            caseId: session.case?.id, isReturning,
         });
     }
 
@@ -851,11 +1130,12 @@ app.post("/api/ask", async (req, res) => {
         const segments = segmentForTTS(cached.reply);
         const ttsResults = await Promise.allSettled(segments.map(chunk => generateTTS(chunk, lang, speaker)));
         const audioChunks = ttsResults.filter(r => r.status === "fulfilled" && r.value).map(r => r.value);
-        appendToSession(session, msg, cached.reply);
+        appendToSession(session, msg, cached.reply, { model: cached.model });
         return res.json({
             reply: cached.reply, model: cached.model + " (cached)", sessionId, audioChunks,
             ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - ttsT0,
             ragContext: cached.ragContext, segments: segments.length, cached: true,
+            caseId: session.case?.id, isReturning,
         });
     }
 
@@ -863,11 +1143,14 @@ app.post("/api/ask", async (req, res) => {
     const { contextString: ragContext, chunks: ragChunks } = buildContext(msg);
     const ragSnippet = ragContext || "";
 
-    // Build conversation history — merge client + server-side session
-    const messages = [{ role: "system", content: getLangPrompt(lang, ragSnippet) }];
-    const combinedHistory = [...session.history, ...history].slice(-8);
+    // Build conversation — server-side history is the single source of truth.
+    // Client `history` parameter is intentionally ignored to prevent prompt bloat
+    // (the bug that killed turn 3). Older turns live compressed in session.summary,
+    // and known slot values are injected via buildSystemPrompt → renderCaseContext.
+    const systemContent = buildSystemPrompt(lang, ragSnippet, session);
+    const messages = [{ role: "system", content: systemContent }];
     let lastRole = "system";
-    for (const m of combinedHistory) {
+    for (const m of session.history.slice(-SESSION_MAX_TURNS * 2)) {
         const role = m.u ? "user" : "assistant";
         if (role === lastRole) continue;
         messages.push({ role, content: sanitize(m.t, 300) });
@@ -882,22 +1165,23 @@ app.post("/api/ask", async (req, res) => {
     const aiT0 = Date.now();
     let reply = "";
     let model = getAvailableModel();
-    const systemPrompt = getLangPrompt(lang, ragSnippet);
+    // Use the enriched prompt (RAG + summary + case context) — same as `messages[0]`.
+    const systemPrompt = systemContent;
 
     // SPEED: Race primary model against Sarvam fallback concurrently — no delay
     try {
         const primaryPromise = callGemini(systemPrompt, messages, 512, model)
-            .then(r => r ? { reply: stripMarkdown(r), model } : null)
-            .catch(() => null);
+            .then(r => r ? { reply: stripMarkdown(r), model } : Promise.reject(new Error("empty")))
+            .catch(e => Promise.reject(e));
         const sarvamPromise = callSarvam(messages, 300)
-            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : null)
-            .catch(() => null);
+            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : Promise.reject(new Error("empty")))
+            .catch(e => Promise.reject(e));
+        // Promise.any — first to RESOLVE SUCCESSFULLY wins; rejections don't prematurely end the race
         const result = await Promise.race([
-            primaryPromise,
-            sarvamPromise,
+            Promise.any([primaryPromise, sarvamPromise]).catch(() => null),
             new Promise(resolve => setTimeout(() => resolve(null), 8000)),
         ]);
-        if (result) {
+        if (result && result.reply) {
             reply = result.reply;
             model = result.model;
             console.log(`[ASK] ${model} OK: "${reply.slice(0, 60)}"`);
@@ -938,12 +1222,18 @@ app.post("/api/ask", async (req, res) => {
         reply = applyRules(reply, { lang, ragChunks, isPhone: false, originalQuery: msg, refusal });
     }
 
+    let isFallback = false;
     if (!reply) {
-        reply = FALLBACK_ERROR[lang] || FALLBACK_ERROR["hi-IN"];
+        // Case-aware soft fallback — never the cold "तकनीकी समस्या" string.
+        // Picks the most relevant FAQ template, or a warm "tell me more" prompt.
+        reply = getSmartFallback(lang, msg, session);
+        model = "smart-fallback";
+        isFallback = true;
     }
 
-    // Cache successful non-refusal responses
-    if (reply && reply !== refusal) {
+    // Cache ONLY successful, non-fallback, non-refusal responses
+    const allFallbackValues = Object.values(FALLBACK_ERROR).concat(Object.values(SOFT_FALLBACK));
+    if (reply && reply !== refusal && !isFallback && !allFallbackValues.includes(reply) && model !== "fallback" && model !== "smart-fallback") {
         responseCacheSet(cacheKey, reply, model, !!ragContext);
     }
 
@@ -960,8 +1250,8 @@ app.post("/api/ask", async (req, res) => {
 
     console.log(`[ASK] ${Date.now() - t0}ms (AI:${aiMs} TTS:${ttsMs}) segs:${segments.length} rag:${!!ragContext} "${reply.slice(0, 60)}"`);
 
-    // Save to session memory
-    appendToSession(session, msg, reply);
+    // Save to session memory + disk (case file)
+    appendToSession(session, msg, reply, { model });
 
     res.json({
         reply,
@@ -973,6 +1263,8 @@ app.post("/api/ask", async (req, res) => {
         ttsMs,
         ragContext: !!ragContext,
         segments: segments.length,
+        caseId: session.case?.id,
+        isReturning,
     });
 });
 
@@ -1947,10 +2239,124 @@ const GOODBYES = {
 };
 
 // ═══════════════════════════════════════════════════════════
+//  2a. CASE ENDPOINTS — read-only inspection of persisted cases
+//
+//  These exist so the web UI can render "case so far" badges, and so a
+//  callback flow (or future lawyer dashboard) can look up history. Writes
+//  always go through appendToSession → caseStore.persistTurn; nothing here
+//  mutates state.
+// ═══════════════════════════════════════════════════════════
+app.get("/api/cases/:id", (req, res) => {
+    const id = String(req.params.id || "");
+    if (!/^case_[a-zA-Z0-9_-]+$/.test(id)) return res.status(400).json({ error: "bad id" });
+    const c = caseStore.loadCase(id);
+    if (!c) return res.status(404).json({ error: "not found" });
+    // Strip phone PII unless the request includes a matching sessionId.
+    // Tightens later when we add real auth.
+    const { phone, ...safe } = c;
+    res.json({ ...safe, phone: phone ? phone.slice(-4).padStart(phone.length, "*") : null });
+});
+
+app.get("/api/cases/by-phone/:phone", (req, res) => {
+    const cases = caseStore.findCasesByPhone(req.params.phone);
+    res.json({
+        count: cases.length,
+        cases: cases.map(c => ({
+            id: c.id,
+            type: c.type,
+            urgency: c.urgency,
+            status: c.status,
+            summary: c.summary || (c.history?.[0]?.t || "").slice(0, 120),
+            updatedAt: c.updatedAt,
+            createdAt: c.createdAt,
+            needs_lawyer: c.needs_lawyer,
+            turn_count: Math.floor((c.history?.length || 0) / 2),
+        })),
+    });
+});
+
+// ═══════════════════════════════════════════════════════════
+//  Lawyer match (Phase E) — score & rank lawyers for a case.
+//  Writes a handoff record to the case file when the user proceeds. The
+//  outbound call / SMS to the lawyer is a later phase; for now we just
+//  capture intent, so a future job can fan it out.
+// ═══════════════════════════════════════════════════════════
+app.post("/api/lawyers/match", async (req, res) => {
+    const { caseId, limit, preferFemale, preferLanguage, preferCity } = req.body || {};
+    if (!caseId || typeof caseId !== "string") return res.status(400).json({ error: "caseId required" });
+    const c = caseStore.loadCase(caseId);
+    if (!c) return res.status(404).json({ error: "case not found" });
+
+    const matches = lawyerMatch.matchLawyers(c, {
+        limit: Math.max(1, Math.min(10, limit || 3)),
+        preferFemale,
+        preferLanguage,
+        preferCity,
+    });
+
+    // Record the match request on the case file. Don't include lawyer phone
+    // numbers in the handoff record yet — only persist the lawyer ids until
+    // the user explicitly chooses one (a later "accept" endpoint, Phase E
+    // follow-up).
+    c.lawyer_offered = true;
+    c.lawyer_handoffs = c.lawyer_handoffs || [];
+    c.lawyer_handoffs.push({
+        ts: Date.now(),
+        type: "match-presented",
+        candidates: matches.map(m => ({ id: m.lawyer.id, score: m.score })),
+    });
+    try { caseStore.saveCase(c); } catch (e) { console.warn("[LAWYER] persist failed:", e.message); }
+
+    res.json({
+        caseId: c.id,
+        matches,
+        count: matches.length,
+    });
+});
+
+// Accept a specific lawyer match — exposes the contact details (phone /
+// email) that were withheld in /api/lawyers/match. Records the acceptance
+// on the case file. The actual outbound dialer is later phase work.
+app.post("/api/lawyers/accept", async (req, res) => {
+    const { caseId, lawyerId } = req.body || {};
+    if (!caseId || !lawyerId) return res.status(400).json({ error: "caseId + lawyerId required" });
+    const c = caseStore.loadCase(caseId);
+    if (!c) return res.status(404).json({ error: "case not found" });
+    const full = lawyerMatch.getLawyerById(lawyerId);
+    if (!full) return res.status(404).json({ error: "lawyer not found" });
+
+    c.lawyer_handoffs = c.lawyer_handoffs || [];
+    c.lawyer_handoffs.push({
+        ts: Date.now(),
+        type: "accepted",
+        lawyer_id: lawyerId,
+        lawyer_name: full.name,
+    });
+    try { caseStore.saveCase(c); } catch { }
+
+    res.json({
+        caseId: c.id,
+        lawyer: {
+            id: full.id, name: full.name, city: full.city, state: full.state,
+            phone: full.phone, email: full.email,
+            specializations: full.specializations, languages: full.languages,
+            rating: full.rating, years_experience: full.years_experience,
+            bar_council: full.bar_council, fee_first_consult: full.fee_first_consult,
+        },
+        next_step: "We've shared your case summary with the lawyer. They will reach out within 24 hours.",
+    });
+});
+
+// ═══════════════════════════════════════════════════════════
 //  2b. STREAMING /api/ask-stream — AI + TTS chunks streamed as ready
 // ═══════════════════════════════════════════════════════════
 app.post("/api/ask-stream", async (req, res) => {
-    const { history = [], message, lang = "hi-IN", speaker } = req.body;
+    const { message, lang = "hi-IN", speaker, sessionId: reqSessionId, phone: reqPhone } = req.body;
+    // Server-side session is the single source of truth — same as /api/ask.
+    // The client previously passed its own `history` array here, which let the
+    // prompt bloat past 2,000 tokens by turn 3 and triggered the cascade timeout.
+    const { session, sessionId, isReturning } = getOrCreateSession(reqSessionId, { phone: reqPhone, lang });
+    session.lang = lang;
     const msg = sanitize(message, 500);
     if (!msg) return res.status(400).json({ error: "No message" });
     if (!SK) return res.status(500).json({ error: "No API key" });
@@ -1967,27 +2373,59 @@ app.post("/api/ask-stream", async (req, res) => {
     const { allow, reason: guardReason } = isLegalQuery(msg);
     if (!allow) {
         console.log(`[STREAM] L1_BLOCK [${guardReason}]: "${msg.slice(0, 50)}"`);
-        sendChunk({ type: "reply", reply: refusal, model: "guardrail", blocked: true });
+        sendChunk({ type: "reply", reply: refusal, model: "guardrail", blocked: true, sessionId });
         try {
             const result = await generateTTS(refusal, lang, speaker);
             if (result) sendChunk({ type: "audio", audio: result.audio, index: 0 });
         } catch { }
-        sendChunk({ type: "done", ms: Date.now() - t0 });
+        sendChunk({ type: "done", ms: Date.now() - t0, sessionId });
         return res.end();
+    }
+
+    // DISTRESS DETECTION (Phase D) — bypass everything for critical signals.
+    // First chunk on the wire goes out in <50ms; the user gets a helpline
+    // number before the LLM would have even started thinking.
+    const distressCheck = distress.detect(msg, lang);
+    if (distressCheck.level === "critical") {
+        console.log(`[STREAM-SAFETY] ${distressCheck.reason} matched="${distressCheck.matched}" → bypass`);
+        const reply = distressCheck.prepend;
+        if (session.case) {
+            session.case.urgency = "critical";
+            session.case.needs_lawyer = true;
+            session.case.distress_level = Math.max(session.case.distress_level || 0, distress.levelToScore("critical"));
+        }
+        sendChunk({
+            type: "reply", reply, model: "safety-bypass", sessionId,
+            safety: distressCheck.reason, helplines: distressCheck.helplines,
+            caseId: session.case?.id, isReturning,
+        });
+        appendToSession(session, msg, reply, { model: "safety-bypass" });
+        const segments = segmentForTTS(reply);
+        await Promise.allSettled(segments.map((chunk, i) =>
+            generateTTS(chunk, lang, speaker).then(result => {
+                if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
+            }).catch(() => { })
+        ));
+        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, segments: segments.length, sessionId, safety: true });
+        return res.end();
+    }
+    if (distressCheck.level === "high" && session.case) {
+        session.case.distress_level = Math.max(session.case.distress_level || 0, distress.levelToScore("high"));
     }
 
     // FAQ CHECK — instant pre-built answer, skip LLM entirely
     const faqMatch = matchFAQ(msg, lang);
     if (faqMatch) {
         console.log(`[STREAM] FAQ HIT: "${faqMatch.answer.slice(0, 60)}"`);
-        sendChunk({ type: "reply", reply: faqMatch.answer, model: "faq-template", faq: true });
+        sendChunk({ type: "reply", reply: faqMatch.answer, model: "faq-template", faq: true, sessionId, caseId: session.case?.id, isReturning });
+        appendToSession(session, msg, faqMatch.answer, { model: "faq-template" });
         const segments = segmentForTTS(faqMatch.answer);
         await Promise.allSettled(segments.map((chunk, i) =>
             generateTTS(chunk, lang, speaker).then(result => {
                 if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
             }).catch(() => { })
         ));
-        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length });
+        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length, sessionId });
         console.log(`[STREAM] ${Date.now() - t0}ms FAQ segs:${segments.length}`);
         return res.end();
     }
@@ -1997,14 +2435,15 @@ app.post("/api/ask-stream", async (req, res) => {
     const cached = responseCacheGet(cacheKey);
     if (cached) {
         console.log(`[STREAM] CACHE HIT: "${cached.reply.slice(0, 60)}"`);
-        sendChunk({ type: "reply", reply: cached.reply, model: cached.model + " (cached)", cached: true });
+        sendChunk({ type: "reply", reply: cached.reply, model: cached.model + " (cached)", cached: true, sessionId, caseId: session.case?.id, isReturning });
+        appendToSession(session, msg, cached.reply, { model: cached.model });
         const segments = segmentForTTS(cached.reply);
         await Promise.allSettled(segments.map((chunk, i) =>
             generateTTS(chunk, lang, speaker).then(result => {
                 if (result) sendChunk({ type: "audio", audio: result.audio, index: i, text: chunk });
             }).catch(() => { })
         ));
-        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length });
+        sendChunk({ type: "done", ms: Date.now() - t0, aiMs: 0, ttsMs: Date.now() - t0, segments: segments.length, sessionId });
         console.log(`[STREAM] ${Date.now() - t0}ms CACHE segs:${segments.length}`);
         return res.end();
     }
@@ -2012,11 +2451,13 @@ app.post("/api/ask-stream", async (req, res) => {
     // RAG RETRIEVAL
     const { contextString: ragContext, chunks: ragChunks } = buildContext(msg);
 
-    // Build conversation
-    const messages = [{ role: "system", content: getLangPrompt(lang, ragContext || "") }];
-    const recent = history.slice(-8);
+    // Build conversation — server-side history only. Older turns live compressed
+    // in session.summary so the prompt stays bounded across long calls.
+    // Slot-aware case context (Phase C) gets injected via buildSystemPrompt.
+    const systemContent = buildSystemPrompt(lang, ragContext || "", session);
+    const messages = [{ role: "system", content: systemContent }];
     let lastRole = "system";
-    for (const m of recent) {
+    for (const m of session.history.slice(-SESSION_MAX_TURNS * 2)) {
         const role = m.u ? "user" : "assistant";
         if (role === lastRole) continue;
         messages.push({ role, content: sanitize(m.t, 300) });
@@ -2031,7 +2472,7 @@ app.post("/api/ask-stream", async (req, res) => {
     const aiT0 = Date.now();
     let reply = "";
     let model = getAvailableModel();
-    const systemPrompt = getLangPrompt(lang, ragContext || "");
+    const systemPrompt = systemContent;
 
     // Helper: TTS a sentence and stream audio chunk
     function ttsSentence(sentence, idx) {
@@ -2040,26 +2481,37 @@ app.post("/api/ask-stream", async (req, res) => {
         }).catch(() => { });
     }
 
-    // SPEED: Race Gemini vs Sarvam 105B concurrently (same pattern as /api/ask)
+    // SPEED: Race Gemini vs Sarvam 105B — first SUCCESS wins (Promise.any),
+    // wrapped in an 8s wall-clock so the user never waits forever.
+    // Promise.any (not Promise.race) so a fast rejection from one provider
+    // doesn't kill the whole race when the other is still working.
     try {
         const primaryPromise = callGemini(systemPrompt, messages, 512, model)
-            .then(r => r ? { reply: stripMarkdown(r), model } : null)
-            .catch(() => null);
+            .then(r => r ? { reply: stripMarkdown(r), model } : Promise.reject(new Error("empty")))
+            .catch(e => Promise.reject(e));
         const sarvamPromise = callSarvam(messages, 500)
-            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : null)
-            .catch(() => null);
+            .then(r => r ? { reply: stripMarkdown(r), model: "sarvam-105b" } : Promise.reject(new Error("empty")))
+            .catch(e => Promise.reject(e));
         const result = await Promise.race([
-            primaryPromise,
-            sarvamPromise,
+            Promise.any([primaryPromise, sarvamPromise]).catch(() => null),
             new Promise(resolve => setTimeout(() => resolve(null), 8000)),
         ]);
-        if (result) {
+        if (result && result.reply) {
             reply = result.reply;
             model = result.model;
         }
     } catch (e) { console.log(`[STREAM-RACE] FAIL:`, e.message); }
 
-    // Fallback if race failed
+    // Fallback if race failed: try the next available Gemini key
+    if (!reply) {
+        const fallbackModel = getAvailableModel();
+        if (fallbackModel !== model) {
+            try {
+                const retryReply = await callGemini(systemPrompt, messages, 512, fallbackModel);
+                if (retryReply) { reply = stripMarkdown(retryReply); model = fallbackModel; }
+            } catch (e) { console.log(`[STREAM-${fallbackModel}] FAIL:`, e.message); }
+        }
+    }
     if (!reply) {
         try {
             const sarvamReply = await callSarvam(messages, 300);
@@ -2074,12 +2526,26 @@ app.post("/api/ask-stream", async (req, res) => {
         reply = applyRules(reply, { lang, ragChunks, isPhone: false, originalQuery: msg, refusal });
     }
 
+    let isFallback = false;
     if (!reply) {
-        reply = FALLBACK_ERROR[lang] || FALLBACK_ERROR["hi-IN"];
+        // Case-aware soft fallback — never the cold "तकनीकी समस्या" string.
+        reply = getSmartFallback(lang, msg, session);
+        model = "smart-fallback";
+        isFallback = true;
     }
 
+    // Cache only successful, non-fallback, non-refusal responses.
+    const allFallbackValues = Object.values(FALLBACK_ERROR).concat(Object.values(SOFT_FALLBACK));
+    if (reply && reply !== refusal && !isFallback && !allFallbackValues.includes(reply) && model !== "fallback" && model !== "smart-fallback") {
+        responseCacheSet(cacheKey, reply, model, !!ragContext);
+    }
+
+    // Persist this turn into the server-side session + case file BEFORE TTS,
+    // so even if TTS hangs, the next turn already sees the new history.
+    appendToSession(session, msg, reply, { model });
+
     // Send reply text so frontend can display it
-    sendChunk({ type: "reply", reply, model, aiMs, rag: !!ragContext });
+    sendChunk({ type: "reply", reply, model, aiMs, rag: !!ragContext, sessionId, caseId: session.case?.id, isReturning });
 
     // Parallel TTS for all segments
     const ttsT0 = Date.now();
@@ -2090,8 +2556,8 @@ app.post("/api/ask-stream", async (req, res) => {
     await Promise.allSettled(ttsPromises);
     const ttsMs = Date.now() - ttsT0;
 
-    sendChunk({ type: "done", ms: Date.now() - t0, aiMs, ttsMs, segments: audioIndex });
-    console.log(`[STREAM] ${Date.now() - t0}ms (AI:${aiMs} TTS:${ttsMs}) segs:${audioIndex} "${reply.slice(0, 60)}"`);
+    sendChunk({ type: "done", ms: Date.now() - t0, aiMs, ttsMs, segments: audioIndex, sessionId });
+    console.log(`[STREAM] ${Date.now() - t0}ms (AI:${aiMs} TTS:${ttsMs}) segs:${audioIndex} sid:${sessionId.slice(-6)} "${reply.slice(0, 60)}"`);
     res.end();
 });
 
