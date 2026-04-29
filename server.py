@@ -1519,7 +1519,7 @@ _SETTINGS_KEY_CATALOG = [
 
 class SetKeyBody(BaseModel):
     name: str = Field(..., min_length=2, max_length=64)
-    key: str = Field(..., min_length=4, max_length=512)
+    key: str = Field(..., min_length=1, max_length=512)
     note: Optional[str] = Field(default="", max_length=200)
 
 
@@ -1637,13 +1637,19 @@ def api_dashboard_stats(ls_session: Optional[str] = Cookie(default=None)):
 
 
 @app.get("/api/dashboard/users")
-def api_dashboard_users(ls_session: Optional[str] = Cookie(default=None)):
+def api_dashboard_users(
+    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=200),
+    ls_session: Optional[str] = Cookie(default=None),
+):
     """User list — name, email, when they were issued an access code,
     last-seen via most-recent message authored. No plaintext code here."""
     _require_user(ls_session)
     rows: list[dict[str, Any]] = []
+    total = 0
     try:
         with auth.db() as conn:
+            total = conn.execute("SELECT COUNT(*) FROM access_codes").fetchone()[0]
             cur = conn.execute(
                 """SELECT
                        ac.id, ac.email, ac.name, ac.created_at, ac.revoked_at,
@@ -1653,7 +1659,8 @@ def api_dashboard_users(ls_session: Optional[str] = Cookie(default=None)):
                        (SELECT COUNT(*) FROM threads t WHERE t.user_id = ac.id) AS thread_count
                      FROM access_codes ac
                     ORDER BY ac.created_at DESC
-                    LIMIT 200"""
+                    LIMIT ? OFFSET ?""",
+                (limit, offset),
             )
             for r in cur.fetchall():
                 rows.append({
@@ -1667,7 +1674,7 @@ def api_dashboard_users(ls_session: Optional[str] = Cookie(default=None)):
                 })
     except Exception as e:  # noqa: BLE001
         logger.warning("dashboard.users failed: %s", e)
-    return {"users": rows}
+    return {"users": rows, "total": total, "offset": offset, "limit": limit}
 
 
 @app.post("/api/dashboard/users/{user_id}/revoke")
@@ -1675,10 +1682,12 @@ def api_dashboard_revoke_user(user_id: int, ls_session: Optional[str] = Cookie(d
     actor = _require_user(ls_session)
     now = int(time.time())
     with auth.db() as conn:
-        conn.execute(
+        cur = conn.execute(
             "UPDATE access_codes SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL",
             (now, user_id),
         )
+        if cur.rowcount == 0:
+            raise HTTPException(404, "User not found or already revoked.")
     _dash_log(actor.get("email"), "revoke_access", target=str(user_id),
               payload={"user_id": user_id})
     return {"ok": True, "user_id": user_id, "revoked_at": now}
@@ -1687,22 +1696,36 @@ def api_dashboard_revoke_user(user_id: int, ls_session: Optional[str] = Cookie(d
 @app.get("/api/dashboard/activity")
 def api_dashboard_activity(
     limit: int = Query(default=50, ge=1, le=200),
+    cursor: Optional[int] = Query(default=None),
     ls_session: Optional[str] = Cookie(default=None),
 ):
     _require_user(ls_session)
     rows: list[dict[str, Any]] = []
     try:
         import db_adapter  # type: ignore
+        # TTL: only return entries from last 90 days
+        ttl_cutoff = int(time.time()) - 90 * 86400
         with db_adapter.db() as conn:
-            rows = db_adapter.fetch_all(
-                conn,
-                "SELECT id, actor, action, target, payload, created_at "
-                "FROM dash_activity ORDER BY created_at DESC LIMIT ?",
-                (limit,),
-            )
+            if cursor:
+                rows = db_adapter.fetch_all(
+                    conn,
+                    "SELECT id, actor, action, target, payload, created_at "
+                    "FROM dash_activity WHERE created_at > ? AND id < ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (ttl_cutoff, cursor, limit),
+                )
+            else:
+                rows = db_adapter.fetch_all(
+                    conn,
+                    "SELECT id, actor, action, target, payload, created_at "
+                    "FROM dash_activity WHERE created_at > ? "
+                    "ORDER BY id DESC LIMIT ?",
+                    (ttl_cutoff, limit),
+                )
     except Exception as e:  # noqa: BLE001
         logger.warning("dashboard.activity failed: %s", e)
-    return {"activity": rows}
+    next_cursor = rows[-1]["id"] if rows else None
+    return {"activity": rows, "next_cursor": next_cursor}
 
 
 @app.get("/api/dashboard/system")

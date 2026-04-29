@@ -87,6 +87,7 @@ export default function DashboardPane({
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [presence, setPresence] = useState(1);
+  const [_tick, setTick] = useState(0); // forces re-render of relative timestamps
 
   const refreshAll = useCallback(async () => {
     setRefreshing(true);
@@ -112,7 +113,9 @@ export default function DashboardPane({
   useEffect(() => {
     void refreshAll();
     const t = setInterval(() => void refreshAll(), 30000);
-    return () => clearInterval(t);
+    // Tick every 60s to keep relative timestamps fresh
+    const tickTimer = setInterval(() => setTick((n) => n + 1), 60000);
+    return () => { clearInterval(t); clearInterval(tickTimer); };
   }, [refreshAll]);
 
   // Live: append new activity rows from the socket stream so a second

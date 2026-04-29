@@ -43,6 +43,7 @@ sio = socketio.AsyncServer(
 
 _asgi: socketio.ASGIApp | None = None
 _main_loop: asyncio.AbstractEventLoop | None = None
+_queue: asyncio.Queue | None = None
 
 
 @sio.event
@@ -66,6 +67,21 @@ async def disconnect(sid: str) -> None:
     await sio.emit("presence:leave", {"sid": sid})
 
 
+async def _broadcast_worker() -> None:
+    """Serialise all broadcasts through a single async queue so bursts
+    of synchronous emit calls don't race each other."""
+    global _queue
+    _queue = asyncio.Queue()
+    while True:
+        event, payload = await _queue.get()
+        try:
+            await sio.emit(event, payload)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("broadcast worker %s failed: %s", event, e)
+        finally:
+            _queue.task_done()
+
+
 def mount(app: Any) -> None:
     """Attach the socket.io ASGI handler to the FastAPI `app`. Call
     once during server startup. Idempotent — second call is a no-op."""
@@ -73,15 +89,13 @@ def mount(app: Any) -> None:
     if _asgi is not None:
         return
     _asgi = socketio.ASGIApp(sio, other_asgi_app=app, socketio_path="/socket.io")
-    # Stash the running loop so synchronous code paths (DB writes from
-    # FastAPI threadpool) can still emit events via `broadcast()`.
     try:
         _main_loop = asyncio.get_event_loop()
     except RuntimeError:
         _main_loop = None
-    # Mount by replacing the FastAPI app's __call__ at the ASGI layer
-    # would be invasive — we instead expect the caller to do
-    # `uvicorn.run(realtime.app, ...)` via the helper below.
+    # Start the broadcast worker so emit calls are serialised
+    if _main_loop and _main_loop.is_running():
+        _main_loop.create_task(_broadcast_worker())
     logger.info("socketio mounted at /socket.io")
 
 
@@ -95,14 +109,18 @@ def asgi_app(fastapi_app: Any) -> Any:
 
 def broadcast(event: str, payload: dict[str, Any]) -> None:
     """Fire-and-forget fan-out. Safe to call from synchronous endpoint
-    handlers (FastAPI runs them in a threadpool); we hop back to the
-    event loop via `run_coroutine_threadsafe`."""
+    handlers (FastAPI runs them in a threadpool). Events are serialised
+    through an async queue worker to avoid race conditions under burst."""
     if _main_loop is None or not _main_loop.is_running():
-        # Server hasn't fully booted yet — no clients to receive the
-        # event anyway. Drop silently.
         return
-    coro = sio.emit(event, payload)
-    try:
-        asyncio.run_coroutine_threadsafe(coro, _main_loop)
-    except Exception as e:  # noqa: BLE001
-        logger.warning("broadcast %s failed: %s", event, e)
+    if _queue is not None:
+        try:
+            asyncio.run_coroutine_threadsafe(_queue.put((event, payload)), _main_loop)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("broadcast enqueue %s failed: %s", event, e)
+    else:
+        # Fallback if worker hasn't started yet
+        try:
+            asyncio.run_coroutine_threadsafe(sio.emit(event, payload), _main_loop)
+        except Exception as e:  # noqa: BLE001
+            logger.warning("broadcast %s failed: %s", event, e)
