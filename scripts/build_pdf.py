@@ -37,6 +37,7 @@ from reportlab.platypus import (
 ROOT = Path(__file__).resolve().parent.parent
 INPUTS = [
     ROOT / "SANHITA.md",
+    ROOT / "STRATEGY.md",
     ROOT / "CALL_SURFACE_PLAN.md",
 ]
 OUT = ROOT / "Sanhita.pdf"
