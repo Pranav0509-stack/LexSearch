@@ -3,17 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Judgment Viewer — LexSearch</title>
-  <link rel="stylesheet" href="style.css" />
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
-  <!-- PDF.js from CDN -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <title>Judgment Viewer — Sanhita</title>
+  <link rel="stylesheet" href="/style.css?v=sanhita1" />
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <!-- PDF.js, SRI-pinned to 3.11.174 -->
+  <script
+    src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
+    integrity="sha384-/1qUCSGwTur9vjf/z9lmu/eCUYbpOTgSjmpbMQZ1/CtX2v/WcAIKqRv+U1DUCG6e"
+    crossorigin="anonymous"
+    referrerpolicy="no-referrer"></script>
 </head>
 <body class="viewer-page">
 
   <!-- ── Viewer Toolbar ── -->
   <div class="viewer-toolbar">
-    <a href="javascript:history.back()" class="back-btn">← Back to Results</a>
+    <a href="/" class="back-btn" id="back-btn">← Back to Results</a>
 
     <span class="case-title" id="case-title">Loading judgment…</span>
 
@@ -45,6 +49,14 @@
       <div class="spinner" style="border-color:rgba(255,255,255,0.2);border-top-color:var(--gold)"></div>
       <div>Loading PDF…</div>
     </div>
+    <div id="error-msg" class="viewer-loading" style="display:none">
+      <div class="viewer-error-title">Couldn't load this judgment</div>
+      <div class="viewer-error-detail" id="error-detail"></div>
+      <div class="viewer-error-actions">
+        <button id="retry-btn" class="btn btn-read">Retry</button>
+        <a href="/" class="btn btn-download">Back to results</a>
+      </div>
+    </div>
     <canvas id="pdf-canvas" style="display:none"></canvas>
   </div>
 
@@ -56,7 +68,7 @@
   const caseTitle = params.get("title") || "Judgment";
   const courtName = params.get("court") || "";
 
-  document.title = `${caseTitle} — LexSearch`;
+  document.title = `${caseTitle} — Sanhita`;
   document.getElementById("case-title").textContent =
     courtName ? `${courtName} · ${caseTitle}` : caseTitle;
 
@@ -65,26 +77,43 @@
   let pdfUrl, downloadHref;
   if (isSC) {
     const pdfName = decodeURIComponent(s3Key.split("/").pop());
-    pdfUrl = `/sc-pdf/${yearParam}/${pdfName}`;
-    downloadHref = `/sc-pdf/${yearParam}/${pdfName}?download=true`;
+    pdfUrl = `/sc-pdf/${yearParam}/${encodeURIComponent(pdfName)}`;
+    downloadHref = `${pdfUrl}?download=true`;
   } else {
+    // s3_key comes pre-encoded from the server; leave it intact so FastAPI's
+    // {s3_key:path} handler can un-quote it once.
     pdfUrl = `/pdf/${s3Key}`;
-    downloadHref = `/pdf/${s3Key}?download=true`;
+    downloadHref = `${pdfUrl}?download=true`;
   }
   const downloadEl = document.getElementById("download-btn");
   downloadEl.href  = downloadHref;
+
+  // If the user landed here from a shared link / new tab, history.back()
+  // is meaningless — fall back to the landing page.
+  document.getElementById("back-btn").addEventListener("click", (e) => {
+    if (window.history.length > 1 && document.referrer) {
+      e.preventDefault();
+      window.history.back();
+    }
+  });
 
   // ── PDF.js setup ──────────────────────────────────────────────────────────
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-  const canvas    = document.getElementById("pdf-canvas");
-  const ctx       = canvas.getContext("2d");
+  const canvas     = document.getElementById("pdf-canvas");
+  const ctx        = canvas.getContext("2d");
   const loadingMsg = document.getElementById("loading-msg");
+  const errorMsg   = document.getElementById("error-msg");
+  const errorDetail= document.getElementById("error-detail");
+  const retryBtn   = document.getElementById("retry-btn");
 
   let pdfDoc      = null;
   let currentPage = 1;
-  let scale       = 1.4;
+  // zoom is the user-facing multiplier (1.0 = 100%). Internal render scale
+  // is zoom * BASE_SCALE. Displaying Math.round(zoom*100) gives a clean %.
+  const BASE_SCALE = 1.4;
+  let zoom = 1.0;
 
   const prevBtn   = document.getElementById("prev-page");
   const nextBtn   = document.getElementById("next-page");
@@ -95,7 +124,7 @@
 
   async function renderPage(num) {
     const page  = await pdfDoc.getPage(num);
-    const vp    = page.getViewport({ scale });
+    const vp    = page.getViewport({ scale: zoom * BASE_SCALE });
     canvas.width  = vp.width;
     canvas.height = vp.height;
 
@@ -107,25 +136,47 @@
   }
 
   function updateZoomLabel() {
-    zoomLabel.textContent = Math.round(scale * 100 / 1.4 * 100) + "%";
+    zoomLabel.textContent = Math.round(zoom * 100) + "%";
   }
 
-  // Load PDF
-  if (!s3Key) {
-    loadingMsg.innerHTML = "<div style='color:#ff8888'>Error: No PDF key provided.</div>";
-  } else {
+  function showError(message) {
+    loadingMsg.style.display = "none";
+    canvas.style.display     = "none";
+    errorDetail.textContent  = message || "";
+    errorMsg.style.display   = "flex";
+  }
+
+  function loadPdf() {
+    errorMsg.style.display   = "none";
+    canvas.style.display     = "none";
+    loadingMsg.style.display = "flex";
+
+    if (!s3Key) {
+      showError("No judgment was specified in the link.");
+      return;
+    }
+
     pdfjsLib.getDocument(pdfUrl).promise
       .then(doc => {
         pdfDoc = doc;
         loadingMsg.style.display = "none";
         canvas.style.display     = "block";
+        currentPage = 1;
         renderPage(1);
         updateZoomLabel();
       })
       .catch(err => {
-        loadingMsg.innerHTML = `<div style='color:#ff8888'>Failed to load PDF: ${err.message}</div>`;
+        const msg = (err && err.message) || "The court archive returned an error.";
+        showError(
+          msg.includes("404")
+            ? "This PDF isn't in the public archive. Try the court's own website."
+            : msg
+        );
       });
   }
+
+  retryBtn.addEventListener("click", loadPdf);
+  loadPdf();
 
   // ── Controls ───────────────────────────────────────────────────────────────
   prevBtn.addEventListener("click", () => {
@@ -137,15 +188,15 @@
   });
 
   zoomInBtn.addEventListener("click", () => {
-    scale = Math.min(scale + 0.2, 4.0);
-    renderPage(currentPage);
+    zoom = Math.min(zoom + 0.1, 3.0);
     updateZoomLabel();
+    if (pdfDoc) renderPage(currentPage);
   });
 
   zoomOutBtn.addEventListener("click", () => {
-    scale = Math.max(scale - 0.2, 0.4);
-    renderPage(currentPage);
+    zoom = Math.max(zoom - 0.1, 0.4);
     updateZoomLabel();
+    if (pdfDoc) renderPage(currentPage);
   });
 
   // Keyboard navigation

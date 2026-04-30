@@ -6,17 +6,69 @@ Run: uvicorn server:app --reload --port 8080
 
 import io
 import logging
+import os
 import tarfile
+import threading
+import time
 import urllib.parse
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import httpx
 import pandas as pd
 import s3fs
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Cookie, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
+
+# Phase 2 — auth + Brief assistant. Both modules degrade gracefully when
+# optional deps (google-generativeai) aren't installed.
+import auth
+from brief_service import answer_question, serialize_citations
+from validators import input_guards
+import vault_service
+import workflows
+from fastapi import File, UploadFile, Form
+
+# ── Retrieval layer: FTS5 (primary) or BM25 (legacy fallback) ──────────
+# The FTS5 adapter queries india_courts.db (22M+ records, <50ms) directly.
+# Falls back to the legacy S3-based BM25 if FTS5 is not configured.
+_RETRIEVAL_AVAILABLE = False
+_FTS5_AVAILABLE = False
+BM25Index = None  # type: ignore[assignment]
+build_index = None  # type: ignore[assignment]
+doc_to_retrieve_hit = None  # type: ignore[assignment]
+
+_SERVER_DIR = Path(__file__).resolve().parent
+INDIA_COURTS_DB = os.environ.get(
+    "INDIA_COURTS_DB",
+    str(_SERVER_DIR.parent / "india-judgments-corpus" / "india_courts.db"),
+)
+
+try:
+    import sys as _sys
+    _adapter_dir = str(_SERVER_DIR.parent / "india-judgments-corpus" / "scripts")
+    if _adapter_dir not in _sys.path:
+        _sys.path.insert(0, _adapter_dir)
+    from sanhita_adapter import FTS5Index
+    _FTS5_AVAILABLE = True
+    _RETRIEVAL_AVAILABLE = True
+except Exception as _fts5_err:
+    FTS5Index = None  # type: ignore[assignment]
+
+# Legacy BM25 fallback (only used if FTS5 adapter not found)
+if not _FTS5_AVAILABLE:
+    try:
+        from retrieval import (
+            BM25Index,
+            build_index,
+            doc_to_retrieve_hit,
+        )
+        _RETRIEVAL_AVAILABLE = True
+    except Exception as _retrieval_err:  # pragma: no cover
+        pass
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -26,9 +78,25 @@ app = FastAPI(title="LexSearch")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_methods=["GET"],
+    allow_methods=["GET", "HEAD", "POST"],
     allow_headers=["*"],
 )
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Sensible defaults: deny framing, strict referrer, no MIME sniffing."""
+
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers.setdefault("X-Frame-Options", "DENY")
+        response.headers.setdefault("X-Content-Type-Options", "nosniff")
+        response.headers.setdefault(
+            "Referrer-Policy", "strict-origin-when-cross-origin"
+        )
+        return response
+
+
+app.add_middleware(SecurityHeadersMiddleware)
 
 # ---------------------------------------------------------------------------
 # S3 config
@@ -376,28 +444,405 @@ def search(
 
 @app.get("/pdf/{s3_key:path}")
 async def proxy_pdf(s3_key: str, download: bool = False):
-    """Proxy HC PDF from S3."""
+    """Proxy HC PDF from S3.
+
+    Opens the upstream stream and inspects status BEFORE returning a
+    response — so a missing PDF turns into a JSON 404, not a half-streamed
+    error the browser can't recover from.
+    """
     decoded = urllib.parse.unquote(s3_key)
     url = f"{HC_HTTP}/{decoded}"
-
-    async def stream():
-        async with httpx.AsyncClient(timeout=60) as client:
-            async with client.stream("GET", url) as resp:
-                if resp.status_code != 200:
-                    raise HTTPException(404, "PDF not found.")
-                async for chunk in resp.aiter_bytes(65536):
-                    yield chunk
-
     fname = decoded.split("/")[-1] or "judgment.pdf"
     disp = f'attachment; filename="{fname}"' if download else f'inline; filename="{fname}"'
-    return StreamingResponse(stream(), media_type="application/pdf",
-                             headers={"Content-Disposition": disp})
+
+    client = httpx.AsyncClient(timeout=60)
+    try:
+        req = client.build_request("GET", url)
+        resp = await client.send(req, stream=True)
+    except httpx.RequestError as exc:
+        await client.aclose()
+        logger.warning("HC PDF upstream error for %s: %s", decoded, exc)
+        raise HTTPException(502, "Court archive is unreachable. Try again in a minute.")
+
+    if resp.status_code != 200:
+        await resp.aclose()
+        await client.aclose()
+        raise HTTPException(404, "PDF not available in the public archive.")
+
+    async def stream():
+        try:
+            async for chunk in resp.aiter_bytes(65536):
+                yield chunk
+        finally:
+            await resp.aclose()
+            await client.aclose()
+
+    return StreamingResponse(
+        stream(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": disp},
+    )
+
+
+@app.head("/pdf/{s3_key:path}")
+async def probe_pdf(s3_key: str):
+    """Lightweight probe so the UI can detect a dead PDF link without
+    downloading bytes. Returns 200 if the object exists, 404 otherwise."""
+    decoded = urllib.parse.unquote(s3_key)
+    url = f"{HC_HTTP}/{decoded}"
+    try:
+        async with httpx.AsyncClient(timeout=8) as client:
+            resp = await client.head(url)
+    except httpx.RequestError:
+        raise HTTPException(502, "Court archive is unreachable.")
+    if resp.status_code != 200:
+        raise HTTPException(404, "PDF not available.")
+    return Response(status_code=200)
+
+
+# ---------------------------------------------------------------------------
+# Retrieval layer — FTS5 (primary) or BM25 (legacy fallback)
+# ---------------------------------------------------------------------------
+BM25_PATH = Path(os.environ.get("LEXSEARCH_BM25_PATH", str(Path(__file__).parent / "bm25.pkl")))
+BM25_ENABLED = os.environ.get("LEXSEARCH_BM25_ENABLED", "true").lower() == "true"
+BM25_MAX_DOCS = int(os.environ.get("LEXSEARCH_BM25_MAX_DOCS", "0")) or None
+BM25_LAZY = os.environ.get("LEXSEARCH_BM25_LAZY", "true").lower() == "true"
+
+_bm25_lock = threading.Lock()
+_bm25_index = None  # FTS5Index or BM25Index
+_bm25_loading = False
+_bm25_load_error: Optional[str] = None
+_bm25_loaded_at: float = 0.0
+
+
+def _load_bm25_blocking() -> None:
+    """Load retrieval index: FTS5 (instant, preferred) or BM25 (legacy fallback)."""
+    global _bm25_index, _bm25_loading, _bm25_load_error, _bm25_loaded_at
+
+    # ── FTS5 path: instant startup, 22M+ docs, <50ms queries ──
+    if _FTS5_AVAILABLE and Path(INDIA_COURTS_DB).exists():
+        try:
+            _bm25_index = FTS5Index(INDIA_COURTS_DB)
+            _bm25_loaded_at = time.time()
+            _bm25_load_error = None
+            logger.info(
+                "FTS5 ready: %d docs from %s (instant startup, multi-table search)",
+                len(_bm25_index), INDIA_COURTS_DB,
+            )
+            return
+        except Exception as e:
+            logger.warning("FTS5 init failed, falling back to BM25: %s", e)
+
+    # ── Legacy BM25 path: S3-based pickle ──
+    if not _RETRIEVAL_AVAILABLE:
+        _bm25_load_error = "retrieval module unavailable"
+        return
+    try:
+        if BM25_PATH.exists():
+            logger.info("Loading BM25 index from %s", BM25_PATH)
+            _bm25_index = BM25Index.load(BM25_PATH)  # type: ignore[union-attr]
+        else:
+            logger.warning(
+                "BM25 pickle not found at %s — building from S3 (this takes minutes). "
+                "In production pre-build via `python ingest/rebuild_bm25.py`.",
+                BM25_PATH,
+            )
+            _bm25_index = build_index(max_docs=BM25_MAX_DOCS)  # type: ignore[misc]
+            try:
+                _bm25_index.save(BM25_PATH)  # type: ignore[union-attr]
+            except Exception as save_err:
+                logger.warning("Could not persist BM25 index: %s", save_err)
+        _bm25_loaded_at = time.time()
+        _bm25_load_error = None
+        if hasattr(_bm25_index, 'docs'):
+            logger.info("BM25 ready: %d docs", len(_bm25_index.docs))
+        else:
+            logger.info("BM25 ready")
+    except Exception as e:
+        _bm25_load_error = f"{type(e).__name__}: {e}"
+        logger.error("BM25 load failed: %s", _bm25_load_error)
+    finally:
+        _bm25_loading = False
+
+
+def _ensure_bm25():
+    """Return the loaded index, kicking off a background load on first call."""
+    global _bm25_loading
+    if not BM25_ENABLED or not _RETRIEVAL_AVAILABLE:
+        return None
+    if _bm25_index is not None:
+        return _bm25_index
+    with _bm25_lock:
+        if _bm25_index is not None:
+            return _bm25_index
+        if not _bm25_loading:
+            _bm25_loading = True
+            if BM25_LAZY:
+                t = threading.Thread(target=_load_bm25_blocking, daemon=True)
+                t.start()
+            else:
+                _load_bm25_blocking()
+    return _bm25_index
+
+
+@app.on_event("startup")
+def _startup_load_index() -> None:
+    # Phase 2: ensure the SQLite schema exists before any request lands.
+    try:
+        auth.init_db()
+        logger.info("auth db ready at %s", auth.DB_PATH)
+    except Exception as e:
+        logger.error("auth.init_db failed: %s", e)
+
+    if BM25_ENABLED and not BM25_LAZY:
+        _ensure_bm25()
+    elif BM25_ENABLED:
+        # kick off background warm-up so the first /retrieve isn't cold
+        _ensure_bm25()
+
+
+class RetrieveRequest(BaseModel):
+    query: str = Field(..., min_length=2, max_length=500)
+    k: int = Field(default=5, ge=1, le=20)
+    tier: Optional[str] = Field(default=None, description="SC / HC / DC filter")
+
+
+@app.post("/retrieve")
+def retrieve(req: RetrieveRequest):
+    """Dense retrieval endpoint consumed by NyayaSathi for grounding.
+
+    Returns an ordered list of hits. Empty list with 200 means the index is
+    loaded but no relevant docs were found — the caller should fall back to
+    its local corpus. A 503 means the index isn't ready yet.
+    """
+    if not _RETRIEVAL_AVAILABLE:
+        raise HTTPException(503, "retrieval module not installed on this deployment")
+    idx = _ensure_bm25()
+    if idx is None:
+        raise HTTPException(503, f"BM25 index not ready ({_bm25_load_error or 'loading'})")
+
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        result_hits = idx.search(req.query, limit=req.k)
+    else:
+        raw = idx.query(req.query, k=req.k, tier=req.tier)
+        result_hits = [doc_to_retrieve_hit(d, s, req.query) for d, s in raw]  # type: ignore[misc]
+    return JSONResponse(
+        {
+            "query": req.query,
+            "k": req.k,
+            "tier": req.tier,
+            "count": len(result_hits),
+            "hits": result_hits,
+        }
+    )
+
+
+@app.get("/judgment/{case_id}")
+def get_judgment(case_id: str):
+    """Return the indexed row for a single case_id (title, citation, body).
+
+    NyayaSathi uses this when the caller asks a follow-up like "tell me more
+    about that judgment". Text, not PDF — use /pdf/* or /sc-pdf/* for files.
+    """
+    idx = _ensure_bm25()
+    if idx is None:
+        raise HTTPException(503, "Index not ready")
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        case = idx.get(case_id)
+        if case:
+            return JSONResponse(case)
+        raise HTTPException(404, f"case_id {case_id} not found")
+    # Legacy BM25 path
+    for d in idx.docs:
+        if d.case_id == case_id:
+            return JSONResponse(
+                {
+                    "case_id": d.case_id,
+                    "court": d.court,
+                    "bench": d.bench,
+                    "year": d.year,
+                    "date": d.date,
+                    "title": d.title,
+                    "citation": d.citation,
+                    "tier": d.tier,
+                    "text": {k: _safe_str(v) for k, v in d.source_row.items()
+                             if k in ("title", "headnote", "description", "judge",
+                                      "petitioner", "respondent", "citation",
+                                      "disposal_nature")},
+                }
+            )
+    raise HTTPException(404, f"case_id {case_id} not in index")
+
+
+@app.post("/admin/reload")
+def admin_reload(authorization: Optional[str] = Header(default=None)):
+    """Hot-reload the BM25 pickle after `rebuild_bm25.py` writes a new one.
+    Auth: Bearer token via LEXSEARCH_ADMIN_TOKEN env. If unset, endpoint is
+    effectively disabled (403)."""
+    global _bm25_index, _bm25_loading, _bm25_load_error
+    expected = os.environ.get("LEXSEARCH_ADMIN_TOKEN", "")
+    if not expected:
+        raise HTTPException(403, "admin reload disabled (set LEXSEARCH_ADMIN_TOKEN)")
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if token != expected:
+        raise HTTPException(401, "bad token")
+    with _bm25_lock:
+        _bm25_index = None
+        _bm25_loading = False
+        _bm25_load_error = None
+    _ensure_bm25()
+    return {"status": "reloading"}
+
+
+# ---------------------------------------------------------------------------
+# Court Search + Analytics API (powered by india_courts.db FTS5)
+# ---------------------------------------------------------------------------
+
+@app.get("/api/cases/search")
+def api_cases_search(
+    q: str = "",
+    jurisdiction: str = "IN",
+    tier: Optional[str] = None,
+    k: int = 20,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Full-text search across 22M+ Indian court records."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not q:
+        return {"hits": [], "total": 0, "engine": "none"}
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        hits = idx.search(q, limit=k)
+        return {"hits": hits, "total": len(idx), "engine": "fts5"}
+    return {"hits": [], "total": 0, "engine": "bm25_no_search"}
+
+
+@app.get("/api/cases/latest")
+def api_cases_latest(
+    jurisdiction: str = "IN",
+    k: int = 20,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Newest cases in the corpus."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None:
+        return {"hits": [], "total": 0}
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        return {"hits": idx.latest(limit=k), "total": len(idx)}
+    return {"hits": [], "total": 0}
+
+
+@app.get("/api/cases/{case_id}")
+def api_case_detail(
+    case_id: str,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Single case detail."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None:
+        raise HTTPException(503)
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        case = idx.get(case_id)
+        if case:
+            return case
+    raise HTTPException(404)
+
+
+@app.get("/api/analytics/corpus-stats")
+def api_corpus_stats(ls_session: Optional[str] = Cookie(default=None)):
+    """Corpus overview: total records, courts, year range."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None:
+        return {}
+    if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+        return idx.stats()
+    return {"total": len(idx.docs) if hasattr(idx, 'docs') else 0}
+
+
+@app.get("/api/analytics/court-efficiency")
+def api_court_efficiency(ls_session: Optional[str] = Cookie(default=None)):
+    """Court efficiency: avg days to dispose, disposal rate per court."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"courts": []}
+    return {"courts": idx.court_efficiency()}
+
+
+@app.get("/api/analytics/bail-intelligence")
+def api_bail_intelligence(
+    court: Optional[str] = None,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Bail grant/rejection rates by court."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {}
+    return idx.bail_intelligence(court_code=court)
+
+
+@app.get("/api/analytics/verdict-patterns")
+def api_verdict_patterns(
+    court: Optional[str] = None,
+    year_from: Optional[int] = None,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Verdict distribution patterns."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.session_valid(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {}
+    return idx.verdict_patterns(court_code=court, year_from=year_from)
+
+
+@app.get("/health")
+def health():
+    """Liveness + BM25 readiness. NyayaSathi pings this before enabling
+    LexSearch-backed grounding on a call."""
+    idx = _bm25_index
+    return {
+        "status": "ok",
+        "retrieval_available": _RETRIEVAL_AVAILABLE,
+        "bm25_enabled": BM25_ENABLED,
+        "bm25_loaded": idx is not None,
+        "bm25_loading": _bm25_loading,
+        "bm25_doc_count": (len(idx.docs) if idx is not None else 0),
+        "bm25_loaded_at": _bm25_loaded_at,
+        "bm25_load_error": _bm25_load_error,
+    }
 
 
 @app.get("/sc-pdf/{year}/{pdf_name}")
 def serve_sc_pdf(year: int, pdf_name: str, download: bool = False):
-    """
-    Extract a single PDF from the Supreme Court tar archive on S3.
+    """Extract a single PDF from the Supreme Court tar archive on S3.
+
+    Failure modes are normalised to JSON 404 so the UI can show a clean
+    "PDF unavailable" state instead of a 500 spinner that never resolves.
     """
     fs = get_fs()
     tar_path = f"{SC_S3}/data/tar/year={year}/english/english.tar"
@@ -416,12 +861,551 @@ def serve_sc_pdf(year: int, pdf_name: str, download: bool = False):
                                 media_type="application/pdf",
                                 headers={"Content-Disposition": disp},
                             )
-        raise HTTPException(404, f"PDF {pdf_name} not found in archive.")
+        raise HTTPException(404, "PDF not available in the archive.")
     except HTTPException:
         raise
+    except FileNotFoundError:
+        raise HTTPException(404, "Archive for that year is not available.")
     except Exception as e:
-        logger.error(f"SC PDF extraction error: {e}")
-        raise HTTPException(500, f"Error extracting PDF: {str(e)}")
+        logger.error("SC PDF extraction error for %s/%s: %s", year, pdf_name, e)
+        raise HTTPException(404, "PDF could not be extracted.")
+
+
+@app.head("/sc-pdf/{year}/{pdf_name}")
+def probe_sc_pdf(year: int, pdf_name: str):
+    """HEAD probe for SC PDFs. Confirms the tar archive for the year exists;
+    we don't scan for the filename (would mean reading the whole tar) — the
+    UI treats a 200 here as "try it, might still 404 on GET" but at least
+    blocks links when the year's archive is missing entirely."""
+    fs = get_fs()
+    tar_path = f"{SC_S3}/data/tar/year={year}/english/english.tar"
+    try:
+        if fs.exists(tar_path):
+            return Response(status_code=200)
+    except Exception as e:
+        logger.debug("SC archive probe failed for %s: %s", year, e)
+    raise HTTPException(404, "SC archive not available for that year.")
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — access requests, login, Brief chat, admin
+# ---------------------------------------------------------------------------
+
+ADMIN_TOKEN = os.environ.get("LEXSEARCH_ADMIN_TOKEN", "")
+
+
+def _client_ip(request: Request) -> str:
+    # Trust X-Forwarded-For if present (behind Render / Nginx), else peer IP.
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.client.host if request.client else ""
+
+
+def _require_admin(authorization: Optional[str]) -> None:
+    if not ADMIN_TOKEN:
+        raise HTTPException(403, "admin disabled (set LEXSEARCH_ADMIN_TOKEN)")
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token or token != ADMIN_TOKEN:
+        raise HTTPException(401, "bad token")
+
+
+def _require_user(session: Optional[str]) -> dict:
+    """Dependency-style helper. Returns the authenticated user row or 401."""
+    uid = auth.verify_session_token(session)
+    if uid is None:
+        raise HTTPException(401, "not signed in")
+    user = auth.get_user(uid)
+    if not user:
+        raise HTTPException(401, "session expired")
+    return user
+
+
+# ── public: access request ─────────────────────────────────────────────────
+
+class AccessRequestBody(BaseModel):
+    name: str = Field(..., min_length=2, max_length=120)
+    email: str = Field(..., min_length=5, max_length=160)
+    role: str = Field(default="", max_length=80)
+    firm: str = Field(default="", max_length=160)
+    bar_no: str = Field(default="", max_length=60)
+    note: str = Field(default="", max_length=1000)
+
+
+@app.post("/api/access-request")
+def api_access_request(body: AccessRequestBody, request: Request):
+    ip = _client_ip(request)
+    if not auth.rate_limit("access_request", ip, max_hits=5, window_s=3600):
+        raise HTTPException(429, "Too many requests from this IP. Try later.")
+    # Minimal email shape check — do not run a full RFC 5321.
+    if "@" not in body.email or "." not in body.email.split("@")[-1]:
+        raise HTTPException(400, "Please provide a valid email address.")
+    rid = auth.create_access_request(
+        body.name, body.email, body.role, body.firm, body.bar_no, body.note, ip
+    )
+    return {"ok": True, "request_id": rid}
+
+
+# ── login / logout ────────────────────────────────────────────────────────
+
+class LoginBody(BaseModel):
+    code: str = Field(..., min_length=6, max_length=32)
+
+
+@app.post("/api/login")
+def api_login(body: LoginBody, request: Request):
+    ip = _client_ip(request)
+    if not auth.rate_limit("login", ip, max_hits=10, window_s=600):
+        raise HTTPException(429, "Too many login attempts. Slow down.")
+    user = auth.validate_code(body.code)
+    if not user:
+        raise HTTPException(401, "Invalid or revoked access code.")
+    token = auth.make_session_token(user["id"])
+    resp = JSONResponse({"ok": True, "user": {"email": user["email"], "name": user["name"]}})
+    resp.set_cookie(
+        auth.SESSION_COOKIE,
+        token,
+        max_age=auth.SESSION_TTL_S,
+        httponly=True,
+        samesite="lax",
+        secure=request.url.scheme == "https",
+        path="/",
+    )
+    return resp
+
+
+@app.get("/api/logout")
+def api_logout():
+    resp = RedirectResponse(url="/", status_code=302)
+    resp.delete_cookie(auth.SESSION_COOKIE, path="/")
+    return resp
+
+
+@app.get("/api/me")
+def api_me(ls_session: Optional[str] = Cookie(default=None)):
+    try:
+        user = _require_user(ls_session)
+    except HTTPException:
+        return JSONResponse({"authenticated": False}, status_code=200)
+    return {"authenticated": True, "user": {"email": user["email"], "name": user["name"]}}
+
+
+# ── brief: threads + chat ─────────────────────────────────────────────────
+
+class NewThreadBody(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=200)
+
+
+@app.get("/api/brief/threads")
+def api_list_threads(ls_session: Optional[str] = Cookie(default=None)):
+    user = _require_user(ls_session)
+    threads = auth.list_user_threads(user["id"], limit=30)
+    return {
+        "user": {"email": user["email"], "name": user["name"]},
+        "threads": threads,
+    }
+
+
+@app.post("/api/brief/threads")
+def api_create_thread(
+    body: NewThreadBody = NewThreadBody(),
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    user = _require_user(ls_session)
+    tid = auth.create_thread(user["id"], title=(body.title or "New matter"))
+    return {
+        "thread": {
+            "id": tid,
+            "title": body.title or "New matter",
+            "created_at": int(time.time()),
+            "updated_at": int(time.time()),
+        }
+    }
+
+
+@app.get("/api/brief/threads/{thread_id}")
+def api_get_thread(
+    thread_id: int,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    user = _require_user(ls_session)
+    msgs = auth.get_thread_messages(thread_id, user["id"])
+    if msgs is None:
+        raise HTTPException(404, "Thread not found.")
+    return {"thread_id": thread_id, "messages": msgs}
+
+
+class ChatBody(BaseModel):
+    thread_id: int = Field(..., ge=1)
+    question: str = Field(..., min_length=2, max_length=2000)
+
+
+@app.post("/api/brief/chat")
+def api_brief_chat(
+    body: ChatBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    user = _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("chat", ip, max_hits=30, window_s=60):
+        raise HTTPException(429, "You're asking very quickly. Breathe.")
+
+    # Ownership check + history pull in one shot
+    history = auth.get_thread_messages(body.thread_id, user["id"])
+    if history is None:
+        raise HTTPException(404, "Thread not found.")
+
+    # ── Input guardrails: length / injection / scope / PII redaction
+    guard = input_guards.check(body.question, history_len=len(history or []))
+    if not guard.allow:
+        # Persist the user turn so the refusal is visible in the thread,
+        # then return a structured refusal envelope (no LLM call, no retrieval).
+        auth.append_message(body.thread_id, "user", body.question, None)
+        auth.append_message(
+            body.thread_id,
+            "assistant",
+            guard.refusal_message,
+            serialize_citations([]),
+        )
+        return JSONResponse({
+            "answer_markdown": guard.refusal_message,
+            "citations": [],
+            "llm": {"provider": "guard", "model": "input_guards", "latency_ms": 0, "fallback_chain": []},
+            "validation": {"passed": False, "confidence": 0.0, "reasons": [guard.reason]},
+            "refused": True,
+            "guard": guard.to_dict(),
+        })
+
+    safe_question = guard.redacted_question or body.question
+
+    # Retrieve grounding hits — FTS5 (primary) or BM25 (legacy).
+    hits: list[dict] = []
+    idx = _ensure_bm25()
+    if idx is not None:
+        try:
+            if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+                # FTS5 adapter returns Sanhita-compatible dicts directly
+                hits = idx.search(safe_question, limit=6)
+                logger.info("FTS5 retrieve for '%s': %d hits", safe_question[:50], len(hits))
+            else:
+                # Legacy BM25 path
+                results = idx.query(safe_question, k=6, tier=None)
+                hits = [doc_to_retrieve_hit(d, s, safe_question) for d, s in results]  # type: ignore[misc]
+        except Exception as e:
+            logger.warning("Retrieval failed in /api/brief/chat: %s", e)
+
+    # Compose the grounded answer (LLM or fallback).
+    result = answer_question(safe_question, hits, history or [])
+    if guard.notes:
+        result["guard"] = guard.to_dict()
+
+    # Persist user + assistant turns. Store the REDACTED question — never
+    # write Aadhaar/PAN/etc. to the DB.
+    auth.append_message(body.thread_id, "user", safe_question, None)
+    auth.append_message(
+        body.thread_id,
+        "assistant",
+        result["answer_markdown"],
+        serialize_citations(result.get("citations") or []),
+    )
+
+    return JSONResponse(result)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# VAULT — per-user document upload + multi-doc Q&A
+# ─────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/vault/docs")
+def api_vault_list(ls_session: Optional[str] = Cookie(default=None)):
+    user = _require_user(ls_session)
+    return {"docs": auth.vault_list_docs(user["id"])}
+
+
+@app.post("/api/vault/upload")
+async def api_vault_upload(
+    request: Request,
+    file: UploadFile = File(...),
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    user = _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("vault_upload", ip, max_hits=20, window_s=600):
+        raise HTTPException(429, "Too many uploads. Try again in a few minutes.")
+
+    # Size check
+    blob = await file.read()
+    if len(blob) > vault_service.UPLOAD_MAX_BYTES:
+        raise HTTPException(413, f"File exceeds {vault_service.UPLOAD_MAX_BYTES // (1024*1024)} MB limit.")
+
+    fname = (file.filename or "upload").lower()
+    if not any(fname.endswith(ext) for ext in vault_service.ALLOWED_EXTS):
+        raise HTTPException(415, f"Allowed types: {', '.join(sorted(vault_service.ALLOWED_EXTS))}")
+
+    text = vault_service.extract_text(file.filename or fname, blob)
+    if not text.strip():
+        raise HTTPException(422, "Could not extract text from this file.")
+
+    doc_id = auth.vault_create_doc(user["id"], file.filename or fname, file.content_type or "", len(blob))
+    chunks = vault_service.chunk_document(doc_id, file.filename or fname, text)
+    n = auth.vault_save_chunks(doc_id, user["id"], chunks)
+    return {"ok": True, "doc_id": doc_id, "filename": file.filename, "chunks": n}
+
+
+@app.delete("/api/vault/docs/{doc_id}")
+def api_vault_delete(doc_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    user = _require_user(ls_session)
+    ok = auth.vault_delete_doc(user["id"], doc_id)
+    if not ok:
+        raise HTTPException(404, "Document not found.")
+    return {"ok": True, "doc_id": doc_id}
+
+
+class VaultChatBody(BaseModel):
+    question: str = Field(..., min_length=2, max_length=2000)
+    doc_ids: Optional[list[int]] = None  # None = all docs
+
+
+@app.post("/api/vault/chat")
+def api_vault_chat(
+    body: VaultChatBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    user = _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("vault_chat", ip, max_hits=30, window_s=60):
+        raise HTTPException(429, "You're asking very quickly. Breathe.")
+
+    guard = input_guards.check(body.question, history_len=1)  # treat as follow-up (don't gate scope)
+    if not guard.allow:
+        return JSONResponse({"answer_markdown": guard.refusal_message, "refused": True,
+                             "citations": [], "guard": guard.to_dict()})
+
+    chunks = auth.vault_load_chunks(user["id"], body.doc_ids)
+    if not chunks:
+        return JSONResponse({
+            "answer_markdown": "Your vault is empty. Upload a document first (PDF, DOCX, or TXT).",
+            "citations": [], "refused": True,
+        })
+
+    hits = vault_service.rank_chunks(guard.redacted_question, chunks, k=8)
+    result = vault_service.answer_over_vault(guard.redacted_question, hits, [])
+    return JSONResponse(result)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# DRAFT — 4 Indian-law templates
+# ─────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/draft/templates")
+def api_draft_templates(ls_session: Optional[str] = Cookie(default=None)):
+    _require_user(ls_session)
+    return {"templates": workflows.list_draft_templates()}
+
+
+class DraftBody(BaseModel):
+    template: str = Field(..., min_length=2, max_length=64)
+    facts: dict[str, Any] = Field(default_factory=dict)
+
+
+@app.post("/api/draft")
+def api_draft(
+    body: DraftBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("draft", ip, max_hits=20, window_s=300):
+        raise HTTPException(429, "Too many draft requests. Wait a few minutes.")
+    try:
+        return workflows.generate_draft(body.template, body.facts)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:
+        logger.error("draft failed: %s", e)
+        raise HTTPException(500, "Draft generation failed.")
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# REVIEW — contract clause review
+# ─────────────────────────────────────────────────────────────────────────
+
+class ReviewBody(BaseModel):
+    clauses: list[str] = Field(..., min_length=1, max_length=40)
+
+
+@app.post("/api/review")
+def api_review(
+    body: ReviewBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("review", ip, max_hits=20, window_s=300):
+        raise HTTPException(429, "Too many review requests.")
+    return workflows.review_contract(body.clauses)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# TRANSLATE — EN ↔ HI
+# ─────────────────────────────────────────────────────────────────────────
+
+class TranslateBody(BaseModel):
+    text: str = Field(..., min_length=1, max_length=8000)
+    direction: str = Field(default="en->hi")
+
+
+@app.post("/api/translate")
+def api_translate(
+    body: TranslateBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("translate", ip, max_hits=30, window_s=300):
+        raise HTTPException(429, "Too many translation requests.")
+    try:
+        return workflows.translate(body.text, direction=body.direction)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# CITATOR — judicial history + related cases
+# ─────────────────────────────────────────────────────────────────────────
+
+class CitatorBody(BaseModel):
+    case_title: str = Field(..., min_length=2, max_length=400)
+    excerpt: str = Field(..., min_length=10, max_length=20000)
+    holdings: str = Field(default="", max_length=8000)
+
+
+@app.post("/api/citator")
+def api_citator(
+    body: CitatorBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("citator", ip, max_hits=30, window_s=300):
+        raise HTTPException(429, "Too many citator requests.")
+    return workflows.citator_summary(body.case_title, body.excerpt, body.holdings)
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# REDLINE + GENERIC WORKFLOWS (Harvey-parity for India)
+# ─────────────────────────────────────────────────────────────────────────
+
+class RedlineBody(BaseModel):
+    text: str = Field(..., min_length=50, max_length=40000)
+
+
+@app.post("/api/redline")
+def api_redline(
+    body: RedlineBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("redline", ip, max_hits=15, window_s=300):
+        raise HTTPException(429, "Too many redline requests.")
+    return workflows.redline_contract(body.text)
+
+
+class GenericBody(BaseModel):
+    key: str = Field(..., min_length=2, max_length=64)
+    text: str = Field(..., min_length=10, max_length=40000)
+
+
+@app.get("/api/workflows")
+def api_workflows_list():
+    return {"workflows": workflows.list_generic_workflows()}
+
+
+@app.post("/api/workflows/run")
+def api_workflows_run(
+    body: GenericBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("wf", ip, max_hits=30, window_s=300):
+        raise HTTPException(429, "Too many workflow runs.")
+    try:
+        return workflows.run_generic(body.key, body.text)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+# ── admin endpoints (bearer-token auth) ───────────────────────────────────
+
+@app.get("/api/admin/requests")
+def api_admin_list_requests(
+    status: Optional[str] = Query(default=None),
+    authorization: Optional[str] = Header(default=None),
+):
+    _require_admin(authorization)
+    return {"requests": auth.list_access_requests(status=status)}
+
+
+@app.post("/api/admin/requests/{request_id}/approve")
+def api_admin_approve(
+    request_id: int,
+    authorization: Optional[str] = Header(default=None),
+):
+    _require_admin(authorization)
+    approved = auth.approve_request(request_id)
+    if not approved:
+        raise HTTPException(404, "No pending request with that id.")
+    # access_code is plaintext — returned ONCE.
+    return approved
+
+
+@app.post("/api/admin/requests/{request_id}/reject")
+def api_admin_reject(
+    request_id: int,
+    authorization: Optional[str] = Header(default=None),
+):
+    _require_admin(authorization)
+    ok = auth.reject_request(request_id)
+    if not ok:
+        raise HTTPException(404, "No pending request with that id.")
+    return {"ok": True, "request_id": request_id, "status": "rejected"}
+
+
+# ── HTML page routes for Phase 2 ──────────────────────────────────────────
+
+@app.get("/login")
+async def serve_login():
+    return FileResponse(STATIC_DIR / "login.html", media_type="text/html")
+
+
+@app.get("/brief")
+async def serve_brief(ls_session: Optional[str] = Cookie(default=None)):
+    # Gate the Brief page — bounce unauthenticated users to /login.
+    uid = auth.verify_session_token(ls_session)
+    if uid is None or auth.get_user(uid) is None:
+        return RedirectResponse(url="/login", status_code=302)
+    return FileResponse(STATIC_DIR / "brief.html", media_type="text/html")
+
+
+@app.get("/brief.js")
+async def serve_brief_js():
+    return FileResponse(STATIC_DIR / "brief.js", media_type="application/javascript")
+
+
+@app.get("/admin")
+async def serve_admin():
+    # Admin page itself is static; the data endpoints are token-gated.
+    return FileResponse(STATIC_DIR / "admin.html", media_type="text/html")
 
 
 # ---------------------------------------------------------------------------
@@ -445,6 +1429,50 @@ async def serve_js():
     return FileResponse(STATIC_DIR / "app.js", media_type="application/javascript")
 
 
+@app.get("/workspaces.js")
+async def serve_workspaces_js():
+    return FileResponse(STATIC_DIR / "workspaces.js", media_type="application/javascript")
+
+
+@app.get("/app-shell.js")
+async def serve_app_shell_js():
+    return FileResponse(STATIC_DIR / "app-shell.js", media_type="application/javascript")
+
+
+@app.get("/app")
+async def serve_app(ls_session: Optional[str] = Cookie(default=None)):
+    uid = auth.verify_session_token(ls_session)
+    if uid is None or auth.get_user(uid) is None:
+        return RedirectResponse(url="/login", status_code=302)
+    return FileResponse(STATIC_DIR / "brief.html", media_type="text/html")
+
+
+@app.get("/assets/{path:path}")
+async def serve_asset(path: str):
+    """Serve static assets (logo, firm logos, etc.) from ./assets/."""
+    safe_path = (STATIC_DIR / "assets" / path).resolve()
+    assets_root = (STATIC_DIR / "assets").resolve()
+    # Prevent path traversal
+    if assets_root not in safe_path.parents and safe_path != assets_root:
+        raise HTTPException(404, "Not found")
+    if not safe_path.is_file():
+        raise HTTPException(404, "Asset not found")
+    ext = safe_path.suffix.lower()
+    media = {
+        ".svg": "image/svg+xml",
+        ".png": "image/png",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".webp": "image/webp",
+        ".ico": "image/x-icon",
+    }.get(ext, "application/octet-stream")
+    return FileResponse(safe_path, media_type=media)
+
+
 @app.get("/")
-async def serve_index():
-    return FileResponse(STATIC_DIR / "index.html", media_type="text/html")
+async def serve_index(ls_session: Optional[str] = Cookie(default=None)):
+    # Marketing site removed — go straight to the product.
+    uid = auth.verify_session_token(ls_session)
+    if uid is None or auth.get_user(uid) is None:
+        return RedirectResponse(url="/login", status_code=302)
+    return RedirectResponse(url="/app", status_code=302)

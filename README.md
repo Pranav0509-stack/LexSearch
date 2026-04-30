@@ -23,7 +23,12 @@ pip install -r requirements.txt
 uvicorn server:app --reload --port 8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080)
+Open [http://localhost:8080](http://localhost:8080).
+
+The frontend calls the API at the same origin (relative paths like `/search`,
+`/pdf/…`), so nothing else needs configuring in dev. In production
+(`render.yaml`) the same pattern applies — the FastAPI app serves both the
+static files and the JSON endpoints.
 
 ## Deploy on Render (Free)
 
@@ -41,8 +46,3 @@ Open [http://localhost:8080](http://localhost:8080)
 
 [vanga/indian-high-court-judgments](https://github.com/vanga/indian-high-court-judgments) · [openjustice-in](https://github.com/openjustice-in)
 
----
-
-*Made for Shreya Didi*
-# LexSearch
-# LexSearch

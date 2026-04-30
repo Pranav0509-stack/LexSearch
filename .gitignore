@@ -1,2 +1,18 @@
 *.pyc
 __pycache__/
+.secret
+lexsearch.db
+.env
+.env.local
+.env.*.local
+
+# BM25 index pickle and any chunked/embedded index files
+bm25.pkl
+chunks.parquet
+chunks.jsonl
+qdrant_storage/
+
+# Eval output
+eval/results/
+india_courts.db
+.claude/

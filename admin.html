@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin — Sanhita</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css?v=sanhita1" />
+</head>
+<body class="admin-body">
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <rect width="64" height="64" rx="10" fill="#0B1220"/>
+          <text x="32" y="46" font-family="Cormorant Garamond, Georgia, serif" font-size="40" font-weight="600" fill="#B8924A" text-anchor="middle" font-style="italic">S</text>
+          <circle cx="48" cy="18" r="2" fill="#B8924A"/>
+        </svg>
+      </span>
+      Sanhita <span class="brand-suffix">/ Admin</span>
+    </a>
+    <div class="nav-spacer"></div>
+    <a href="/" class="nav-cta ghost">Back to site</a>
+  </div>
+</nav>
+
+<main class="admin-shell">
+  <header class="admin-header">
+    <h1>Access requests</h1>
+    <div class="admin-token-row">
+      <label for="admin-token">Admin token</label>
+      <input type="password" id="admin-token" placeholder="LEXSEARCH_ADMIN_TOKEN" autocomplete="off" />
+      <button id="load-btn" class="btn-primary">Load</button>
+    </div>
+  </header>
+
+  <div class="admin-tabs">
+    <button class="tab-btn active" data-status="pending">Pending</button>
+    <button class="tab-btn" data-status="approved">Approved</button>
+    <button class="tab-btn" data-status="rejected">Rejected</button>
+  </div>
+
+  <div id="admin-error" class="admin-error" role="alert"></div>
+  <div id="request-table-wrap">
+    <p class="admin-hint">Paste your admin token above and click Load.</p>
+  </div>
+</main>
+
+<script>
+(function () {
+  const tokenInput = document.getElementById('admin-token');
+  const loadBtn = document.getElementById('load-btn');
+  const wrap = document.getElementById('request-table-wrap');
+  const err = document.getElementById('admin-error');
+  const tabs = document.querySelectorAll('.tab-btn');
+
+  // Remember token in sessionStorage (NOT localStorage — clears on tab close).
+  const saved = sessionStorage.getItem('lexadm_token');
+  if (saved) tokenInput.value = saved;
+
+  let activeStatus = 'pending';
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  async function adminFetch(path, opts = {}) {
+    const tok = tokenInput.value.trim();
+    if (!tok) throw new Error('Enter the admin token first.');
+    sessionStorage.setItem('lexadm_token', tok);
+    const resp = await fetch(path, {
+      ...opts,
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${tok}`,
+        ...(opts.headers || {}),
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) throw new Error(data.detail || `HTTP ${resp.status}`);
+    return data;
+  }
+
+  async function load() {
+    err.textContent = '';
+    wrap.innerHTML = '<p class="admin-hint">Loading…</p>';
+    try {
+      const data = await adminFetch(`/api/admin/requests?status=${activeStatus}`);
+      renderTable(data.requests || []);
+    } catch (e) {
+      wrap.innerHTML = '';
+      err.textContent = e.message;
+    }
+  }
+
+  function renderTable(rows) {
+    if (!rows.length) {
+      wrap.innerHTML = `<p class="admin-hint">No ${activeStatus} requests.</p>`;
+      return;
+    }
+    const t = document.createElement('table');
+    t.className = 'admin-table';
+    t.innerHTML = `
+      <thead>
+        <tr>
+          <th>Name</th><th>Email</th><th>Firm</th><th>Role</th>
+          <th>Note</th><th>Submitted</th><th></th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    `;
+    const tbody = t.querySelector('tbody');
+    for (const r of rows) {
+      const tr = document.createElement('tr');
+      const when = new Date(r.created_at * 1000).toLocaleString('en-IN');
+      tr.innerHTML = `
+        <td><strong>${esc(r.name)}</strong><br/><span class="muted">${esc(r.bar_no || '')}</span></td>
+        <td>${esc(r.email)}</td>
+        <td>${esc(r.firm || '')}</td>
+        <td>${esc(r.role || '')}</td>
+        <td class="col-note">${esc(r.note || '')}</td>
+        <td>${when}</td>
+        <td class="col-actions"></td>
+      `;
+      const actions = tr.querySelector('.col-actions');
+      if (r.status === 'pending') {
+        const approve = document.createElement('button');
+        approve.className = 'btn-primary btn-sm';
+        approve.textContent = 'Approve';
+        approve.addEventListener('click', () => approveOne(r.id, approve));
+        const reject = document.createElement('button');
+        reject.className = 'btn-ghost btn-sm';
+        reject.textContent = 'Reject';
+        reject.addEventListener('click', () => rejectOne(r.id, tr));
+        actions.appendChild(approve);
+        actions.appendChild(reject);
+      } else {
+        actions.textContent = r.status;
+      }
+      tbody.appendChild(tr);
+    }
+    wrap.innerHTML = '';
+    wrap.appendChild(t);
+  }
+
+  async function approveOne(id, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Approving…';
+    try {
+      const data = await adminFetch(`/api/admin/requests/${id}/approve`, { method: 'POST' });
+      alert(
+        `Approved ${data.name} <${data.email}>\n\n` +
+        `Access code (share ONCE, not stored in plaintext):\n\n${data.access_code}`
+      );
+      load();
+    } catch (e) {
+      err.textContent = e.message;
+      btn.disabled = false;
+      btn.textContent = 'Approve';
+    }
+  }
+
+  async function rejectOne(id, row) {
+    if (!confirm('Reject this request?')) return;
+    try {
+      await adminFetch(`/api/admin/requests/${id}/reject`, { method: 'POST' });
+      load();
+    } catch (e) {
+      err.textContent = e.message;
+    }
+  }
+
+  loadBtn.addEventListener('click', load);
+  tabs.forEach((b) => {
+    b.addEventListener('click', () => {
+      tabs.forEach((x) => x.classList.remove('active'));
+      b.classList.add('active');
+      activeStatus = b.dataset.status;
+      load();
+    });
+  });
+})();
+</script>
+</body>
+</html>

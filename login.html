@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in — Sanhita Brief</title>
+  <link rel="icon" href="/assets/logo.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/style.css?v=sanhita1" />
+</head>
+<body class="auth-body">
+
+<nav class="site-nav">
+  <div class="site-nav-inner">
+    <a href="/" class="brand">
+      <span class="brand-mark">
+        <svg viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg" fill="none">
+          <rect width="64" height="64" rx="10" fill="#0B1220"/>
+          <text x="32" y="46" font-family="Cormorant Garamond, Georgia, serif" font-size="40" font-weight="600" fill="#B8924A" text-anchor="middle" font-style="italic">S</text>
+          <circle cx="48" cy="18" r="2" fill="#B8924A"/>
+        </svg>
+      </span>
+      Sanhita<span class="brand-deva" aria-hidden="true">सं</span>
+    </a>
+    <div class="nav-spacer"></div>
+    <a href="/" class="nav-cta ghost">Back to site</a>
+  </div>
+</nav>
+
+<main class="auth-shell">
+  <div class="auth-card">
+    <div class="auth-eyebrow">Sanhita Brief</div>
+    <h1 class="auth-title">Sign in to your chamber.</h1>
+    <p class="auth-lede">
+      Enter the 12-character access code your firm received when access was
+      approved. Lost it? <a href="mailto:pranavpandey.pr@gmail.com">Write to us</a>.
+    </p>
+
+    <form id="login-form" class="auth-form" autocomplete="off">
+      <label for="code-input">Access code</label>
+      <input
+        type="text"
+        id="code-input"
+        name="code"
+        placeholder="ABCD-EFGH-JKLM"
+        maxlength="16"
+        spellcheck="false"
+        autocapitalize="characters"
+        required
+      />
+      <button type="submit" class="btn-primary" id="login-submit">
+        Sign in
+      </button>
+      <div id="login-error" class="auth-error" role="alert"></div>
+    </form>
+
+    <div class="auth-divider"><span>or</span></div>
+
+    <a href="/#access" class="btn-ghost auth-request-link">
+      Request access for your chambers →
+    </a>
+  </div>
+</main>
+
+<script>
+(function () {
+  const form = document.getElementById('login-form');
+  const input = document.getElementById('code-input');
+  const err = document.getElementById('login-error');
+  const btn = document.getElementById('login-submit');
+
+  // Auto-format: uppercase + hyphens every 4 chars
+  input.addEventListener('input', () => {
+    const raw = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 12);
+    const parts = [];
+    for (let i = 0; i < raw.length; i += 4) parts.push(raw.slice(i, i + 4));
+    input.value = parts.join('-');
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    err.textContent = '';
+    btn.disabled = true;
+    btn.textContent = 'Signing in…';
+    try {
+      const resp = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: input.value.trim() }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        err.textContent = data.detail || 'Invalid or revoked code.';
+        btn.disabled = false;
+        btn.textContent = 'Sign in';
+        return;
+      }
+      window.location.href = '/brief';
+    } catch (_) {
+      err.textContent = 'Network error. Try again.';
+      btn.disabled = false;
+      btn.textContent = 'Sign in';
+    }
+  });
+})();
+</script>
+</body>
+</html>
