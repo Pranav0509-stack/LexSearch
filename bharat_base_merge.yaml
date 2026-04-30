@@ -1,0 +1,56 @@
+# ============================================================
+# BharatLLM Forge — Merge Configuration
+# ============================================================
+# Run: python merge_engine/run_merge.py --config configs/bharat_base_merge.yaml
+
+# Base model (the "anchor" — all deltas computed relative to this)
+# Use Mistral 7B as base since it has the best balance
+base_model_path: "./models/mistral-7b"
+
+# Source models to merge
+# Weights are normalized automatically (don't need to sum to 1.0)
+source_models:
+  - name: "mistral-7b"
+    path: "./models/mistral-7b"
+    weight: 0.50          # Largest weight: primary reasoning backbone
+
+  - name: "llama3-8b"
+    path: "./models/llama3-8b"
+    weight: 0.35          # Strong general capability
+
+  - name: "navarasa"
+    path: "./models/navarasa"
+    weight: 0.15          # Indic language injection
+
+# Merge strategy
+# Options: ties_dare, slerp (2 models only), franken
+merge_strategy: "ties_dare"
+
+# DARE parameters
+dare_drop_rate: 0.15      # Drop 15% of delta weights (reduces noise/interference)
+dare_rescale: true        # Rescale after dropping (preserves magnitude)
+
+# TIES parameters
+ties_density: 0.30        # Keep top 30% magnitude parameters per model
+ties_lambda: 1.00         # Scale factor for merged deltas
+
+# Indic vocabulary extension
+extend_vocab: true
+indic_languages:
+  - "hi"    # Hindi
+  - "bn"    # Bengali
+  - "ta"    # Tamil
+  - "te"    # Telugu
+  - "mr"    # Marathi
+  - "gu"    # Gujarati
+  - "kn"    # Kannada
+  - "ml"    # Malayalam
+  - "pa"    # Punjabi
+vocab_extension_size: 16000   # Add 16K new Indic tokens
+
+# Output
+output_dir: "./outputs/bharat-base-7b"
+
+# System
+device: "auto"            # "auto", "cuda", "cpu"
+dtype: "float16"          # "float16", "bfloat16", "float32"

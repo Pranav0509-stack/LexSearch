@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LexSearch — IPC/BNS Converter</title>
+  <link rel="stylesheet" href="style.css?v=2" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚖️</text></svg>" />
+</head>
+<body>
+
+<header class="site-header">
+  <a href="/" class="logo">
+    <span class="logo-icon">⚖️</span>
+    <div class="logo-text">LexSearch</div>
+  </a>
+  <nav class="header-nav">
+    <a href="/" class="nav-link">Search</a>
+    <a href="/converter.html" class="nav-link active">IPC/BNS</a>
+    <a href="/drafter.html" class="nav-link">Drafter</a>
+    <a href="/fir.html" class="nav-link">FIR</a>
+    <a href="/similar.html" class="nav-link">Similar</a>
+    <a href="/predict.html" class="nav-link">Predictor</a>
+  </nav>
+  <span class="header-made">Made for Shreya Didi</span>
+</header>
+
+<div class="converter-page">
+  <div class="page-header">
+    <h1>IPC / BNS Section Converter</h1>
+    <p>Convert between old Indian Penal Code and new Bharatiya Nyaya Sanhita sections</p>
+  </div>
+
+  <div class="converter-search-bar">
+    <div class="converter-controls">
+      <div class="direction-toggle">
+        <button class="dir-btn active" data-dir="ipc_to_bns">IPC → BNS</button>
+        <button class="dir-btn" data-dir="bns_to_ipc">BNS → IPC</button>
+        <button class="dir-btn" data-dir="both">Both</button>
+      </div>
+      <input type="text" id="converter-input" placeholder="Section number or keyword (e.g. 302, murder, theft)" autocomplete="off" />
+      <button class="search-btn" id="converter-search-btn">Search</button>
+    </div>
+  </div>
+
+  <div id="converter-error" class="error-toast" style="display:none"></div>
+
+  <div id="converter-loading" class="state-screen" style="display:none">
+    <div class="spinner"></div>
+    <p>Searching...</p>
+  </div>
+
+  <div id="converter-welcome" class="state-screen">
+    <div class="icon">📜</div>
+    <h3>Convert IPC to BNS Sections</h3>
+    <p>India replaced IPC with BNS (Bharatiya Nyaya Sanhita) on 1 July 2024. Search any section number or keyword to find the new equivalent.</p>
+    <div class="quick-links">
+      <button class="quick-btn" data-q="302">IPC 302 (Murder)</button>
+      <button class="quick-btn" data-q="420">IPC 420 (Cheating)</button>
+      <button class="quick-btn" data-q="498A">IPC 498A (Cruelty)</button>
+      <button class="quick-btn" data-q="376">IPC 376 (Rape)</button>
+      <button class="quick-btn" data-q="354">IPC 354 (Modesty)</button>
+      <button class="quick-btn" data-q="307">IPC 307 (Attempt Murder)</button>
+    </div>
+  </div>
+
+  <div id="converter-empty" class="state-screen" style="display:none">
+    <div class="icon">🔍</div>
+    <h3>No matching sections</h3>
+    <p>Try a different section number or keyword.</p>
+  </div>
+
+  <div id="converter-results"></div>
+</div>
+
+<script src="converter.js"></script>
+</body>
+</html>

@@ -1,0 +1,81 @@
+# ============================================================
+# BharatLLM — QLoRA Fine-Tuning Configuration
+# ============================================================
+# Run: python finetune/train.py --config configs/finetune_bharat.yaml
+#
+# Hardware requirements:
+#   - 16GB VRAM (RTX 3090 / A100 40GB) for 7B model with 4-bit
+#   - 24GB VRAM recommended for faster training
+#   - Google Colab A100 works great ($10-20 for full run)
+
+# Model (output of merge engine)
+model_path: "./outputs/bharat-base-7b"
+output_dir: "./outputs/bharat-llm-7b"
+
+# Training data
+data_dir: "./data/processed"
+languages:
+  - "hi"    # Hindi — 600M speakers
+  - "bn"    # Bengali — 100M speakers
+  - "ta"    # Tamil — 90M speakers
+  - "mr"    # Marathi — 95M speakers
+  - "te"    # Telugu — 96M speakers
+  - "gu"    # Gujarati — 60M speakers
+
+max_seq_length: 2048
+max_samples_per_lang: null    # null = use all available data
+
+# Dataset format: "text", "instruction", "chat"
+dataset_format: "instruction"
+
+# ── LoRA Configuration ──────────────────────────────────────
+lora_rank: 64
+lora_alpha: 128         # Usually 2x rank
+lora_dropout: 0.05
+
+# Which layers to apply LoRA to
+# All attention + FFN layers for best quality
+lora_target_modules:
+  - "q_proj"
+  - "k_proj"
+  - "v_proj"
+  - "o_proj"
+  - "gate_proj"
+  - "up_proj"
+  - "down_proj"
+
+# ── Quantization ─────────────────────────────────────────────
+use_4bit: true
+bnb_4bit_compute_dtype: "bfloat16"
+bnb_4bit_quant_type: "nf4"     # NF4 is better than FP4 for LLMs
+use_double_quant: true          # Saves ~0.5GB VRAM
+
+# ── Training Hyperparameters ──────────────────────────────────
+num_train_epochs: 3
+max_steps: -1           # -1 = use num_train_epochs; set to 5000 for quick test
+
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 8   # Effective batch = 4 * 8 = 32
+
+learning_rate: 0.0002       # 2e-4 is standard for LoRA
+lr_scheduler_type: "cosine" # Cosine decay works best
+warmup_ratio: 0.05          # 5% warmup
+
+optim: "paged_adamw_8bit"   # Memory-efficient AdamW
+weight_decay: 0.01
+max_grad_norm: 1.0
+
+# ── Precision ────────────────────────────────────────────────
+fp16: false
+bf16: true          # Use BF16 on A100/H100; use fp16 on older GPUs
+
+gradient_checkpointing: true  # Save VRAM at cost of ~20% speed
+
+# ── Logging & Saving ─────────────────────────────────────────
+logging_steps: 25
+save_steps: 500
+eval_steps: 500
+save_total_limit: 3     # Keep only last 3 checkpoints
+
+# Tracking: "wandb", "tensorboard", "none"
+report_to: "wandb"
