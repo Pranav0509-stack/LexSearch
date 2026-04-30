@@ -40,26 +40,16 @@ import SettingsPane from "./settings-pane";
 import DashboardPane from "./dashboard-pane";
 import ClientsPane from "./clients-pane";
 
-// Sanhita serves three jurisdictions: India, Singapore, Hong Kong.
-// Each has a live BM25 corpus (ingested from open GitHub datasets) + a
-// dedicated default-source stack in `connectors._default_sources_for`.
-const JURISDICTIONS: { code: string; flag: string; name: string }[] = [
-  { code: "IN", flag: "🇮🇳", name: "India" },
-  { code: "SG", flag: "🇸🇬", name: "Singapore" },
-  { code: "HK", flag: "🇭🇰", name: "Hong Kong SAR" },
-];
+// Sanhita — India's largest AI legal research platform.
+// 30M+ judgments from all 25 High Courts (1950–2025), FTS5-indexed.
+const JURISDICTION = "IN";
 
-// Source databases — `available_connectors()` from the FastAPI backend tells
-// us at runtime which ones have API keys wired so we can grey out the rest.
+// Source databases — FTS5 is the primary search engine over 30M+ records.
 const SOURCES: { value: string; icon: string; label: string }[] = [
-  { value: "", icon: "⚖️", label: "All available" },
-  { value: "indian_kanoon", icon: "🇮🇳", label: "Indian Kanoon" },
-  { value: "ecourts", icon: "🏛️", label: "eCourts (India)" },
-  { value: "egov_japan", icon: "🇯🇵", label: "e-Gov (Japan)" },
-  { value: "web", icon: "🌐", label: "Open web" },
-  { value: "seed", icon: "📚", label: "Seed corpus" },
-  { value: "indian_kanoon,ecourts", icon: "⚖️", label: "Indian sources only" },
-  { value: "web,seed", icon: "🌍", label: "Web + seed" },
+  { value: "", icon: "⚖️", label: "All courts" },
+  { value: "fts5", icon: "🏛️", label: "Case law (30M+)" },
+  { value: "legal_qa", icon: "❓", label: "Legal Q&A (1.3M)" },
+  { value: "statutes", icon: "📜", label: "Statutes & Acts" },
 ];
 
 // Reasoning model picker. The `value` maps to llm.router.generate's
@@ -76,20 +66,20 @@ const MODELS: { value: string; label: string }[] = [
 
 const SUGGESTIONS: { q: string; tag: string }[] = [
   {
-    tag: "Anticipatory bail",
-    q: "Conditions for anticipatory bail under §482 BNSS — leading authority since 2024.",
+    tag: "Bail under NDPS Act",
+    q: "What are the grounds for bail under Section 37 of the NDPS Act? Cite leading HC judgments.",
   },
   {
     tag: "Section 138 NI Act",
-    q: "Standard of proof for cheque dishonour under Section 138 NI Act, recent SC view.",
+    q: "Standard of proof for cheque dishonour under Section 138 NI Act — recent High Court rulings.",
   },
   {
-    tag: "Japan labour law",
-    q: "Termination for poor performance in Japan — Article 16 Labour Contracts Act test.",
+    tag: "Writ Petition Art. 226",
+    q: "Grounds for filing a writ petition under Article 226 — when can a High Court issue certiorari?",
   },
   {
-    tag: "Singapore IP",
-    q: "Trademark passing-off test under Singapore law, citing recent High Court decisions.",
+    tag: "Motor Accident Claims",
+    q: "Formula for computing motor accident compensation — multiplier method vs structured formula.",
   },
 ];
 
@@ -168,7 +158,7 @@ export default function AppPage() {
   // advances them on a timer so the user sees motion even though the
   // backend isn't streaming.
   const [thinkingPhases, setThinkingPhases] = useState<string[]>([]);
-  const [jurisdiction, setJurisdiction] = useState("IN");
+  const jurisdiction = JURISDICTION; // India-only — no dropdown needed
   const [source, setSource] = useState("");
   const [connectors, setConnectors] = useState<Record<string, boolean>>({});
   // Output language for the AI's reply. Persisted in localStorage so a
@@ -580,21 +570,11 @@ export default function AppPage() {
             // Tighter horizontal rhythm (gap-1.5) so all 4 selectors +
             // citations toggle fit on a 14" laptop without wrapping.
             <div className="flex items-center gap-1.5 flex-wrap min-w-0 toolbar-pills">
-              <label className="pill" title="Jurisdiction">
+              <span className="pill" title="India — 30M+ judgments">
                 <Globe size={12} className="text-[var(--ink-soft)] shrink-0" />
-                <span className="shrink-0">{JURISDICTIONS.find((j) => j.code === jurisdiction)?.flag}</span>
-                <select
-                  value={jurisdiction}
-                  onChange={(e) => setJurisdiction(e.target.value)}
-                  className="pill-select"
-                >
-                  {JURISDICTIONS.map((j) => (
-                    <option key={j.code} value={j.code}>
-                      {j.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+                <span className="shrink-0">🇮🇳</span>
+                <span className="text-xs opacity-70">India</span>
+              </span>
 
               <label className="pill" title="Source databases">
                 <LibraryIcon size={12} className="text-[var(--accent)] shrink-0" />

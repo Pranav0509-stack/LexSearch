@@ -33,10 +33,7 @@ export interface LibraryDoc {
 }
 
 const JURISDICTIONS: { code: string; flag: string; name: string }[] = [
-  { code: "", flag: "🌏", name: "All jurisdictions" },
   { code: "IN", flag: "🇮🇳", name: "India" },
-  { code: "SG", flag: "🇸🇬", name: "Singapore" },
-  { code: "HK", flag: "🇭🇰", name: "Hong Kong" },
 ];
 
 const KINDS: { value: string; label: string }[] = [
