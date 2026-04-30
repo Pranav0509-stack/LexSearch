@@ -1,0 +1,17 @@
+.git
+.gitignore
+.claude
+*.db
+*.db-wal
+*.db-shm
+node_modules
+sanhita-react
+__pycache__
+*.pyc
+.env
+.env.*
+eval/
+ingest/
+bm25.pkl
+chunks.*
+*.md

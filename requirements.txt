@@ -1,20 +1,24 @@
+# Core
 fastapi>=0.111.0
 uvicorn[standard]>=0.29.0
+pydantic>=2.6.0
+httpx>=0.27.0
+python-multipart>=0.0.9
+
+# Data / search
 pandas>=2.2.0
 pyarrow>=16.0.0
-s3fs>=2024.3.0
-httpx>=0.27.0
-aiofiles>=23.2.0
-pydantic>=2.6.0
-rank_bm25>=0.2.2
+
+# PDF / document processing
 pdfplumber>=0.11.0
-beautifulsoup4>=4.12.0
-tenacity>=8.2.0
-lxml>=5.2.0
-# Phase 2 — Brief assistant. Optional at runtime (brief_service imports lazily).
-google-generativeai>=0.7.0
-# Sanhita Vault — DOCX extraction (PDF via pdfplumber above).
 python-docx>=1.1.0
-# TLS trust on macOS python.org builds (fixes [SSL: CERTIFICATE_VERIFY_FAILED]).
+beautifulsoup4>=4.12.0
+lxml>=5.2.0
+
+# LLM providers (brief_service imports lazily — app runs without these)
+google-generativeai>=0.7.0
+
+# Utilities
+aiofiles>=23.2.0
+tenacity>=8.2.0
 certifi>=2024.2.2
-python-multipart>=0.0.9

@@ -42,10 +42,14 @@ build_index = None  # type: ignore[assignment]
 doc_to_retrieve_hit = None  # type: ignore[assignment]
 
 _SERVER_DIR = Path(__file__).resolve().parent
-INDIA_COURTS_DB = os.environ.get(
-    "INDIA_COURTS_DB",
+# DB path resolution: env var > local symlink > sibling repo > /data (Docker)
+_DB_CANDIDATES = [
+    os.environ.get("INDIA_COURTS_DB", ""),
+    str(_SERVER_DIR / "india_courts.db"),  # local symlink
     str(_SERVER_DIR.parent / "india-judgments-corpus" / "india_courts.db"),
-)
+    "/data/india_courts.db",  # Railway/Docker volume
+]
+INDIA_COURTS_DB = next((p for p in _DB_CANDIDATES if p and Path(p).exists()), _DB_CANDIDATES[2])
 
 try:
     import sys as _sys
@@ -701,21 +705,27 @@ def admin_reload(authorization: Optional[str] = Header(default=None)):
 @app.get("/api/cases/search")
 def api_cases_search(
     q: str = "",
-    jurisdiction: str = "IN",
-    tier: Optional[str] = None,
+    court_code: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    verdict: Optional[str] = None,
     k: int = 20,
     ls_session: Optional[str] = Cookie(default=None),
 ):
-    """Full-text search across 22M+ Indian court records."""
+    """Full-text search across 31M+ Indian court records with advanced filters."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None or not q:
         return {"hits": [], "total": 0, "engine": "none"}
     if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
-        hits = idx.search(q, limit=k)
+        hits = idx.search(
+            q, court_code=court_code,
+            year_from=year_from, year_to=year_to,
+            verdict=verdict, limit=k,
+        )
         return {"hits": hits, "total": len(idx), "engine": "fts5"}
     return {"hits": [], "total": 0, "engine": "bm25_no_search"}
 
@@ -729,7 +739,7 @@ def api_cases_latest(
     """Newest cases in the corpus."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None:
@@ -737,6 +747,32 @@ def api_cases_latest(
     if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
         return {"hits": idx.latest(limit=k), "total": len(idx)}
     return {"hits": [], "total": 0}
+
+
+@app.get("/api/cases/courts")
+def api_cases_courts(ls_session: Optional[str] = Cookie(default=None)):
+    """List all courts with case counts for filter dropdowns."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.verify_session_token(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"courts": []}
+    return {"courts": idx.courts()}
+
+
+@app.get("/api/cases/verdicts")
+def api_cases_verdicts(ls_session: Optional[str] = Cookie(default=None)):
+    """List top verdicts with counts for filter dropdowns."""
+    if not ls_session:
+        raise HTTPException(401)
+    if not auth.verify_session_token(ls_session):
+        raise HTTPException(401)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"verdicts": []}
+    return {"verdicts": idx.verdicts()}
 
 
 @app.get("/api/cases/{case_id}")
@@ -747,7 +783,7 @@ def api_case_detail(
     """Single case detail."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None:
@@ -764,7 +800,7 @@ def api_corpus_stats(ls_session: Optional[str] = Cookie(default=None)):
     """Corpus overview: total records, courts, year range."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None:
@@ -779,7 +815,7 @@ def api_court_efficiency(ls_session: Optional[str] = Cookie(default=None)):
     """Court efficiency: avg days to dispose, disposal rate per court."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
@@ -795,7 +831,7 @@ def api_bail_intelligence(
     """Bail grant/rejection rates by court."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
@@ -812,7 +848,7 @@ def api_verdict_patterns(
     """Verdict distribution patterns."""
     if not ls_session:
         raise HTTPException(401)
-    if not auth.session_valid(ls_session):
+    if not auth.verify_session_token(ls_session):
         raise HTTPException(401)
     idx = _ensure_bm25()
     if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
@@ -831,7 +867,7 @@ def health():
         "bm25_enabled": BM25_ENABLED,
         "bm25_loaded": idx is not None,
         "bm25_loading": _bm25_loading,
-        "bm25_doc_count": (len(idx.docs) if idx is not None else 0),
+        "bm25_doc_count": (len(idx) if idx is not None else 0),
         "bm25_loaded_at": _bm25_loaded_at,
         "bm25_load_error": _bm25_load_error,
     }
