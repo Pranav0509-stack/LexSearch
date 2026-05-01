@@ -860,6 +860,17 @@ def api_corpus_stats(ls_session: Optional[str] = Cookie(default=None)):
     return {"total": len(idx.docs) if hasattr(idx, 'docs') else 0}
 
 
+@app.get("/api/languages")
+def api_languages():
+    """Available languages for chat responses."""
+    from brief_service import LANGUAGES
+    return {"languages": [
+        {"code": k, "label": v.split("(")[0].strip(),
+         "native": v.split("(")[1].rstrip(")") if "(" in v else v}
+        for k, v in LANGUAGES.items()
+    ]}
+
+
 @app.get("/api/analytics/court-efficiency")
 def api_court_efficiency(ls_session: Optional[str] = Cookie(default=None)):
     """Court efficiency: avg days to dispose, disposal rate per court."""
@@ -1124,6 +1135,11 @@ def api_get_thread(
 class ChatBody(BaseModel):
     thread_id: int = Field(..., ge=1)
     question: str = Field(..., min_length=2, max_length=2000)
+    lang: str = Field(default="en", max_length=5)
+    language: Optional[str] = Field(default=None, max_length=5)  # frontend sends this
+    jurisdiction: Optional[str] = None
+    sources: Optional[list[str]] = None
+    prefer: Optional[str] = None
 
 
 @app.post("/api/brief/chat")
@@ -1166,23 +1182,25 @@ def api_brief_chat(
     safe_question = guard.redacted_question or body.question
 
     # Retrieve grounding hits — FTS5 (primary) or BM25 (legacy).
+    # Get up to 10 hits for better grounding coverage.
     hits: list[dict] = []
     idx = _ensure_bm25()
     if idx is not None:
         try:
             if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
                 # FTS5 adapter returns Sanhita-compatible dicts directly
-                hits = idx.search(safe_question, limit=6)
+                hits = idx.search(safe_question, limit=10)
                 logger.info("FTS5 retrieve for '%s': %d hits", safe_question[:50], len(hits))
             else:
                 # Legacy BM25 path
-                results = idx.query(safe_question, k=6, tier=None)
+                results = idx.query(safe_question, k=10, tier=None)
                 hits = [doc_to_retrieve_hit(d, s, safe_question) for d, s in results]  # type: ignore[misc]
         except Exception as e:
             logger.warning("Retrieval failed in /api/brief/chat: %s", e)
 
     # Compose the grounded answer (LLM or fallback).
-    result = answer_question(safe_question, hits, history or [])
+    lang = body.language or body.lang or "en"
+    result = answer_question(safe_question, hits, history or [], lang=lang)
     if guard.notes:
         result["guard"] = guard.to_dict()
 

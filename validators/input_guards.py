@@ -42,8 +42,12 @@ INJECTION_PATTERNS = [
 ]
 INJECTION_RE = re.compile("|".join(INJECTION_PATTERNS), re.IGNORECASE)
 
-# ── Scope: must be plausibly an Indian-law question. Heuristic: contains at
-# least one legal-domain token OR is a follow-up (short + has cite refs).
+# ── Scope: must be plausibly an Indian-law question. Very permissive —
+# lawyers ask in natural language ("road accident in goa", "my landlord is
+# not returning deposit", "cheating case procedure").  We let almost
+# everything through and let the retrieval + LLM handle off-topic gracefully.
+#
+# Only BLOCK queries that are *clearly* not law-related (recipes, code, etc.)
 LEGAL_TOKENS = [
     # statutes / codes
     r"\bIPC\b", r"\bCrPC\b", r"\bCPC\b", r"\bIEA\b", r"\bBNS\b", r"\bBNSS\b", r"\bBSA\b",
@@ -52,21 +56,31 @@ LEGAL_TOKENS = [
     # courts / fora
     r"\bSupreme Court\b", r"\bHigh Court\b", r"\bSC\b", r"\bHC\b", r"\bDistrict Court\b",
     r"\bTribunal\b", r"\bNCLT\b", r"\bNCLAT\b", r"\bDRT\b", r"\bSAT\b", r"\bITAT\b",
-    r"\beCourts?\b", r"\bMagistrate\b", r"\bSessions\b",
+    r"\beCourts?\b", r"\bMagistrate\b", r"\bSessions\b", r"\bCourt\b",
     # process / outcomes
     r"\bbail\b", r"\banticipatory\b", r"\bwrit\b", r"\bmandamus\b", r"\bcertiorari\b",
     r"\bhabeas corpus\b", r"\bquo warranto\b", r"\binjunction\b", r"\bstay\b",
     r"\barbitration\b", r"\bappeal\b", r"\brevision\b", r"\bremand\b",
     r"\bjudgment\b", r"\border\b", r"\bdecree\b", r"\bcitation\b", r"\bprecedent\b",
+    r"\bFIR\b", r"\bcharge\s*sheet\b", r"\bwarrant\b", r"\bsummons\b",
     # subject areas
     r"\bcontract\b", r"\btort\b", r"\bcriminal\b", r"\bcivil\b", r"\bmatrimonial\b",
     r"\bproperty\b", r"\binheritance\b", r"\btenancy\b", r"\beviction\b",
     r"\bcompany\b", r"\binsolvency\b", r"\bIBC\b", r"\bcompetition\b", r"\bGST\b",
     r"\bincome[- ]?tax\b", r"\bcustoms\b", r"\bcyber\b", r"\bIT Act\b",
     r"\bPOCSO\b", r"\bdowry\b", r"\b498A\b", r"\b138\b",
+    r"\bmurder\b", r"\bkilling\b", r"\btheft\b", r"\brobbery\b", r"\bfraud\b",
+    r"\bcheating\b", r"\bforgery\b", r"\bkidnapping\b", r"\bextortion\b",
+    r"\bassault\b", r"\bhurt\b", r"\bgrievous\b", r"\brape\b", r"\bmolestation\b",
+    r"\baccident\b", r"\bcompensation\b", r"\binsurance\b", r"\bclaim\b",
+    r"\bdivorce\b", r"\bcustody\b", r"\bmaintenance\b", r"\balimony\b",
+    r"\blandlord\b", r"\btenant\b", r"\brent\b", r"\bevict\b", r"\bdeposit\b",
+    r"\bbreach\b", r"\bdispute\b", r"\blitigat\b", r"\bproceed\b",
+    r"\bdefamation\b", r"\bnuisance\b", r"\btrespass\b",
     # actors
     r"\badvocate\b", r"\bcounsel\b", r"\bclient\b", r"\bplaintiff\b", r"\bdefendant\b",
     r"\bpetitioner\b", r"\brespondent\b", r"\baccused\b", r"\bcomplainant\b",
+    r"\blawyer\b", r"\bjudge\b", r"\bprosecutor\b", r"\bpolice\b", r"\bvictim\b",
     # misc
     r"\bvs?\.?\b", r"\bv\.\b", r"\bAIR\b", r"\bSCC\b", r"\bILR\b", r"\bCriLJ\b",
     # doctrines / common legal phrasing
@@ -78,28 +92,41 @@ LEGAL_TOKENS = [
     r"\bcheque\b", r"\bdishonou?r\b", r"\bdefault\b", r"\bnegligence\b",
     r"\bdamages?\b", r"\bcompensation\b", r"\bsuit\b", r"\bcase\s+law\b",
     r"\blaw\s+on\b", r"\bunder\s+(?:the\s+)?[A-Z]",  # "under the X Act" pattern
-    # ── Pan-Asia jurisdictions ─────────────────────────────────────
-    # Singapore
-    r"\bSingapor(?:e|ean)\b", r"\bSGCA\b", r"\bSGHC\b", r"\bMAS\b", r"\bIAA\b",
-    r"\bCompanies Act\b", r"\boppression\b",
-    # Hong Kong
-    r"\bHong Kong\b", r"\bHKCFA\b", r"\bCFA\b", r"\bHKSAR\b", r"\bBasic Law\b",
-    # UAE / DIFC / ADGM
-    r"\bUAE\b", r"\bDIFC\b", r"\bADGM\b", r"\bEmirat(?:es|i)\b", r"\bSharia\b",
-    # Malaysia / Indonesia / Thailand / Vietnam / Philippines
-    r"\bMalaysia(?:n)?\b", r"\bBursa\b",
-    r"\bIndonesia(?:n)?\b", r"\bMahkamah\b", r"\bKUHP\b",
-    r"\bThai(?:land)?\b",
-    r"\bVietnam(?:ese)?\b",
-    r"\bPhilippin(?:e|es|o)\b", r"\bRTC\b", r"\bSandiganbayan\b",
-    # Japan / Korea
-    r"\bJapan(?:ese)?\b", r"\bMinpo\b", r"\bSaikosai\b",
-    r"\bKorea(?:n)?\b", r"\bROK\b", r"\bKCC\b",
-    # South Asia neighbours
-    r"\bBangladesh(?:i)?\b", r"\bSri Lanka(?:n)?\b", r"\bNepal(?:i|ese)?\b",
-    # Cross-border commercial terms
-    r"\bchoice[- ]of[- ]law\b", r"\bseat\s+of\s+arbitration\b", r"\bNew York Convention\b",
+    # ── Natural-language legal queries (how lawyers actually ask) ──
+    r"\bcase\b", r"\bfind\b.*\bcase\b", r"\bsearch\b", r"\blegal\b",
+    r"\blaw\b", r"\bright(?:s)?\b", r"\bpenalt(?:y|ies)\b", r"\bpunish\b",
+    r"\boffence\b", r"\boffense\b", r"\bcrime\b", r"\billegal\b",
+    r"\bconvict\b", r"\bacquit\b", r"\bsentence\b", r"\bimprison\b",
+    r"\bfine\b", r"\bpenalty\b", r"\bliable\b", r"\bliability\b",
+    r"\bnotice\b", r"\bcomplaint\b", r"\bpetition\b", r"\bapplication\b",
+    r"\brelief\b", r"\bremedy\b", r"\bgrievance\b", r"\bapproach\b",
+    r"\bprocedure\b", r"\bprocess\b", r"\bfiling\b", r"\bfile\b",
+    r"\bhearing\b", r"\btrial\b", r"\bevidence\b", r"\bwitness\b",
+    r"\baffidavit\b", r"\bsurety\b", r"\bbond\b",
+    # place-specific (Indian states/cities — people ask "case in goa")
+    r"\bIndia\b", r"\bIndian\b", r"\bgoa\b", r"\bdelhi\b", r"\bmumbai\b",
+    r"\bbombay\b", r"\bchennai\b", r"\bmadras\b", r"\bkolkata\b", r"\bcalcutta\b",
+    r"\bbangalore\b", r"\bhyderabad\b", r"\bahmedabad\b", r"\bjaipur\b",
+    r"\blucknow\b", r"\bpatna\b", r"\bpunjab\b", r"\bharyana\b",
+    r"\bkerala\b", r"\btamil\b", r"\bkarnataka\b", r"\bandhra\b", r"\btelangana\b",
+    r"\bmaharashtra\b", r"\bgujarat\b", r"\brajasthan\b", r"\bMP\b", r"\bUP\b",
+    r"\bbihar\b", r"\bwest bengal\b", r"\bassam\b", r"\bodisha\b",
+    r"\bjharkhand\b", r"\bchhattisgarh\b", r"\buttarakhand\b", r"\bhimachal\b",
+    r"\bjammu\b", r"\bkashmir\b", r"\bsikkim\b", r"\bmeghalaya\b",
+    r"\bmanipuri?\b", r"\btripura\b", r"\bnagaland\b", r"\bmizoram\b", r"\barunachal\b",
+    # ── Pan-Asia / cross-border ─────────────────────────────────────
+    r"\bSingapor(?:e|ean)\b", r"\bHong Kong\b", r"\bUAE\b", r"\bDIFC\b",
+    r"\bMalaysia(?:n)?\b", r"\bBangladesh(?:i)?\b", r"\bSri Lanka(?:n)?\b",
+    r"\bNepal(?:i|ese)?\b", r"\bchoice[- ]of[- ]law\b",
+    r"\bseat\s+of\s+arbitration\b", r"\bNew York Convention\b",
     r"\benforce(?:ment)?\b", r"\bjurisdiction(?:al)?\b",
+    # ── General question words that suggest legal intent ────────────
+    r"\bwhat\s+(?:is|are|should|can)\b",  # "what is the law on..."
+    r"\bhow\s+(?:to|do|can|should)\b",    # "how to file..."
+    r"\bcan\s+(?:I|we|a)\b",              # "can I sue..."
+    r"\bis\s+it\s+(?:legal|illegal|lawful|unlawful)\b",
+    r"\bwhat\s+(?:happens|if)\b",
+    r"\bdatabase\b", r"\bfind\s+me\b",
 ]
 LEGAL_RE = re.compile("|".join(LEGAL_TOKENS), re.IGNORECASE)
 
