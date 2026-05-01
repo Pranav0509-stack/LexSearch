@@ -775,6 +775,56 @@ def api_cases_verdicts(ls_session: Optional[str] = Cookie(default=None)):
     return {"verdicts": idx.verdicts()}
 
 
+@app.get("/api/cases/related/{case_id}")
+def api_related_cases(
+    case_id: str,
+    limit: int = 10,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Get cases related to a given case via citation graph (1-hop neighbors)."""
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"related": []}
+    return {"related": idx.related_cases(case_id, limit=min(limit, 50))}
+
+
+@app.get("/api/cases/doc-types")
+def api_doc_types(ls_session: Optional[str] = Cookie(default=None)):
+    """Document type distribution (from classifier)."""
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"doc_types": []}
+    return {"doc_types": idx.doc_type_distribution()}
+
+
+@app.get("/api/templates")
+def api_templates_list(ls_session: Optional[str] = Cookie(default=None)):
+    """List all draft templates from database."""
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"templates": []}
+    return {"templates": idx.draft_templates()}
+
+
+@app.get("/api/templates/{template_id}")
+def api_template_detail(
+    template_id: str,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Get a single template with full body text."""
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        raise HTTPException(503)
+    tmpl = idx.draft_template(template_id)
+    if not tmpl:
+        raise HTTPException(404, "Template not found")
+    return tmpl
+
+
 @app.get("/api/cases/{case_id}")
 def api_case_detail(
     case_id: str,
@@ -1257,7 +1307,12 @@ def api_draft(
     if not auth.rate_limit("draft", ip, max_hits=20, window_s=300):
         raise HTTPException(429, "Too many draft requests. Wait a few minutes.")
     try:
-        return workflows.generate_draft(body.template, body.facts)
+        # Try DB-backed template first
+        db_template = None
+        idx = _ensure_bm25()
+        if idx and _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+            db_template = idx.draft_template(body.template)
+        return workflows.generate_draft(body.template, body.facts, db_template=db_template)
     except ValueError as e:
         raise HTTPException(400, str(e))
     except Exception as e:
