@@ -730,6 +730,9 @@ export default function CourtSearchPane({
                 Use in Assistant <ArrowUpRight size={11} />
               </button>
             )}
+
+            {/* Related Cases via Citation Graph */}
+            <RelatedCases caseId={openCase.case_id} onOpen={(id) => openDetail(id)} />
           </div>
         )}
       </aside>
@@ -928,5 +931,69 @@ function CaseCard({
         </div>
       </div>
     </li>
+  );
+}
+
+
+/* ── Related Cases (Citation Graph) ──────────────────────────── */
+
+function RelatedCases({ caseId, onOpen }: { caseId: string; onOpen: (id: string) => void }) {
+  const [related, setRelated] = useState<{ case_id: string; pagerank: number; relationship: string }[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!caseId) return;
+    let cancelled = false;
+    setLoading(true);
+    fetch(`/api/cases/related/${encodeURIComponent(caseId)}?limit=6`, { credentials: "same-origin" })
+      .then((r) => r.ok ? r.json() : { related: [] })
+      .then((d) => { if (!cancelled) setRelated(d.related || []); })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [caseId]);
+
+  if (loading) {
+    return (
+      <div className="mt-4 pt-4 border-t border-[var(--line)]">
+        <div className="text-[10px] tracking-[0.22em] uppercase text-[var(--ink-soft)] mb-2">Related Cases</div>
+        <div className="text-xs text-[var(--ink-soft)] animate-pulse">Loading citation graph...</div>
+      </div>
+    );
+  }
+  if (related.length === 0) return null;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-[var(--line)]">
+      <div className="text-[10px] tracking-[0.22em] uppercase text-[var(--ink-soft)] mb-2 flex items-center gap-1.5">
+        <Scale size={10} />
+        <span>Related Cases (Citation Graph)</span>
+        <span className="ml-auto text-[9px] normal-case tracking-normal">{related.length} found</span>
+      </div>
+      <ul className="space-y-1.5">
+        {related.map((r) => (
+          <li key={r.case_id}>
+            <button
+              onClick={() => onOpen(r.case_id)}
+              className="w-full text-left px-3 py-2 rounded-lg bg-[var(--bg)] border border-[var(--line)] hover:border-[var(--accent-soft)] transition-colors text-xs group"
+            >
+              <span className="text-[var(--ink)] group-hover:text-[var(--accent)] transition-colors font-mono truncate block">
+                {r.case_id}
+              </span>
+              <span className="flex items-center gap-2 mt-0.5 text-[var(--ink-soft)]">
+                <span className={`px-1 py-0.5 rounded text-[8px] uppercase tracking-wider ${
+                  r.relationship === "cited_by" ? "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" : "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300"
+                }`}>
+                  {r.relationship === "cited_by" ? "Cited by this case" : "Cites this case"}
+                </span>
+                {r.pagerank > 0 && (
+                  <span className="text-[9px]">PR: {r.pagerank.toFixed(6)}</span>
+                )}
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
