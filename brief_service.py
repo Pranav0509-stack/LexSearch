@@ -31,43 +31,40 @@ logger = logging.getLogger(__name__)
 
 
 # ── System prompt: the soul of Sanhita ─────────────────────────────────
-SYSTEM_PROMPT = """You are Sanhita Brief, an AI legal research assistant built
-on India's largest structured corpus of 31.9 million court judgments across 25
-High Courts (1950-2025), 13.6 million legal documents, 1.36 million legal QA
-pairs, and 2,383 indexed statutes.
+SYSTEM_PROMPT = """You are Sanhita Brief, an AI legal research assistant for Indian advocates.
+You are backed by India's largest structured corpus: 31.9 million court judgments across
+25 High Courts (1950-2025), 13.6 million legal documents, 1.36 million legal QA pairs,
+and 2,383 indexed statutes.
 
-Your role: answer legal questions grounded in the retrieved judgments below.
-You are NOT a generic chatbot — you are a specialized Indian legal research
-tool used by advocates, law students, and judges.
+RULES — NON-NEGOTIABLE:
+1. Cite EVERY substantive claim with [n] matching the retrieved case index. No citation = bug.
+2. NEVER invent case names, citations, statute sections, or holdings.
+3. No preamble phrases: "Based on retrieved cases", "I think", "In my opinion".
+4. Use Indian legal vocabulary: "advocate", "petitioner", "respondent", "matter", "reportable".
+5. When user mentions IPC/CrPC/IEA, note BNS/BNSS/BSA equivalent if corpus supports it.
+6. If retrieved cases partially cover the question, answer what you CAN and flag the gap.
+7. Prioritize jurisdiction mentioned by user (state/city/court).
+8. NEWS items [NEWS-n] may supplement but never replace corpus citations [1]-[10].
 
-Rules — non-negotiable:
+ANSWER STRUCTURE (always use this):
+**Direct Answer**
+2-3 sentences directly answering the question. [cite]
 
-1. Ground EVERY substantive sentence in a numbered citation like [1], [2],
-   matching the index of the retrieved case. A sentence without a [n] is a
-   bug.
-2. NEVER invent case names, citations, statute sections, or holdings. If the
-   retrieved cases do not fully cover the question, say what you CAN answer
-   from the record and explicitly note the gap.
-3. Do not write "Based on the retrieved cases…" or "I think…" or "In my
-   opinion…". Just answer.
-4. Indian-law vocabulary: "advocate", "chamber", "matter", "reportable".
-   When a user cites a superseded provision (IPC / CrPC / IEA), note the BNS
-   / BNSS / BSA equivalent in parentheses if the retrieved record supports
-   the mapping.
-5. Structure your answer with:
-   a. **Direct answer** — 2-3 sentences answering the question
-   b. **Relevant principles** — key legal principles from the cases
-   c. **Applicable provisions** — statutes/sections that apply
-   d. **Practice note** — practical takeaway for the advocate
-6. Be comprehensive. 300-600 words. Cover the question thoroughly.
-7. When the question mentions a specific state or city, prioritize cases
-   from that jurisdiction in your answer.
-8. Always mention the court, year, and citation of each case you reference.
-9. If NEWS items are provided (tagged [NEWS-n]), you may reference them for
-   recent developments, but ALWAYS prioritize corpus judgments [1]-[10] for
-   legal analysis. News items supplement, never replace, case law citations.
+**Relevant Principles**
+- Bullet each key legal principle with citation [cite]
+- Include landmark holdings, tests, standards applied
 
-Output plain markdown. No preamble."""
+**Applicable Provisions**
+- List statutes, sections, rules. Note BNS/BNSS equivalents where relevant.
+
+**Case Analysis**
+For the 2-3 most directly relevant cases: what were the facts, what did the court hold,
+why does it matter for this question. Quote key phrases in "quotes" [cite].
+
+**Practice Note**
+Practical takeaway: what should the advocate do, argue, watch for, or avoid.
+
+Output plain markdown. Aim 500-800 words. Be thorough — lawyers need depth."""
 
 
 SYSTEM_PROMPT_MULTILANG = """You are Sanhita Brief, an AI legal research assistant.
@@ -102,7 +99,30 @@ LANGUAGES = {
 }
 
 
+def _classify_doc_type(h: dict[str, Any]) -> str:
+    """Classify a search hit into a document type based on source/tier metadata."""
+    source = (h.get("source") or "").lower()
+    tier = (h.get("tier") or "").upper()
+    if "statutes" in source or tier == "STATUTE":
+        return "STATUTE"
+    if "legal_qa" in source or tier == "QA":
+        return "LEGAL_QA"
+    if "legal_docs" in source:
+        return "LEGAL_DOC"
+    # Default: judgment from the judgments table
+    return "JUDGMENT"
+
+
 def _build_context(hits: list[dict[str, Any]]) -> str:
+    """Build structured context for the LLM with full document text, separate
+    verdict section, and document type classification.
+
+    Each case block now includes:
+    - DOCUMENT TYPE classification (JUDGMENT / LEGAL_DOC / STATUTE / LEGAL_QA)
+    - Full metadata (court, year, judge, bench)
+    - VERDICT as a clearly separated section
+    - Full text content (up to 4000 chars) — not just the old 1200-char excerpt
+    """
     if not hits:
         return "(no relevant cases found in the corpus)"
     blocks = []
@@ -115,26 +135,52 @@ def _build_context(hits: list[dict[str, Any]]) -> str:
         judge = h.get("judge") or ""
         bench = h.get("bench") or ""
         date_decided = h.get("date_decided") or ""
-        excerpt = h.get("excerpt") or ""
         source = h.get("source") or ""
         tier = h.get("tier") or ""
+        doc_type = _classify_doc_type(h)
 
+        # Use full_text if available, fall back to explanation → excerpt
+        full_text = (h.get("full_text") or "").strip()
+        explanation = (h.get("explanation") or "").strip()
+        excerpt = (h.get("excerpt") or "").strip()
+
+        # Pick the richest available content, up to 4000 chars
+        if full_text:
+            content = full_text[:4000]
+        elif explanation and excerpt:
+            content = f"{explanation[:2000]}\n---\n{excerpt[:2000]}"
+        elif explanation:
+            content = explanation[:4000]
+        else:
+            content = excerpt[:4000]
+
+        # Build the structured block
         meta_parts = []
         if court: meta_parts.append(f"Court: {court}")
         if year: meta_parts.append(f"Year: {year}")
         if date_decided: meta_parts.append(f"Decided: {date_decided}")
-        if verdict: meta_parts.append(f"Verdict: {verdict}")
         if judge: meta_parts.append(f"Judge: {judge}")
         if bench: meta_parts.append(f"Bench: {bench}")
         if tier: meta_parts.append(f"Tier: {tier}")
 
-        blocks.append(
-            f"[{i}] {title}\n"
-            f"    Citation: {citation}\n"
-            f"    {' | '.join(meta_parts)}\n"
-            f"    Source: {source}\n"
-            f"    Excerpt: {excerpt[:1200]}"
-        )
+        lines = [
+            f"[{i}] {title}",
+            f"    Document Type: {doc_type}",
+            f"    Citation: {citation}",
+            f"    {' | '.join(meta_parts)}",
+            f"    Source: {source}",
+        ]
+
+        # Verdict as a clearly separated section
+        if verdict:
+            lines.append(f"    ── VERDICT ──")
+            lines.append(f"    {verdict}")
+
+        # Document content
+        lines.append(f"    ── DOCUMENT CONTENT ──")
+        lines.append(f"    {content}")
+
+        blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
 
@@ -159,6 +205,12 @@ def _citation_payload(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif tier == "SC" and h.get("pdf_name") and h.get("year"):
             pdf_url = f"/sc-pdf/{h['year']}/{urllib.parse.quote(h['pdf_name'])}"
         url = h.get("url") or pdf_url
+        doc_type = _classify_doc_type(h)
+
+        # Include full_text and explanation for richer UI rendering
+        full_text = (h.get("full_text") or "").strip()
+        explanation = (h.get("explanation") or "").strip()
+        excerpt = (h.get("excerpt") or "").strip()
 
         out.append({
             "n": i,
@@ -167,13 +219,18 @@ def _citation_payload(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "citation": h.get("citation") or "",
             "court": h.get("court") or "",
             "year": h.get("year") or "",
-            "excerpt": (h.get("excerpt") or "")[:500],
+            "excerpt": excerpt[:500],
+            "full_text": full_text[:6000] if full_text else "",
+            "explanation": explanation[:2000] if explanation else "",
             "tier": tier,
+            "doc_type": doc_type,
             "pdf_url": pdf_url,
             "url": url,
             "score": h.get("score"),
             "verdict": h.get("verdict") or "",
             "judge": h.get("judge") or "",
+            "bench": h.get("bench") or "",
+            "date_decided": h.get("date_decided") or "",
         })
     return out
 
@@ -222,35 +279,17 @@ def answer_question(
     # No provider configured → give structured case results (no LLM needed)
     if not available:
         if hits:
-            # Build a useful non-LLM response from the retrieved cases
-            answer_lines = [
-                f"**Found {len(hits)} relevant cases** from the corpus:\n",
-            ]
-            for i, h in enumerate(hits[:6], 1):
-                title = h.get("title") or h.get("case_id") or "Untitled"
-                court = h.get("court") or ""
-                year = h.get("year") or ""
-                verdict = h.get("verdict") or ""
-                excerpt = (h.get("excerpt") or "")[:300]
-                answer_lines.append(
-                    f"**[{i}] {title}**\n"
-                    f"{court} · {year}"
-                    + (f" · {verdict}" if verdict else "")
-                    + f"\n> {excerpt}\n"
-                )
-            answer_lines.append(
-                "\n*Note: No LLM provider is configured, so I'm showing raw search results. "
-                "Configure an API key (Gemini, Anthropic, Groq, or Cloudflare) for AI-composed answers.*"
-            )
-            answer_md = "\n".join(answer_lines)
+            answer_md = _build_no_llm_response(question, hits)
             grounding = 1.0  # 100% grounded — all from DB
         else:
             answer_md = (
+                "## No Results Found\n\n"
                 "No matching cases found in the corpus for this query. "
-                "Try different search terms, or use Court Search for advanced filters."
+                "Try different search terms, or use **Court Search** for advanced filters."
             )
             grounding = 0.0
 
+        followups = _smart_followups_no_llm(question)
         return {
             "answer_markdown": answer_md,
             "citations": citations,
@@ -258,6 +297,7 @@ def answer_question(
             "validation": {"passed": bool(hits), "confidence": grounding, "reasons": ["no LLM provider — raw results"]},
             "refused": False,  # NOT refused — we still give useful results
             "grounding_pct": grounding,
+            "followups": followups,
         }
 
     # Build the system prompt (with optional language)
@@ -353,6 +393,7 @@ def answer_question(
                 "grounding_pct": verdict.grounding_pct,
             }
 
+    followups = generate_followups(question, resp.text, lang)
     return {
         "answer_markdown": resp.text,
         "citations": citations,
@@ -361,8 +402,244 @@ def answer_question(
         "refused": False,
         "grounding_pct": verdict.grounding_pct,
         "web_signals": web_signal_data,
+        "followups": followups,
     }
 
 
 def serialize_citations(citations: list[dict[str, Any]]) -> str:
     return json.dumps(citations, ensure_ascii=False)
+
+
+# ── Rich no-LLM response builder ──────────────────────────────────────────
+
+# Verdict → icon mapping for display
+_VERDICT_ICONS = {
+    "allowed": "✅", "dismissed": "❌", "disposed": "📋",
+    "granted": "✅", "rejected": "❌", "acquitted": "⚖️",
+    "convicted": "🔒", "partly allowed": "🔶", "partly dismissed": "🔶",
+    "quashed": "🚫", "stayed": "⏸️", "remanded": "↩️",
+}
+
+def _verdict_icon(v: str) -> str:
+    if not v:
+        return "📄"
+    v_lower = v.lower()
+    for kw, icon in _VERDICT_ICONS.items():
+        if kw in v_lower:
+            return icon
+    return "📄"
+
+def _tier_badge(tier: str) -> str:
+    t = (tier or "").upper()
+    if t == "SC":   return "🏛️ Supreme Court"
+    if t == "HC":   return "⚖️ High Court"
+    if t == "LM":   return "⭐ Landmark"
+    return ""
+
+_DOC_TYPE_LABELS = {
+    "JUDGMENT": "Judgment",
+    "LEGAL_DOC": "Legal Document",
+    "STATUTE": "Statute",
+    "LEGAL_QA": "Legal Q&A",
+}
+
+_DOC_TYPE_ICONS = {
+    "JUDGMENT": "⚖️",
+    "LEGAL_DOC": "📑",
+    "STATUTE": "📜",
+    "LEGAL_QA": "❓",
+}
+
+def _build_no_llm_response(question: str, hits: list[dict[str, Any]]) -> str:
+    """Build a rich, structured markdown response grouped by document type
+    when no LLM is configured. Verdict is shown as a distinct section."""
+    if not hits:
+        return "No results found in the corpus."
+
+    top = hits[:8]
+
+    # Group hits by doc type
+    grouped: dict[str, list] = {}
+    for h in top:
+        dt = _classify_doc_type(h)
+        grouped.setdefault(dt, []).append(h)
+
+    # Count totals per type for header
+    type_counts = {dt: len(items) for dt, items in grouped.items()}
+    type_summary = " · ".join(
+        f"{_DOC_TYPE_ICONS.get(dt, '📄')} {count} {_DOC_TYPE_LABELS.get(dt, dt)}"
+        for dt, count in type_counts.items()
+    )
+
+    lines = [
+        f"## {len(top)} Results Found\n",
+        f"*{type_summary}*\n",
+        f"*Ranked by BM25 relevance from 31.9M Indian court records.*\n",
+        "---\n",
+    ]
+
+    idx = 0
+    # Render in a fixed order: JUDGMENT → LEGAL_DOC → STATUTE → LEGAL_QA
+    for dt in ["JUDGMENT", "LEGAL_DOC", "STATUTE", "LEGAL_QA"]:
+        items = grouped.get(dt, [])
+        if not items:
+            continue
+
+        dt_icon = _DOC_TYPE_ICONS.get(dt, "📄")
+        dt_label = _DOC_TYPE_LABELS.get(dt, dt)
+        lines.append(f"## {dt_icon} {dt_label}s\n")
+
+        for h in items:
+            idx += 1
+            title  = h.get("title") or h.get("case_id") or "Untitled"
+            court  = h.get("court") or ""
+            year   = h.get("year") or ""
+            verdict = h.get("verdict") or ""
+            judge  = h.get("judge") or ""
+            bench  = h.get("bench") or ""
+            tier   = (h.get("tier") or "").upper()
+            citation = h.get("citation") or ""
+            excerpt  = (h.get("excerpt") or "")[:400].strip()
+            explanation = (h.get("explanation") or "")[:300].strip()
+
+            icon = _verdict_icon(verdict)
+            tier_badge = _tier_badge(tier)
+
+            # Header line
+            lines.append(f"### {icon} [{idx}] {title}")
+
+            # Meta line — court · year · citation
+            meta_parts = []
+            if tier_badge: meta_parts.append(tier_badge)
+            if court and not tier_badge: meta_parts.append(court)
+            if year:     meta_parts.append(str(year))
+            if citation: meta_parts.append(f"`{citation}`")
+            if meta_parts:
+                lines.append(f"**{' · '.join(meta_parts)}**\n")
+
+            # Bench / Judge
+            if judge:
+                lines.append(f"- **Bench:** {judge}")
+            elif bench:
+                lines.append(f"- **Bench:** {bench}")
+
+            # Verdict as a distinct section
+            if verdict:
+                lines.append(f"\n#### Verdict")
+                lines.append(f"**{verdict.title()}**\n")
+
+            # Explanation (case analysis) — separate from raw excerpt
+            if explanation:
+                lines.append(f"#### Analysis")
+                if len(explanation) == 300 and "." in explanation[150:]:
+                    explanation = explanation[:150 + explanation[150:].rfind(".") + 1]
+                lines.append(f"> {explanation}\n")
+
+            # Excerpt / description
+            if excerpt and excerpt != explanation:
+                # Trim at sentence boundary if possible
+                if len(excerpt) == 400 and "." in excerpt[200:]:
+                    excerpt = excerpt[:200 + excerpt[200:].rfind(".") + 1]
+                lines.append(f"> {excerpt}\n")
+
+            lines.append("---\n")
+
+    lines.append(
+        "\n> 💡 **Add an AI key** (Gemini · Anthropic · Groq · Cloudflare) in Settings "
+        "to get a full cited legal analysis with principles, case analysis, and practice notes."
+    )
+    return "\n".join(lines)
+
+
+def _smart_followups_no_llm(question: str) -> list[str]:
+    """Generate contextually relevant follow-up nudges without an LLM."""
+    q = question.lower()
+    # Bail
+    if any(w in q for w in ["bail", "custody", "arrest", "detention"]):
+        return [
+            "What factors does the court weigh in granting or refusing bail?",
+            "Can bail be cancelled after it is granted? On what grounds?",
+            "What is the difference between anticipatory bail and regular bail?",
+        ]
+    # Section 138 / NI Act
+    if any(w in q for w in ["cheque", "138", "ni act", "dishonour", "bounce"]):
+        return [
+            "What is the limitation period for filing a complaint under Section 138?",
+            "Can a company be prosecuted under Section 138 NI Act?",
+            "What defences are available to the accused in a Section 138 case?",
+        ]
+    # Writ petition
+    if any(w in q for w in ["writ", "226", "mandamus", "certiorari", "habeas"]):
+        return [
+            "What is the difference between Article 226 and Article 32 writs?",
+            "Can a writ petition be filed against a private party?",
+            "What is the doctrine of exhaustion of remedies in writ jurisdiction?",
+        ]
+    # NDPS / drugs
+    if any(w in q for w in ["ndps", "narcotic", "drug", "contraband"]):
+        return [
+            "What are the mandatory minimum sentences under the NDPS Act?",
+            "How is 'commercial quantity' defined under the NDPS Act?",
+            "What special conditions apply to bail under Section 37 NDPS Act?",
+        ]
+    # Motor accident
+    if any(w in q for w in ["accident", "motor", "compensation", "mact"]):
+        return [
+            "How is compensation calculated for permanent disability in motor accidents?",
+            "What is the Multiplier Method used by courts for loss of income?",
+            "Can compensation be awarded even if the claimant was partially at fault?",
+        ]
+    # Divorce / matrimonial
+    if any(w in q for w in ["divorce", "matrimonial", "maintenance", "alimony", "custody"]):
+        return [
+            "What is the legal procedure for mutual consent divorce in India?",
+            "How does the court determine the quantum of maintenance?",
+            "What factors influence child custody decisions in Indian courts?",
+        ]
+    # Consumer
+    if any(w in q for w in ["consumer", "deficiency", "service", "forum"]):
+        return [
+            "What is the pecuniary jurisdiction of District vs State vs National consumer forums?",
+            "What constitutes 'deficiency of service' under the Consumer Protection Act?",
+            "What is the limitation period for filing a consumer complaint?",
+        ]
+    # Generic legal follow-ups
+    return [
+        "How has this legal position evolved in recent High Court judgments?",
+        "What is the limitation period applicable to this matter?",
+        "What procedural steps should I follow when filing this matter?",
+    ]
+
+
+# ── Follow-up question generation ─────────────────────────────────────────
+_FOLLOWUP_SYSTEM = """You are a legal research assistant. Given a legal question and its answer,
+generate exactly 3 follow-up questions an Indian advocate would naturally ask next.
+Questions must be specific, actionable, and directly related to the answer.
+Return ONLY a JSON array of 3 strings. No explanation. Example:
+["What is the limitation period for filing?", "Can bail be cancelled after grant?", "What documents are required?"]"""
+
+def generate_followups(question: str, answer_markdown: str, lang: str = "en") -> list[str]:
+    """Generate 3 follow-up questions using a fast LLM call."""
+    try:
+        prompt = f"Question: {question}\n\nAnswer summary: {answer_markdown[:800]}\n\nGenerate 3 follow-up questions."
+        resp = router.generate(
+            _FOLLOWUP_SYSTEM, prompt,
+            temperature=0.7,
+            max_tokens=200,
+            prefer="openai",   # fast, cheap
+        )
+        text = resp.text.strip()
+        # Extract JSON array from response
+        import re as _re
+        m = _re.search(r'\[.*\]', text, _re.DOTALL)
+        if m:
+            questions = json.loads(m.group(0))
+            return [q.strip() for q in questions if isinstance(q, str)][:3]
+    except Exception as e:
+        logger.debug("followup generation failed: %s", e)
+    # Fallback: generic follow-ups based on question
+    return [
+        "What is the limitation period applicable here?",
+        "How has this position evolved in recent High Court judgments?",
+        "What procedural steps should I follow to file this matter?",
+    ]

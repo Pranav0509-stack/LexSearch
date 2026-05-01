@@ -157,6 +157,31 @@ def init_db() -> None:
             );
             CREATE INDEX IF NOT EXISTS idx_vault_chunks_user ON vault_chunks(user_id);
             CREATE INDEX IF NOT EXISTS idx_vault_chunks_doc  ON vault_chunks(doc_id);
+
+            -- ── Legal Document Editor ──
+            CREATE TABLE IF NOT EXISTS legal_documents (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id     INTEGER NOT NULL,
+                title       TEXT NOT NULL DEFAULT 'Untitled Document',
+                doc_type    TEXT NOT NULL DEFAULT 'general',
+                content     TEXT NOT NULL DEFAULT '',
+                citations   TEXT DEFAULT '[]',
+                word_count  INTEGER DEFAULT 0,
+                created_at  INTEGER NOT NULL,
+                updated_at  INTEGER NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_docs_user ON legal_documents(user_id, updated_at DESC);
+
+            CREATE TABLE IF NOT EXISTS document_versions (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc_id      INTEGER NOT NULL,
+                user_id     INTEGER NOT NULL,
+                content     TEXT NOT NULL,
+                word_count  INTEGER DEFAULT 0,
+                saved_at    INTEGER NOT NULL,
+                FOREIGN KEY(doc_id) REFERENCES legal_documents(id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS idx_versions_doc ON document_versions(doc_id, saved_at DESC);
             """
         )
 
@@ -431,3 +456,87 @@ def rate_limit(bucket: str, ip: str, max_hits: int, window_s: int) -> bool:
             return False
         hits.append(now)
         return True
+
+
+# ── Legal Document Editor helpers ───────────────────────────────────────────
+
+def doc_create(user_id: int, title: str, doc_type: str, content: str = "") -> int:
+    now = int(time.time())
+    wc = len(content.split())
+    with _db_lock, db() as c:
+        cur = c.execute(
+            "INSERT INTO legal_documents (user_id, title, doc_type, content, word_count, created_at, updated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (user_id, title, doc_type, content, wc, now, now),
+        )
+        return cur.lastrowid
+
+
+def doc_list(user_id: int) -> list[dict]:
+    with db() as c:
+        rows = c.execute(
+            "SELECT id, title, doc_type, word_count, created_at, updated_at FROM legal_documents "
+            "WHERE user_id = ? ORDER BY updated_at DESC LIMIT 50",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def doc_get(doc_id: int, user_id: int) -> dict | None:
+    with db() as c:
+        row = c.execute(
+            "SELECT * FROM legal_documents WHERE id = ? AND user_id = ?",
+            (doc_id, user_id),
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def doc_save(doc_id: int, user_id: int, title: str, content: str, citations: str = "[]") -> bool:
+    now = int(time.time())
+    wc = len(content.split())
+    with _db_lock, db() as c:
+        # Save a version snapshot every save
+        c.execute(
+            "INSERT INTO document_versions (doc_id, user_id, content, word_count, saved_at) VALUES (?, ?, ?, ?, ?)",
+            (doc_id, user_id, content, wc, now),
+        )
+        # Keep only last 20 versions per doc
+        c.execute(
+            "DELETE FROM document_versions WHERE doc_id = ? AND id NOT IN "
+            "(SELECT id FROM document_versions WHERE doc_id = ? ORDER BY saved_at DESC LIMIT 20)",
+            (doc_id, doc_id),
+        )
+        n = c.execute(
+            "UPDATE legal_documents SET title=?, content=?, citations=?, word_count=?, updated_at=? "
+            "WHERE id=? AND user_id=?",
+            (title, content, citations, wc, now, doc_id, user_id),
+        ).rowcount
+    return n > 0
+
+
+def doc_delete(doc_id: int, user_id: int) -> bool:
+    with _db_lock, db() as c:
+        n = c.execute(
+            "DELETE FROM legal_documents WHERE id=? AND user_id=?",
+            (doc_id, user_id),
+        ).rowcount
+    return n > 0
+
+
+def doc_versions(doc_id: int, user_id: int) -> list[dict]:
+    with db() as c:
+        rows = c.execute(
+            "SELECT id, word_count, saved_at FROM document_versions "
+            "WHERE doc_id=? AND user_id=? ORDER BY saved_at DESC LIMIT 20",
+            (doc_id, user_id),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def doc_restore_version(doc_id: int, version_id: int, user_id: int) -> str | None:
+    with db() as c:
+        row = c.execute(
+            "SELECT content FROM document_versions WHERE id=? AND doc_id=? AND user_id=?",
+            (version_id, doc_id, user_id),
+        ).fetchone()
+    return row["content"] if row else None

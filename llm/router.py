@@ -1,50 +1,39 @@
 """
-Sanhita — LLM Router (paid-tier).
+Sanhita — LLM Router.
 
-Four-provider stack walked in order, with per-provider circuit breakers:
+Provider chain (walked in order, circuit-breaker per provider):
 
-  1. Anthropic Claude Sonnet 4.5  — PRIMARY  (best reasoning, paid)
-  2. Groq Llama 3.3 70B           — helper   (sub-second TTFT, fast lane)
-  3. Gemini 2.5 Pro               — fallback (long-context backup)
-  4. Cloudflare Workers AI 8B     — emergency helper (cheap classify/rewrite)
+  1. OpenAI GPT-4o       — PRIMARY  (best instruction-following, paid)
+  2. Gemini 2.5 Flash    — SECONDARY (fast, free tier available)
+  3. Groq Llama 3.3 70B  — TERTIARY  (sub-second, free tier)
+  4. Anthropic Claude    — QUATERNARY (backup, paid)
 
-Why this order: Claude Sonnet 4.5 is currently the strongest model for
-constrained, citation-faithful legal generation. Groq sits second so any
-Claude outage degrades to fast Llama-70B in <800ms. Gemini Pro keeps a
-1M-token long-context option open for Vault (multi-PDF Q&A). Cloudflare
-is for cheap helper tasks like query rewrite or scope classification.
-
-Each provider is wrapped in a circuit breaker: 3 failures inside 60s opens
-the breaker for 120s (no calls land on it during that window). The router
-walks the chain in order, returning the first success and the provider
-metadata so the UI can show which model answered.
+Circuit breaker: 3 failures in 60s → provider skipped for 120s.
 
 Environment:
-  ANTHROPIC_API_KEY       — required for Claude (primary)
-  ANTHROPIC_MODEL         — default "claude-sonnet-4-5-20250929"
-  GROQ_API_KEY            — required for Groq
-  GROQ_MODEL              — default "llama-3.3-70b-versatile"
-  GEMINI_API_KEY          — required for Gemini
-  GEMINI_MODEL            — default "gemini-2.5-pro"
-  CF_ACCOUNT_ID           — required for Cloudflare
-  CF_API_TOKEN            — required for Cloudflare
-  CF_MODEL                — default "@cf/meta/llama-3.1-8b-instruct"
-  LLM_TIMEOUT_S           — per-call timeout (default 30)
+  OPENAI_API_KEY    — required for OpenAI (primary)
+  OPENAI_MODEL      — default "gpt-4o-mini"
+  GEMINI_API_KEY    — required for Gemini
+  GEMINI_MODEL      — default "gemini-2.5-flash"
+  GROQ_API_KEY      — required for Groq
+  GROQ_MODEL        — default "llama-3.3-70b-versatile"
+  ANTHROPIC_API_KEY — required for Claude
+  ANTHROPIC_MODEL   — default "claude-sonnet-4-5"
+  LLM_TIMEOUT_S     — per-call timeout (default 45)
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import ssl
 import time
 import urllib.error
 import urllib.request
-import json
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-# Use certifi's CA bundle if available (fixes macOS python.org SSL trust issues).
 try:
     import certifi
     _SSL_CTX = ssl.create_default_context(cafile=certifi.where())
@@ -53,20 +42,22 @@ except Exception:
 
 logger = logging.getLogger(__name__)
 
+# ── Credentials ────────────────────────────────────────────────────────────
+OPENAI_API_KEY   = os.environ.get("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL     = os.environ.get("OPENAI_MODEL", "gpt-4o-mini").strip()
+
+GEMINI_API_KEY   = os.environ.get("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL     = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
+
+GROQ_API_KEY     = os.environ.get("GROQ_API_KEY", "").strip()
+GROQ_MODEL       = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-ANTHROPIC_MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5-20250929").strip()
+ANTHROPIC_MODEL   = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5").strip()
 
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "").strip()
-GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile").strip()
+LLM_TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "45"))
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.5-flash").strip()
-
-CF_ACCOUNT_ID = os.environ.get("CF_ACCOUNT_ID", "").strip()
-CF_API_TOKEN = os.environ.get("CF_API_TOKEN", "").strip()
-CF_MODEL = os.environ.get("CF_MODEL", "@cf/meta/llama-3.1-8b-instruct").strip()
-
-LLM_TIMEOUT_S = float(os.environ.get("LLM_TIMEOUT_S", "30"))
+_UA = "Sanhita-Brief/2.0 (+https://sanhita.law)"
 
 
 # ── Circuit breaker ────────────────────────────────────────────────────────
@@ -82,7 +73,7 @@ class _Breaker:
     def is_open(self) -> bool:
         if self.opened_at and (time.monotonic() - self.opened_at) < self.open_for_s:
             return True
-        if self.opened_at:  # cooldown elapsed → close
+        if self.opened_at:
             self.opened_at = 0.0
             self.failures.clear()
         return False
@@ -101,60 +92,70 @@ class _Breaker:
 
 
 _BREAKERS: dict[str, _Breaker] = {
-    "anthropic": _Breaker("anthropic"),
-    "groq": _Breaker("groq"),
+    "openai": _Breaker("openai"),
     "gemini": _Breaker("gemini"),
-    "cloudflare": _Breaker("cloudflare"),
+    "groq": _Breaker("groq"),
+    "anthropic": _Breaker("anthropic"),
 }
 
 
-_UA = "Sanhita-Brief/1.0 (+https://sanhita.law)"
-
-
-def _http_post_json(url: str, headers: dict[str, str], payload: dict[str, Any], timeout: float) -> dict[str, Any]:
+# ── HTTP helper ───────────────────────────────────────────────────────────
+def _http_post_json(url: str, headers: dict, payload: dict, timeout: float) -> dict:
     body = json.dumps(payload).encode("utf-8")
-    merged = {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-        "User-Agent": _UA,
-        **headers,
-    }
-    req = urllib.request.Request(url, data=body, headers=merged, method="POST")
+    req = urllib.request.Request(
+        url, data=body,
+        headers={"Content-Type": "application/json", "Accept": "application/json",
+                 "User-Agent": _UA, **headers},
+        method="POST",
+    )
     try:
         with urllib.request.urlopen(req, timeout=timeout, context=_SSL_CTX) as resp:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
-        # surface the response body so the caller logs the real reason
         try:
-            err_body = e.read().decode("utf-8", errors="replace")[:500]
+            err_body = e.read().decode("utf-8", errors="replace")[:600]
         except Exception:
             err_body = ""
         raise RuntimeError(f"HTTP {e.code}: {err_body or e.reason}") from e
 
 
-# ── Providers ──────────────────────────────────────────────────────────────
-def _call_anthropic(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
-    if not ANTHROPIC_API_KEY:
-        raise RuntimeError("ANTHROPIC_API_KEY not set")
+# ── Provider implementations ──────────────────────────────────────────────
+def _call_openai(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
+    if not OPENAI_API_KEY:
+        raise RuntimeError("OPENAI_API_KEY not set")
     data = _http_post_json(
-        "https://api.anthropic.com/v1/messages",
+        "https://api.openai.com/v1/chat/completions",
+        {"Authorization": f"Bearer {OPENAI_API_KEY}"},
         {
-            "x-api-key": ANTHROPIC_API_KEY,
-            "anthropic-version": "2023-06-01",
-        },
-        {
-            "model": ANTHROPIC_MODEL,
-            "max_tokens": max_tokens,
+            "model": OPENAI_MODEL,
             "temperature": temperature,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
+            "max_tokens": max_tokens,
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user",   "content": user},
+            ],
         },
         timeout=LLM_TIMEOUT_S,
     )
-    # Response shape: { content: [{type: "text", text: "..."}], ... }
-    blocks = data.get("content") or []
-    text_parts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
-    return "".join(text_parts).strip()
+    return data["choices"][0]["message"]["content"].strip()
+
+
+def _call_gemini(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
+    if not GEMINI_API_KEY:
+        raise RuntimeError("GEMINI_API_KEY not set")
+    try:
+        import google.generativeai as genai  # type: ignore
+    except Exception as e:
+        raise RuntimeError(f"google-generativeai not installed: {e}")
+    import warnings
+    warnings.filterwarnings("ignore", category=FutureWarning)
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
+    resp = model.generate_content(
+        user,
+        generation_config={"temperature": temperature, "max_output_tokens": max_tokens},
+    )
+    return (getattr(resp, "text", "") or "").strip()
 
 
 def _call_groq(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
@@ -169,7 +170,7 @@ def _call_groq(system: str, user: str, *, temperature: float, max_tokens: int) -
             "max_tokens": max_tokens,
             "messages": [
                 {"role": "system", "content": system},
-                {"role": "user", "content": user},
+                {"role": "user",   "content": user},
             ],
         },
         timeout=LLM_TIMEOUT_S,
@@ -177,53 +178,33 @@ def _call_groq(system: str, user: str, *, temperature: float, max_tokens: int) -
     return data["choices"][0]["message"]["content"].strip()
 
 
-def _call_cloudflare(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
-    if not (CF_ACCOUNT_ID and CF_API_TOKEN):
-        raise RuntimeError("CF_ACCOUNT_ID / CF_API_TOKEN not set")
-    url = f"https://api.cloudflare.com/client/v4/accounts/{CF_ACCOUNT_ID}/ai/run/{CF_MODEL}"
+def _call_anthropic(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
+    if not ANTHROPIC_API_KEY:
+        raise RuntimeError("ANTHROPIC_API_KEY not set")
     data = _http_post_json(
-        url,
-        {"Authorization": f"Bearer {CF_API_TOKEN}"},
+        "https://api.anthropic.com/v1/messages",
+        {"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01"},
         {
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": user},
-            ],
-            "temperature": temperature,
+            "model": ANTHROPIC_MODEL,
             "max_tokens": max_tokens,
+            "temperature": temperature,
+            "system": system,
+            "messages": [{"role": "user", "content": user}],
         },
         timeout=LLM_TIMEOUT_S,
     )
-    # CF response shape: { result: { response: "..." }, success: true }
-    if not data.get("success"):
-        raise RuntimeError(f"cloudflare error: {data.get('errors')}")
-    return (data.get("result", {}).get("response") or "").strip()
+    blocks = data.get("content") or []
+    return "".join(b.get("text", "") for b in blocks if b.get("type") == "text").strip()
 
 
-def _call_gemini(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
-    if not GEMINI_API_KEY:
-        raise RuntimeError("GEMINI_API_KEY not set")
-    try:
-        import google.generativeai as genai  # type: ignore
-    except Exception as e:
-        raise RuntimeError(f"google-generativeai not installed: {e}")
-    genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
-    resp = model.generate_content(
-        user,
-        generation_config={"temperature": temperature, "max_output_tokens": max_tokens},
-    )
-    return (getattr(resp, "text", "") or "").strip()
-
-
-# ── Router ─────────────────────────────────────────────────────────────────
+# ── Router ────────────────────────────────────────────────────────────────
 @dataclass
 class LLMResponse:
     text: str
-    provider: str       # "groq" | "cloudflare" | "gemini"
+    provider: str
     model: str
     latency_ms: int
-    fallback_chain: list[str]   # which providers were tried
+    fallback_chain: list[str]
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -235,21 +216,23 @@ class LLMResponse:
         }
 
 
-_CHAIN: list[tuple[str, callable, str]] = [
-    ("anthropic", _call_anthropic, ANTHROPIC_MODEL),
-    ("groq", _call_groq, GROQ_MODEL),
-    ("gemini", _call_gemini, GEMINI_MODEL),
-    ("cloudflare", _call_cloudflare, CF_MODEL),
+_CHAIN: list[tuple[str, Any, str]] = [
+    ("openai",     _call_openai,     OPENAI_MODEL),
+    ("gemini",     _call_gemini,     GEMINI_MODEL),
+    ("groq",       _call_groq,       GROQ_MODEL),
+    ("anthropic",  _call_anthropic,  ANTHROPIC_MODEL),
 ]
+
+_HAS_CREDS = {
+    "openai":    lambda: bool(OPENAI_API_KEY),
+    "gemini":    lambda: bool(GEMINI_API_KEY),
+    "groq":      lambda: bool(GROQ_API_KEY),
+    "anthropic": lambda: bool(ANTHROPIC_API_KEY),
+}
 
 
 def available_providers() -> list[str]:
-    out = []
-    if ANTHROPIC_API_KEY: out.append("anthropic")
-    if GROQ_API_KEY: out.append("groq")
-    if GEMINI_API_KEY: out.append("gemini")
-    if CF_ACCOUNT_ID and CF_API_TOKEN: out.append("cloudflare")
-    return out
+    return [name for name, check in _HAS_CREDS.items() if check()]
 
 
 def generate(
@@ -257,17 +240,10 @@ def generate(
     user: str,
     *,
     temperature: float = 0.2,
-    max_tokens: int = 900,
+    max_tokens: int = 2000,
     prefer: Optional[str] = None,
 ) -> LLMResponse:
-    """
-    Walk the provider chain. Returns the first successful response.
-
-    `prefer="cloudflare"` short-circuits to the small/fast helper for
-    classification/rewrite tasks (where we don't need 70B).
-
-    Raises RuntimeError if every available provider fails / breaker is open.
-    """
+    """Walk the provider chain, return first success."""
     chain = _CHAIN
     if prefer:
         chain = sorted(_CHAIN, key=lambda x: 0 if x[0] == prefer else 1)
@@ -276,16 +252,12 @@ def generate(
     last_err: Optional[Exception] = None
 
     for name, fn, model_name in chain:
+        if not _HAS_CREDS[name]():
+            continue
         breaker = _BREAKERS[name]
         if breaker.is_open():
             tried.append(f"{name}:open")
             continue
-        # skip providers without creds
-        if name == "anthropic" and not ANTHROPIC_API_KEY: continue
-        if name == "groq" and not GROQ_API_KEY: continue
-        if name == "cloudflare" and not (CF_ACCOUNT_ID and CF_API_TOKEN): continue
-        if name == "gemini" and not GEMINI_API_KEY: continue
-
         t0 = time.monotonic()
         tried.append(name)
         try:
@@ -305,4 +277,4 @@ def generate(
             breaker.record_failure()
             logger.warning("[router] %s failed: %s", name, e)
 
-    raise RuntimeError(f"all LLM providers failed (tried={tried}): {last_err}")
+    raise RuntimeError(f"all providers failed (tried={tried}): {last_err}")

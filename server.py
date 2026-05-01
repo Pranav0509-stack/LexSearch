@@ -7,6 +7,7 @@ Run: uvicorn server:app --reload --port 8080
 import io
 import logging
 import os
+import re
 import tarfile
 import threading
 import time
@@ -26,11 +27,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # Phase 2 — auth + Brief assistant. Both modules degrade gracefully when
 # optional deps (google-generativeai) aren't installed.
 import auth
-from brief_service import answer_question, serialize_citations
+from brief_service import answer_question, serialize_citations, generate_followups
 from validators import input_guards
 import vault_service
 import workflows
 import web_signals
+import doc_editor
 from fastapi import File, UploadFile, Form
 
 # ── Retrieval layer: FTS5 (primary) or BM25 (legacy fallback) ──────────
@@ -703,6 +705,23 @@ def admin_reload(authorization: Optional[str] = Header(default=None)):
 # Court Search + Analytics API (powered by india_courts.db FTS5)
 # ---------------------------------------------------------------------------
 
+# ── Document-type → optimized query rewrite map ────────────────────────────
+# Each doc type gets a keyword prefix prepended to the user query so the
+# FTS5 search returns the most relevant case law for that document type.
+_DOC_TYPE_QUERY_PREFIX: dict[str, str] = {
+    "bail_application":    "bail Section 437 439",
+    "anticipatory_bail":   "anticipatory bail Section 438",
+    "writ_petition":       "writ petition Article 226 mandamus certiorari",
+    "legal_notice":        "notice Section 138 dishonour demand",
+    "plaint":              "plaint civil suit decree",
+    "written_statement":   "written statement reply defence",
+    "consumer_complaint":  "consumer complaint deficiency service",
+    "affidavit":           "affidavit sworn statement verification",
+    "memo_of_appeal":      "appeal judgment set aside",
+    "vakalatnama":         "",
+}
+
+
 @app.get("/api/cases/search")
 def api_cases_search(
     q: str = "",
@@ -710,10 +729,13 @@ def api_cases_search(
     year_from: Optional[int] = None,
     year_to: Optional[int] = None,
     verdict: Optional[str] = None,
+    doc_type: Optional[str] = None,   # ← NEW: filter/boost by document type
     k: int = 20,
     ls_session: Optional[str] = Cookie(default=None),
 ):
-    """Full-text search across 31M+ Indian court records with advanced filters."""
+    """Full-text search across 31M+ Indian court records.
+    Pass doc_type to automatically boost results relevant to that document type.
+    """
     if not ls_session:
         raise HTTPException(401)
     if not auth.verify_session_token(ls_session):
@@ -721,13 +743,21 @@ def api_cases_search(
     idx = _ensure_bm25()
     if idx is None or not q:
         return {"hits": [], "total": 0, "engine": "none"}
+
+    # Boost query with doc-type prefix so relevant case law surfaces first
+    search_q = q
+    if doc_type and doc_type in _DOC_TYPE_QUERY_PREFIX:
+        prefix = _DOC_TYPE_QUERY_PREFIX[doc_type]
+        if prefix:
+            search_q = f"{prefix} {q}"
+
     if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
         hits = idx.search(
-            q, court_code=court_code,
+            search_q, court_code=court_code,
             year_from=year_from, year_to=year_to,
             verdict=verdict, limit=k,
         )
-        return {"hits": hits, "total": len(idx), "engine": "fts5"}
+        return {"hits": hits, "total": len(idx), "engine": "fts5", "effective_query": search_q}
     return {"hits": [], "total": 0, "engine": "bm25_no_search"}
 
 
@@ -846,6 +876,177 @@ def api_case_detail(
     raise HTTPException(404)
 
 
+@app.get("/api/qa/search")
+def api_qa_search(
+    q: str = "",
+    category: Optional[str] = None,
+    k: int = 20,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Fast Legal QA search — queries legal_qa_fts directly (2ms vs 8.8s for full search).
+
+    Bypasses the multi-table FTS5Index.search() and queries only legal_qa_fts
+    for instant Q&A results. Returns questions, answers, category, acts cited.
+    """
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not q:
+        return {"hits": [], "total": 0, "engine": "none"}
+
+    if not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"hits": [], "total": 0, "engine": "unavailable"}
+
+    safe_q = re.sub(r"[^\w\s]", " ", q)
+    safe_q = re.sub(r"\s+", " ", safe_q).strip()
+    if not safe_q:
+        return {"hits": [], "total": 0, "engine": "none"}
+
+    try:
+        params = [safe_q, k * 2]
+        cat_clause = ""
+        if category:
+            cat_clause = "AND q.category = ?"
+            params.insert(1, category)
+
+        rows = idx.conn.execute(
+            f"""SELECT q.qa_id, q.question, q.answer, q.category, q.acts_cited,
+                       q.context, bm25(legal_qa_fts) AS score
+               FROM legal_qa_fts f
+               JOIN legal_qa q ON q.rowid = f.rowid
+               WHERE legal_qa_fts MATCH ? {cat_clause}
+               ORDER BY score
+               LIMIT ?""",
+            params,
+        ).fetchall()
+
+        hits = []
+        for r in rows:
+            hits.append({
+                "qa_id": r[0] or "",
+                "question": (r[1] or "")[:300],
+                "answer": (r[2] or "")[:1200],
+                "category": r[3] or "",
+                "acts_cited": r[4] or "",
+                "context": (r[5] or "")[:400],
+                "score": abs(r[6]) if r[6] else 0,
+                "source": "legal_qa_fts5",
+            })
+
+        # Get approximate total
+        try:
+            total = idx.conn.execute("SELECT MAX(rowid) FROM legal_qa").fetchone()[0] or 0
+        except Exception:
+            total = len(hits)
+
+        return {"hits": hits[:k], "total": total, "engine": "legal_qa_fts5"}
+    except Exception as e:
+        logger.warning("QA search error: %s", e)
+        return {"hits": [], "total": 0, "engine": "error", "error": str(e)}
+
+
+@app.get("/api/analytics/judge-profile")
+def api_judge_profile(
+    judge: str = Query(..., min_length=2, description="Judge name (partial match OK)"),
+    court_code: Optional[str] = None,
+    year_from: Optional[int] = None,
+    year_to: Optional[int] = None,
+    limit: int = 50,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Judge-level analytics: verdict breakdown, bail rates, case volume over time.
+
+    Queries the 16M+ judgments table for cases decided by the given judge.
+    Partial name matching — 'Chandrachud' matches 'Justice D.Y. Chandrachud'.
+    """
+    _require_user(ls_session)
+    idx = _ensure_bm25()
+    if idx is None or not (_FTS5_AVAILABLE and isinstance(idx, FTS5Index)):
+        return {"judge": judge, "cases": [], "verdict_breakdown": {}, "total": 0}
+
+    try:
+        clauses = ["LOWER(j.judge) LIKE ?"]
+        params: list = [f"%{judge.lower()}%"]
+
+        if court_code:
+            clauses.append("j.court_code = ?")
+            params.append(court_code)
+        if year_from:
+            clauses.append("j.year >= ?")
+            params.append(year_from)
+        if year_to:
+            clauses.append("j.year <= ?")
+            params.append(year_to)
+
+        where = " AND ".join(clauses)
+        params.append(min(limit, 200))
+
+        rows = idx.conn.execute(
+            f"""SELECT j.cnr, j.title, j.court, j.year, j.verdict, j.judge,
+                       j.date_decided, j.description
+               FROM judgments j
+               WHERE {where}
+               ORDER BY j.year DESC, j.id DESC
+               LIMIT ?""",
+            params,
+        ).fetchall()
+
+        cases = []
+        verdict_counts: dict[str, int] = {}
+        court_counts: dict[str, int] = {}
+        year_counts: dict[int, int] = {}
+
+        for r in rows:
+            verdict = (r[4] or "").strip()
+            court = (r[2] or "")
+            year = r[3]
+            verdict_counts[verdict] = verdict_counts.get(verdict, 0) + 1
+            court_counts[court] = court_counts.get(court, 0) + 1
+            if year:
+                year_counts[int(year)] = year_counts.get(int(year), 0) + 1
+            cases.append({
+                "cnr": r[0] or "",
+                "title": r[1] or (r[7] or "")[:120] or r[0] or "",
+                "court": court,
+                "year": year,
+                "verdict": verdict,
+                "judge": r[5] or "",
+                "date_decided": r[6] or "",
+                "citation": r[0] or "",
+            })
+
+        # Count total (may be larger than limit)
+        count_params = [f"%{judge.lower()}%"]
+        count_clauses = ["LOWER(j.judge) LIKE ?"]
+        if court_code:
+            count_clauses.append("j.court_code = ?")
+            count_params.append(court_code)
+        where_count = " AND ".join(count_clauses)
+        total_row = idx.conn.execute(
+            f"SELECT COUNT(*) FROM judgments j WHERE {where_count}", count_params
+        ).fetchone()
+        total = total_row[0] if total_row else len(cases)
+
+        # Find the actual judge names matched (for display)
+        name_rows = idx.conn.execute(
+            "SELECT DISTINCT judge FROM judgments WHERE LOWER(judge) LIKE ? LIMIT 10",
+            [f"%{judge.lower()}%"],
+        ).fetchall()
+        matched_names = [r[0] for r in name_rows if r[0]]
+
+        return {
+            "query": judge,
+            "matched_names": matched_names,
+            "total": total,
+            "cases": cases,
+            "verdict_breakdown": verdict_counts,
+            "court_breakdown": court_counts,
+            "yearly_volume": dict(sorted(year_counts.items())),
+        }
+    except Exception as e:
+        logger.warning("Judge profile error: %s", e)
+        return {"judge": judge, "cases": [], "verdict_breakdown": {}, "total": 0, "error": str(e)}
+
+
 @app.get("/api/analytics/corpus-stats")
 def api_corpus_stats(ls_session: Optional[str] = Cookie(default=None)):
     """Corpus overview: total records, courts, year range."""
@@ -896,6 +1097,189 @@ def api_news_search(q: str = Query(default="", description="Search query")):
 def api_news_sources():
     """List available news signal sources."""
     return {"sources": web_signals.available_sources()}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# LEGAL DOCUMENT EDITOR  — Google-Docs-style drafting with AI + citations
+# ─────────────────────────────────────────────────────────────────────────
+
+class DocCreateBody(BaseModel):
+    title: str = "Untitled Document"
+    doc_type: str = "general"
+    content: str = ""
+
+class DocSaveBody(BaseModel):
+    title: Optional[str] = None
+    content: str
+    citations: str = "[]"
+
+class AiCompleteBody(BaseModel):
+    content: str
+    cursor_text: str = ""
+    doc_type: str = ""
+
+class AiImproveBody(BaseModel):
+    selected_text: str
+    doc_type: str = ""
+
+class AiWriteSectionBody(BaseModel):
+    instruction: str
+    doc_type: str = ""
+    context: str = ""
+
+class AiSuggestCasesBody(BaseModel):
+    argument: str
+
+
+@app.get("/api/editor/doc-types")
+def api_editor_doc_types():
+    """List all legal document types with templates."""
+    return {"doc_types": doc_editor.list_doc_types()}
+
+
+@app.get("/api/editor/template/{doc_type}")
+def api_editor_template(doc_type: str):
+    """Get starter template for a document type."""
+    tmpl = doc_editor.get_template(doc_type)
+    if not tmpl:
+        raise HTTPException(404, f"Unknown doc_type: {doc_type}")
+    return {"doc_type": doc_type, "template": tmpl}
+
+
+@app.get("/api/editor/docs")
+def api_editor_list(ls_session: Optional[str] = Cookie(default=None)):
+    """List user's saved documents."""
+    user = _require_user(ls_session)
+    return {"documents": auth.doc_list(user["id"])}
+
+
+@app.post("/api/editor/docs")
+def api_editor_create(body: DocCreateBody, ls_session: Optional[str] = Cookie(default=None)):
+    """Create a new document (optionally with template content)."""
+    import time as _time
+    user = _require_user(ls_session)
+    content = body.content
+    if not content and body.doc_type != "general":
+        content = doc_editor.get_template(body.doc_type)
+    doc_id = auth.doc_create(user["id"], body.title, body.doc_type, content)
+    now = int(_time.time())
+    return {"doc": {"id": doc_id, "title": body.title, "doc_type": body.doc_type,
+                    "content": content, "word_count": len(content.split()), "updated_at": now}}
+
+
+@app.get("/api/editor/docs/{doc_id}")
+def api_editor_get(doc_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    """Get a document by ID."""
+    user = _require_user(ls_session)
+    doc = auth.doc_get(doc_id, user["id"])
+    if not doc:
+        raise HTTPException(404, "Document not found")
+    return {"doc": doc}
+
+
+@app.put("/api/editor/docs/{doc_id}")
+def api_editor_save(doc_id: int, body: DocSaveBody, ls_session: Optional[str] = Cookie(default=None)):
+    """Save/auto-save a document."""
+    import time as _time
+    user = _require_user(ls_session)
+    # Fetch existing title if not provided
+    title = body.title
+    if title is None:
+        existing = auth.doc_get(doc_id, user["id"])
+        title = existing["title"] if existing else "Untitled Document"
+    ok = auth.doc_save(doc_id, user["id"], title, body.content, body.citations)
+    if not ok:
+        raise HTTPException(404, "Document not found")
+    wc = len(body.content.split())
+    now = int(_time.time())
+    return {"doc": {"id": doc_id, "title": title, "word_count": wc, "updated_at": now}}
+
+
+@app.delete("/api/editor/docs/{doc_id}")
+def api_editor_delete(doc_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    """Delete a document."""
+    user = _require_user(ls_session)
+    ok = auth.doc_delete(doc_id, user["id"])
+    if not ok:
+        raise HTTPException(404, "Document not found")
+    return {"deleted": True}
+
+
+@app.get("/api/editor/docs/{doc_id}/versions")
+def api_editor_versions(doc_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    """Get version history for a document."""
+    user = _require_user(ls_session)
+    versions = auth.doc_versions(doc_id, user["id"])
+    return {"versions": versions}
+
+
+@app.post("/api/editor/docs/{doc_id}/restore/{version_id}")
+def api_editor_restore(doc_id: int, version_id: int, ls_session: Optional[str] = Cookie(default=None)):
+    """Restore a previous version."""
+    user = _require_user(ls_session)
+    content = auth.doc_restore_version(doc_id, version_id, user["id"])
+    if content is None:
+        raise HTTPException(404, "Version not found")
+    return {"content": content}
+
+
+@app.post("/api/editor/ai/complete")
+def api_editor_ai_complete(body: AiCompleteBody, ls_session: Optional[str] = Cookie(default=None)):
+    """AI: continue writing from cursor position."""
+    _require_user(ls_session)
+    completion = doc_editor.ai_complete(body.content, body.doc_type, body.cursor_text)
+    return {"completion": completion}
+
+
+@app.post("/api/editor/ai/improve")
+def api_editor_ai_improve(body: AiImproveBody, ls_session: Optional[str] = Cookie(default=None)):
+    """AI: improve selected text."""
+    _require_user(ls_session)
+    improved = doc_editor.ai_improve(body.selected_text, body.doc_type)
+    return {"improved": improved}
+
+
+@app.post("/api/editor/ai/write-section")
+def api_editor_ai_write(body: AiWriteSectionBody, ls_session: Optional[str] = Cookie(default=None)):
+    """AI: write a complete section based on instruction."""
+    _require_user(ls_session)
+    text = doc_editor.ai_write_section(body.instruction, body.doc_type, body.context)
+    return {"text": text}
+
+
+@app.post("/api/editor/ai/suggest-cases")
+def api_editor_suggest_cases(
+    body: AiSuggestCasesBody,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """AI: suggest what case law to search for a given argument. Then search."""
+    _require_user(ls_session)
+    suggestion = doc_editor.ai_suggest_case_search(body.argument)
+    # Actually run the search
+    hits: list[dict] = []
+    idx = _ensure_bm25()
+    if idx is not None and suggestion.get("search_query"):
+        try:
+            if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+                hits = idx.search(suggestion["search_query"], limit=8)
+        except Exception as e:
+            logger.warning("editor case search failed: %s", e)
+    return {
+        "search_query": suggestion.get("search_query", ""),
+        "explanation": suggestion.get("explanation", ""),
+        "cases": hits[:8],
+    }
+
+
+@app.post("/api/editor/ai/insert-citation")
+def api_editor_insert_citation(
+    body: dict,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Format a case as a citation string for insertion."""
+    _require_user(ls_session)
+    citation_str = doc_editor.ai_insert_citation(body)
+    return {"citation": citation_str}
 
 
 @app.get("/api/analytics/court-efficiency")
