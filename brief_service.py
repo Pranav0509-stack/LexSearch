@@ -113,21 +113,27 @@ def _build_context(hits: list[dict[str, Any]]) -> str:
         year = h.get("year") or ""
         verdict = h.get("verdict") or ""
         judge = h.get("judge") or ""
+        bench = h.get("bench") or ""
+        date_decided = h.get("date_decided") or ""
         excerpt = h.get("excerpt") or ""
         source = h.get("source") or ""
+        tier = h.get("tier") or ""
 
         meta_parts = []
         if court: meta_parts.append(f"Court: {court}")
         if year: meta_parts.append(f"Year: {year}")
+        if date_decided: meta_parts.append(f"Decided: {date_decided}")
         if verdict: meta_parts.append(f"Verdict: {verdict}")
         if judge: meta_parts.append(f"Judge: {judge}")
+        if bench: meta_parts.append(f"Bench: {bench}")
+        if tier: meta_parts.append(f"Tier: {tier}")
 
         blocks.append(
             f"[{i}] {title}\n"
             f"    Citation: {citation}\n"
             f"    {' | '.join(meta_parts)}\n"
             f"    Source: {source}\n"
-            f"    Excerpt: {excerpt[:900]}"
+            f"    Excerpt: {excerpt[:1200]}"
         )
     return "\n\n".join(blocks)
 
@@ -277,7 +283,7 @@ def answer_question(
 
     # ── First pass — 1200 tokens for comprehensive answers
     try:
-        resp = router.generate(sys_prompt, user_prompt, temperature=0.2, max_tokens=1200)
+        resp = router.generate(sys_prompt, user_prompt, temperature=0.2, max_tokens=2000)
     except Exception as e:
         logger.error("router.generate failed: %s", e)
         # Even if LLM fails, return the raw cases
@@ -313,7 +319,7 @@ def answer_question(
     if not verdict.passed and verdict.gates.get("cite_present") and verdict.gates.get("scope_check"):
         rewrite_prompt = _build_user_prompt(question, context, history_block, rewrite=True)
         try:
-            resp2 = router.generate(sys_prompt, rewrite_prompt, temperature=0.1, max_tokens=1200)
+            resp2 = router.generate(sys_prompt, rewrite_prompt, temperature=0.1, max_tokens=2000)
             verdict2 = answer_gates.validate(resp2.text, hits, question=question)
             if verdict2.confidence > verdict.confidence:
                 resp, verdict = resp2, verdict2

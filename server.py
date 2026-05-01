@@ -1216,7 +1216,7 @@ def api_brief_chat(
         try:
             if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
                 # FTS5 adapter returns Sanhita-compatible dicts directly
-                hits = idx.search(safe_question, limit=10)
+                hits = idx.search(safe_question, limit=12)
                 logger.info("FTS5 retrieve for '%s': %d hits", safe_question[:50], len(hits))
             else:
                 # Legacy BM25 path
