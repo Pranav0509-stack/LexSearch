@@ -167,21 +167,43 @@ def validate(
 
 
 def refusal_payload(question: str, hits: list[dict[str, Any]], reasons: list[str]) -> str:
-    """The prose-free fallback when an answer can't be grounded."""
+    """Structured fallback when LLM answer can't be grounded — still useful."""
     if not hits:
         return (
-            "I couldn't find on-point judgments for this question in the indexed "
-            "corpus, so I won't compose an answer — fabricating one would be worse "
-            "than admitting the gap. Try narrower terms, name a specific section, "
-            "or upload the brief you're working from."
+            "No matching cases found in the corpus for this query. "
+            "Try more specific terms — name a statute, section number, "
+            "court, or describe the fact pattern in detail.\n\n"
+            "**Tip:** Use *Court Search* for advanced filters across 31.9M records."
         )
     lines = [
-        "I can't compose a grounded answer to this from the retrieved record. "
-        "Closest cases for you to read directly:",
-        "",
+        f"Here are **{min(len(hits), 6)} relevant cases** from the corpus "
+        f"matching your query:\n",
     ]
-    for i, h in enumerate(hits[:3], 1):
+    for i, h in enumerate(hits[:6], 1):
         t = h.get("title") or h.get("case_id") or "Untitled"
+        court = h.get("court") or ""
+        year = h.get("year") or ""
         cit = h.get("citation") or ""
-        lines.append(f"- **[{i}] {t}** {cit}".rstrip())
+        verdict = h.get("verdict") or ""
+        excerpt = (h.get("excerpt") or "")[:250]
+
+        meta_parts = []
+        if court: meta_parts.append(court)
+        if year: meta_parts.append(str(year))
+        if verdict: meta_parts.append(f"*{verdict}*")
+        meta = " · ".join(meta_parts)
+
+        lines.append(f"**[{i}] {t}**")
+        if cit and cit != t:
+            lines.append(f"📋 {cit}")
+        if meta:
+            lines.append(f"🏛️ {meta}")
+        if excerpt:
+            lines.append(f"> {excerpt}")
+        lines.append("")
+
+    lines.append(
+        "*For a detailed AI analysis, configure an LLM API key "
+        "(Gemini, Groq, Anthropic, or Cloudflare) in your environment.*"
+    )
     return "\n".join(lines)
