@@ -28,9 +28,13 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Sanhita — research counsel for Asian jurisdictions",
+  title: "Sanhita — India's AI Legal Research Platform",
   description:
-    "Grounded legal answers across India, Japan, Singapore, and 14 more Asian markets. Every claim cited.",
+    "Search 31.9M Indian court judgments across 25 High Courts (1950–2025). AI-powered legal research with verified citations.",
+  icons: {
+    icon: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({

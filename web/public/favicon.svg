@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#1a1a1a"/>
+  <g transform="translate(12, 8)">
+    <!-- Scale of justice -->
+    <line x1="20" y1="6" x2="20" y2="42" stroke="#c9a96e" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Top beam -->
+    <line x1="6" y1="12" x2="34" y2="12" stroke="#c9a96e" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Left chain -->
+    <line x1="6" y1="12" x2="6" y2="24" stroke="#c9a96e" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Right chain -->
+    <line x1="34" y1="12" x2="34" y2="24" stroke="#c9a96e" stroke-width="1.8" stroke-linecap="round"/>
+    <!-- Left pan -->
+    <path d="M0 24 Q6 32 12 24" stroke="#c9a96e" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Right pan -->
+    <path d="M28 24 Q34 32 40 24" stroke="#c9a96e" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- Base -->
+    <line x1="12" y1="42" x2="28" y2="42" stroke="#c9a96e" stroke-width="2.5" stroke-linecap="round"/>
+    <!-- Top circle -->
+    <circle cx="20" cy="6" r="3" fill="#c9a96e"/>
+  </g>
+  <!-- S monogram -->
+  <text x="32" y="56" text-anchor="middle" font-family="Georgia,serif" font-size="12" font-weight="bold" fill="#c9a96e" opacity="0.6">S</text>
+</svg>

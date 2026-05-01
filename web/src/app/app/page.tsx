@@ -28,6 +28,7 @@ import {
   Sparkles,
   Scale,
   LayoutDashboard,
+  FileText,
 } from "lucide-react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { renderMarkdown } from "./markdown";
@@ -39,6 +40,7 @@ import CourtSearchPane from "./court-search-pane";
 import SettingsPane from "./settings-pane";
 import DashboardPane from "./dashboard-pane";
 import ClientsPane from "./clients-pane";
+import TemplatesPage from "./templates/page";
 
 // Sanhita — India's largest AI legal research platform.
 // 30M+ judgments from all 25 High Courts (1950–2025), FTS5-indexed.
@@ -92,7 +94,8 @@ type Mode =
   | "library"
   | "clients"
   | "settings"
-  | "dashboard";
+  | "dashboard"
+  | "templates";
 
 interface LanguageOpt {
   code: string;
@@ -138,9 +141,56 @@ interface Message {
   followups?: string[];
 }
 
+// Map URL hash to mode for deep-linking: /app#search → court-search
+const HASH_TO_MODE: Record<string, Mode> = {
+  "": "assistant",
+  assistant: "assistant",
+  search: "court-search",
+  "court-search": "court-search",
+  vault: "vault",
+  storage: "vault",
+  workflows: "workflows",
+  history: "history",
+  library: "library",
+  clients: "clients",
+  settings: "settings",
+  dashboard: "dashboard",
+  templates: "templates",
+};
+const MODE_TO_HASH: Record<Mode, string> = {
+  assistant: "",
+  "court-search": "search",
+  vault: "vault",
+  workflows: "workflows",
+  history: "history",
+  library: "library",
+  clients: "clients",
+  settings: "settings",
+  dashboard: "dashboard",
+  templates: "templates",
+};
+
 export default function AppPage() {
   const router = useRouter();
-  const [mode, setMode] = useState<Mode>("assistant");
+
+  // Read initial mode from URL hash (e.g., /app#search)
+  const initialMode = (): Mode => {
+    if (typeof window === "undefined") return "assistant";
+    const hash = window.location.hash.replace("#", "");
+    return HASH_TO_MODE[hash] || "assistant";
+  };
+  const [mode, _setMode] = useState<Mode>(initialMode);
+
+  // Wrap setMode to also update the URL hash
+  const setMode = useCallback((m: Mode) => {
+    _setMode(m);
+    const hash = MODE_TO_HASH[m];
+    if (hash) {
+      window.history.replaceState(null, "", `/app#${hash}`);
+    } else {
+      window.history.replaceState(null, "", "/app");
+    }
+  }, []);
   const [user, setUser] = useState<{ email?: string; name?: string } | null>(null);
   // Threads list is no longer rendered in the sidebar (History pane owns
   // that surface). We still keep `setThreads` to seed the list on boot and
@@ -158,6 +208,17 @@ export default function AppPage() {
   // advances them on a timer so the user sees motion even though the
   // backend isn't streaming.
   const [thinkingPhases, setThinkingPhases] = useState<string[]>([]);
+  // Sync mode with URL hash for back/forward navigation
+  useEffect(() => {
+    const onHash = () => {
+      const hash = window.location.hash.replace("#", "");
+      const m = HASH_TO_MODE[hash] || "assistant";
+      _setMode(m);
+    };
+    window.addEventListener("hashchange", onHash);
+    return () => window.removeEventListener("hashchange", onHash);
+  }, []);
+
   const jurisdiction = JURISDICTION; // India-only — no dropdown needed
   const [source, setSource] = useState("");
   const [connectors, setConnectors] = useState<Record<string, boolean>>({});
@@ -514,16 +575,17 @@ export default function AppPage() {
           New matter
         </button>
 
-        <nav className="px-2 flex flex-col gap-0.5">
-          <SideItem icon={<MessageSquare size={16} />} label="Assistant" active={mode === "assistant"} onClick={() => { setMode("assistant"); setSidebarOpen(false); }} />
-          <SideItem icon={<FolderClosed size={16} />} label="Storage" active={mode === "vault"} onClick={() => { setMode("vault"); setSidebarOpen(false); }} />
-          <SideItem icon={<Workflow size={16} />} label="Workflows" active={mode === "workflows"} onClick={() => { setMode("workflows"); setSidebarOpen(false); }} />
-          <SideItem icon={<Scale size={16} />} label="Court Search" active={mode === "court-search"} onClick={() => { setMode("court-search"); setSidebarOpen(false); }} />
-          <SideItem icon={<Inbox size={16} />} label="Clients" active={mode === "clients"} onClick={() => { setMode("clients"); setSidebarOpen(false); }} badge={newClientCount > 0 ? newClientCount : undefined} />
-          <SideItem icon={<HistoryIcon size={16} />} label="History" active={mode === "history"} onClick={() => { setMode("history"); setSidebarOpen(false); }} />
-          <SideItem icon={<LibraryIcon size={16} />} label="Library" active={mode === "library"} onClick={() => { setMode("library"); setSidebarOpen(false); }} />
-          <SideItem icon={<SettingsIcon size={16} />} label="Settings" active={mode === "settings"} onClick={() => { setMode("settings"); setSidebarOpen(false); }} />
-          <SideItem icon={<LayoutDashboard size={16} />} label="Dashboard" active={mode === "dashboard"} onClick={() => { setMode("dashboard"); setSidebarOpen(false); }} />
+        <nav className="px-2 flex flex-col gap-0.5" role="navigation" aria-label="Main navigation">
+          <SideItem href="/app" icon={<MessageSquare size={16} />} label="Assistant" active={mode === "assistant"} onClick={() => { setMode("assistant"); setSidebarOpen(false); }} />
+          <SideItem href="/app#vault" icon={<FolderClosed size={16} />} label="Storage" active={mode === "vault"} onClick={() => { setMode("vault"); setSidebarOpen(false); }} />
+          <SideItem href="/app#workflows" icon={<Workflow size={16} />} label="Workflows" active={mode === "workflows"} onClick={() => { setMode("workflows"); setSidebarOpen(false); }} />
+          <SideItem href="/app#search" icon={<Scale size={16} />} label="Court Search" active={mode === "court-search"} onClick={() => { setMode("court-search"); setSidebarOpen(false); }} />
+          <SideItem href="/app#templates" icon={<FileText size={16} />} label="Templates" active={mode === "templates"} onClick={() => { setMode("templates"); setSidebarOpen(false); }} />
+          <SideItem href="/app#clients" icon={<Inbox size={16} />} label="Clients" active={mode === "clients"} onClick={() => { setMode("clients"); setSidebarOpen(false); }} badge={newClientCount > 0 ? newClientCount : undefined} />
+          <SideItem href="/app#history" icon={<HistoryIcon size={16} />} label="History" active={mode === "history"} onClick={() => { setMode("history"); setSidebarOpen(false); }} />
+          <SideItem href="/app#library" icon={<LibraryIcon size={16} />} label="Library" active={mode === "library"} onClick={() => { setMode("library"); setSidebarOpen(false); }} />
+          <SideItem href="/app#settings" icon={<SettingsIcon size={16} />} label="Settings" active={mode === "settings"} onClick={() => { setMode("settings"); setSidebarOpen(false); }} />
+          <SideItem href="/app#dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" active={mode === "dashboard"} onClick={() => { setMode("dashboard"); setSidebarOpen(false); }} />
         </nav>
 
         {/* Spacer pushes footer to bottom — past threads now live in History pane */}
@@ -731,6 +793,7 @@ export default function AppPage() {
             }}
           />
         )}
+        {mode === "templates" && <TemplatesPage />}
         {mode === "dashboard" && (
           <DashboardPane
             // "Ask Sanhita" hands the assistant a snapshot of the current
@@ -755,12 +818,14 @@ export default function AppPage() {
 // ───────────────────────────────────────────────────────────────────────────
 
 function SideItem({
+  href,
   icon,
   label,
   active,
   onClick,
   badge,
 }: {
+  href?: string;
   icon: React.ReactNode;
   label: string;
   active?: boolean;
@@ -768,13 +833,15 @@ function SideItem({
   badge?: number;
 }) {
   return (
-    <button
-      onClick={onClick}
-      className={`flex items-center gap-3 px-4 py-2 rounded-lg text-sm font-medium transition-colors text-left ${
+    <a
+      href={href || "#"}
+      onClick={(e) => { e.preventDefault(); onClick(); }}
+      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
         active
           ? "bg-[var(--highlight)] text-[var(--ink)]"
           : "text-[var(--ink-soft)] hover:bg-[var(--bg-elev)] hover:text-[var(--ink)]"
       }`}
+      aria-current={active ? "page" : undefined}
     >
       <span className="text-[var(--accent)]">{icon}</span>
       <span className="flex-1">{label}</span>
@@ -783,7 +850,7 @@ function SideItem({
           {badge > 99 ? "99+" : badge}
         </span>
       )}
-    </button>
+    </a>
   );
 }
 
@@ -795,6 +862,8 @@ function modeTitle(mode: Mode): string {
       return "Storage";
     case "workflows":
       return "Workflows";
+    case "court-search":
+      return "Court Search";
     case "clients":
       return "Clients";
     case "history":
@@ -803,6 +872,12 @@ function modeTitle(mode: Mode): string {
       return "Library";
     case "settings":
       return "Settings";
+    case "dashboard":
+      return "Dashboard";
+    case "templates":
+      return "Templates";
+    default:
+      return "Sanhita";
   }
 }
 
@@ -860,7 +935,7 @@ function AssistantPane({
             <PromptInputBox
               onSend={onSend}
               isLoading={thinking}
-              placeholder="Ask Sanhita — cite-grounded answers across Asia"
+              placeholder="Ask Sanhita — cite-grounded answers from 31.9M Indian judgments"
             />
           </div>
         </div>
