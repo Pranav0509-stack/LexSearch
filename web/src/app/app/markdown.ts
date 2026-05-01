@@ -35,9 +35,8 @@ export function renderMarkdown(md: string): string {
   const lines = String(md ?? "").split("\n");
   const out: string[] = [];
 
-  // Tracks open list state so consecutive bullet lines collapse into a
-  // single <ul>/<ol> block.
   let listType: "ul" | "ol" | null = null;
+  let blockquoteBuf: string[] = [];
   let paragraphBuf: string[] = [];
 
   const flushParagraph = () => {
@@ -47,44 +46,64 @@ export function renderMarkdown(md: string): string {
     paragraphBuf = [];
   };
   const closeList = () => {
-    if (listType) {
-      out.push(`</${listType}>`);
-      listType = null;
-    }
+    if (listType) { out.push(`</${listType}>`); listType = null; }
+  };
+  const flushBlockquote = () => {
+    if (blockquoteBuf.length === 0) return;
+    const inner = blockquoteBuf.join(" ").trim();
+    if (inner) out.push(`<blockquote>${renderInline(esc(inner))}</blockquote>`);
+    blockquoteBuf = [];
   };
 
   for (const raw of lines) {
     const line = raw.trimEnd();
     const escaped = esc(line);
 
-    // Blank line — paragraph/list break.
+    // Blank line — flush everything
     if (line.trim() === "") {
       flushParagraph();
       closeList();
+      flushBlockquote();
       continue;
     }
 
-    // Headings: ## or ### (the LLM uses ## for memo sections).
-    const h3 = /^###\s+(.*)$/.exec(line);
-    const h2 = /^##\s+(.*)$/.exec(line);
-    if (h2 || h3) {
+    // Horizontal rule: --- or ***
+    if (/^[-*]{3,}\s*$/.test(line.trim())) {
       flushParagraph();
       closeList();
-      const tag = h3 ? "h3" : "h2";
-      const body = (h3?.[1] ?? h2?.[1] ?? "").trim();
+      flushBlockquote();
+      out.push('<hr class="prose-hr" />');
+      continue;
+    }
+
+    // Headings: ####, ###, ##, #
+    const h4m = /^####\s+(.*)$/.exec(line);
+    const h3m = /^###\s+(.*)$/.exec(line);
+    const h2m = /^##\s+(.*)$/.exec(line);
+    const h1m = /^#\s+(.*)$/.exec(line);
+    if (h4m || h3m || h2m || h1m) {
+      flushParagraph(); closeList(); flushBlockquote();
+      const tag = h4m ? "h4" : h3m ? "h3" : h2m ? "h2" : "h1";
+      const body = (h4m?.[1] ?? h3m?.[1] ?? h2m?.[1] ?? h1m?.[1] ?? "").trim();
       out.push(`<${tag}>${renderInline(esc(body))}</${tag}>`);
       continue;
     }
 
-    // Bullets: `* foo` or `- foo` at line start.
+    // Blockquote: > text
+    const bq = /^>\s*(.*)$/.exec(line);
+    if (bq) {
+      flushParagraph(); closeList();
+      blockquoteBuf.push(bq[1]);
+      continue;
+    } else {
+      flushBlockquote();
+    }
+
+    // Bullets: `* foo` or `- foo` (but not `---`)
     const bullet = /^\s*[*-]\s+(.+)$/.exec(line);
     if (bullet) {
       flushParagraph();
-      if (listType !== "ul") {
-        closeList();
-        out.push("<ul>");
-        listType = "ul";
-      }
+      if (listType !== "ul") { closeList(); out.push("<ul>"); listType = "ul"; }
       out.push(`<li>${renderInline(esc(bullet[1]))}</li>`);
       continue;
     }
@@ -93,22 +112,18 @@ export function renderMarkdown(md: string): string {
     const num = /^\s*(\d+)\.\s+(.+)$/.exec(line);
     if (num) {
       flushParagraph();
-      if (listType !== "ol") {
-        closeList();
-        out.push("<ol>");
-        listType = "ol";
-      }
+      if (listType !== "ol") { closeList(); out.push("<ol>"); listType = "ol"; }
       out.push(`<li>${renderInline(esc(num[2]))}</li>`);
       continue;
     }
 
-    // Plain text — accumulate. (Closing any open list because plain
-    // prose between bullets is a real paragraph, not a continuation.)
+    // Plain text
     closeList();
     paragraphBuf.push(escaped);
   }
 
   flushParagraph();
   closeList();
+  flushBlockquote();
   return out.join("\n");
 }

@@ -41,6 +41,7 @@ import SettingsPane from "./settings-pane";
 import DashboardPane from "./dashboard-pane";
 import ClientsPane from "./clients-pane";
 import TemplatesPage from "./templates/page";
+import EditorPane from "./editor-pane";
 
 // Sanhita — India's largest AI legal research platform.
 // 30M+ judgments from all 25 High Courts (1950–2025), FTS5-indexed.
@@ -95,7 +96,8 @@ type Mode =
   | "clients"
   | "settings"
   | "dashboard"
-  | "templates";
+  | "templates"
+  | "editor";
 
 interface LanguageOpt {
   code: string;
@@ -119,6 +121,11 @@ interface Citation {
   citation?: string;
   excerpt?: string;
   pdf_url?: string;
+  url?: string;
+  tier?: string;
+  verdict?: string;
+  judge?: string;
+  score?: number;
 }
 
 interface TraceStep {
@@ -156,6 +163,7 @@ const HASH_TO_MODE: Record<string, Mode> = {
   settings: "settings",
   dashboard: "dashboard",
   templates: "templates",
+  editor: "editor",
 };
 const MODE_TO_HASH: Record<Mode, string> = {
   assistant: "",
@@ -168,6 +176,7 @@ const MODE_TO_HASH: Record<Mode, string> = {
   settings: "settings",
   dashboard: "dashboard",
   templates: "templates",
+  editor: "editor",
 };
 
 export default function AppPage() {
@@ -541,21 +550,19 @@ export default function AppPage() {
 
       {/* ── Sidebar ─────────────────────────────────────────────────────── */}
       <aside
-        className={`flex flex-col border-r border-[var(--line)] bg-[var(--bg)] min-w-0 z-40 transition-transform duration-200
+        className={`flex flex-col bg-[var(--bg-elev)] border-r border-[var(--line)] min-w-0 z-40 transition-transform duration-200
           fixed md:static inset-y-0 left-0 w-[260px] md:w-[230px] shrink-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0`}
       >
         <div className="px-6 pt-7 pb-6 flex items-start justify-between">
           <div>
-            <div className="font-display text-3xl tracking-tight">Sanhita</div>
+            <div className="font-display text-3xl tracking-tight text-[var(--ink)]">Sanhita</div>
             <div className="text-[10px] tracking-[0.22em] uppercase text-[var(--ink-soft)] mt-1">
               Research counsel
             </div>
           </div>
-          {/* Close button — visible only on phone where the sidebar is a
-              drawer over the chat column. */}
           <button
-            className="md:hidden p-1.5 rounded-lg text-[var(--ink-soft)] hover:bg-[var(--bg-elev)]"
+            className="md:hidden p-1.5 rounded-lg hover:bg-[var(--bg)] transition-colors text-[var(--ink-soft)]"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
           >
@@ -569,7 +576,7 @@ export default function AppPage() {
             newThread();
             setSidebarOpen(false);
           }}
-          className="mx-4 mb-4 flex items-center gap-2 rounded-xl bg-[var(--ink)] text-[var(--bg)] py-2.5 px-4 text-sm font-medium hover:bg-[var(--accent)] transition-colors"
+          className="mx-4 mb-4 flex items-center gap-2 rounded-xl py-2.5 px-4 text-sm font-medium bg-[var(--ink)] text-[var(--bg)] hover:opacity-90 transition-opacity"
         >
           <Plus size={16} strokeWidth={2.4} />
           New matter
@@ -580,7 +587,7 @@ export default function AppPage() {
           <SideItem href="/app#vault" icon={<FolderClosed size={16} />} label="Storage" active={mode === "vault"} onClick={() => { setMode("vault"); setSidebarOpen(false); }} />
           <SideItem href="/app#workflows" icon={<Workflow size={16} />} label="Workflows" active={mode === "workflows"} onClick={() => { setMode("workflows"); setSidebarOpen(false); }} />
           <SideItem href="/app#search" icon={<Scale size={16} />} label="Court Search" active={mode === "court-search"} onClick={() => { setMode("court-search"); setSidebarOpen(false); }} />
-          <SideItem href="/app#templates" icon={<FileText size={16} />} label="Templates" active={mode === "templates"} onClick={() => { setMode("templates"); setSidebarOpen(false); }} />
+          <SideItem href="/app#editor" icon={<FileDown size={16} />} label="Draft Editor" active={mode === "editor"} onClick={() => { setMode("editor"); setSidebarOpen(false); }} />
           <SideItem href="/app#clients" icon={<Inbox size={16} />} label="Clients" active={mode === "clients"} onClick={() => { setMode("clients"); setSidebarOpen(false); }} badge={newClientCount > 0 ? newClientCount : undefined} />
           <SideItem href="/app#history" icon={<HistoryIcon size={16} />} label="History" active={mode === "history"} onClick={() => { setMode("history"); setSidebarOpen(false); }} />
           <SideItem href="/app#library" icon={<LibraryIcon size={16} />} label="Library" active={mode === "library"} onClick={() => { setMode("library"); setSidebarOpen(false); }} />
@@ -588,17 +595,15 @@ export default function AppPage() {
           <SideItem href="/app#dashboard" icon={<LayoutDashboard size={16} />} label="Dashboard" active={mode === "dashboard"} onClick={() => { setMode("dashboard"); setSidebarOpen(false); }} />
         </nav>
 
-        {/* Spacer pushes footer to bottom — past threads now live in History pane */}
         <div className="flex-1" />
 
-        {/* Footer — who am I + sign out */}
         <div className="mt-auto p-4 border-t border-[var(--line)]">
           <div className="text-xs text-[var(--ink-soft)] truncate" title={user?.email}>
             {user?.name || user?.email || "—"}
           </div>
           <a
             href="/api/logout"
-            className="mt-2 flex items-center gap-2 text-xs text-[var(--ink-soft)] hover:text-[var(--danger)] transition-colors"
+            className="mt-2 flex items-center gap-2 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] transition-colors"
           >
             <LogOut size={13} /> Sign out
           </a>
@@ -722,14 +727,25 @@ export default function AppPage() {
           />
         )}
         {mode === "vault" && <VaultPane />}
-        {mode === "workflows" && <WorkflowsPane />}
+        {mode === "workflows" && (
+          <WorkflowsPane
+            onOpenInEditor={(content, title) => {
+              // Store draft content in sessionStorage for EditorPane to pick up
+              if (typeof window !== "undefined") {
+                window.sessionStorage.setItem("editor_draft_content", content);
+                window.sessionStorage.setItem("editor_draft_title", title);
+              }
+              setMode("editor");
+            }}
+          />
+        )}
         {mode === "court-search" && (
           <CourtSearchPane
             onUseInChat={async (c) => {
               const tid = activeThread || (await newThread());
               if (!tid) return;
               setMode("assistant");
-              const seed = `Use this case as context:\n\n${c.body_md}\n\nNow help me with: `;
+              const seed = `Use this case as context:\n\n${c.body_md}\n\nAnalyze this document and help me with: `;
               setMessages((prev) => [
                 ...prev,
                 { role: "assistant", content: seed },
@@ -772,7 +788,7 @@ export default function AppPage() {
               const tid = activeThread || (await newThread());
               if (!tid) return;
               setMode("assistant");
-              const seed = `Use this ${doc.kind} as context:\n\n**${doc.title}**\n\n${doc.body_md.slice(0, 1200)}…\n\nNow help me with: `;
+              const seed = `Use this ${doc.kind} as context:\n\n**${doc.title}**\n\n${doc.body_md}\n\nAnalyze this document and help me with: `;
               setMessages((prev) => [
                 ...prev,
                 { role: "assistant", content: seed },
@@ -794,6 +810,7 @@ export default function AppPage() {
           />
         )}
         {mode === "templates" && <TemplatesPage />}
+        {mode === "editor" && <EditorPane />}
         {mode === "dashboard" && (
           <DashboardPane
             // "Ask Sanhita" hands the assistant a snapshot of the current
@@ -836,17 +853,17 @@ function SideItem({
     <a
       href={href || "#"}
       onClick={(e) => { e.preventDefault(); onClick(); }}
-      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors text-left ${
+      className={`flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm transition-colors text-left ${
         active
-          ? "bg-[var(--highlight)] text-[var(--ink)]"
-          : "text-[var(--ink-soft)] hover:bg-[var(--bg-elev)] hover:text-[var(--ink)]"
+          ? "bg-[var(--highlight)] text-[var(--ink)] font-medium"
+          : "text-[var(--ink-soft)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
       }`}
       aria-current={active ? "page" : undefined}
     >
-      <span className="text-[var(--accent)]">{icon}</span>
+      <span className={active ? "text-[var(--accent)]" : "text-[var(--ink-soft)]"}>{icon}</span>
       <span className="flex-1">{label}</span>
       {badge !== undefined && badge > 0 && (
-        <span className="text-[10px] tracking-wide bg-[var(--accent)] text-[var(--bg)] rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-mono">
+        <span className="text-[10px] rounded-full px-1.5 py-0.5 min-w-[18px] text-center font-mono bg-[var(--accent)] text-white">
           {badge > 99 ? "99+" : badge}
         </span>
       )}
@@ -876,6 +893,8 @@ function modeTitle(mode: Mode): string {
       return "Dashboard";
     case "templates":
       return "Templates";
+    case "editor":
+      return "Draft Editor";
     default:
       return "Sanhita";
   }
@@ -1069,7 +1088,7 @@ function ChatBubble({ m, onPickFollowup }: { m: Message; onPickFollowup?: (q: st
   if (m.role === "user") {
     return (
       <div className="self-end max-w-[88%] sm:max-w-[80%]">
-        <div className="bg-[var(--ink)] text-[var(--bg)] rounded-2xl rounded-br-sm px-4 sm:px-5 py-2.5 sm:py-3 leading-relaxed whitespace-pre-wrap break-words">
+        <div className="bg-[var(--accent)] text-white rounded-2xl rounded-br-sm px-4 sm:px-5 py-2.5 sm:py-3 leading-relaxed whitespace-pre-wrap break-words">
           {m.content}
         </div>
       </div>
@@ -1337,37 +1356,110 @@ function TraceBreadcrumbs({ trace }: { trace: TraceStep[] }) {
   );
 }
 
+// Verdict -> colour mapping for the badge chip
+const VERDICT_COLORS: Record<string, string> = {
+  allowed:          "bg-[#e6f4ea] text-[#1e8e3e] border-[#a8d5b5]",
+  granted:          "bg-[#e6f4ea] text-[#1e8e3e] border-[#a8d5b5]",
+  acquitted:        "bg-[#e6f4ea] text-[#1e8e3e] border-[#a8d5b5]",
+  dismissed:        "bg-[#fce8e6] text-[#d93025] border-[#f5a9a3]",
+  rejected:         "bg-[#fce8e6] text-[#d93025] border-[#f5a9a3]",
+  convicted:        "bg-[#fce8e6] text-[#d93025] border-[#f5a9a3]",
+  "partly allowed": "bg-[#fef7e0] text-[#b5770d] border-[#fdd87a]",
+  "partly dismissed":"bg-[#fef7e0] text-[#b5770d] border-[#fdd87a]",
+  disposed:         "bg-[#e8f0fe] text-[#1a73e8] border-[#a8c4f5]",
+  quashed:          "bg-[#f3e8fd] text-[#8430ce] border-[#cfabee]",
+  stayed:           "bg-[#fef7e0] text-[#b5770d] border-[#fdd87a]",
+  remanded:         "bg-[#e8f0fe] text-[#1a73e8] border-[#a8c4f5]",
+};
+
+function verdictColor(v?: string): string {
+  if (!v) return "bg-[var(--bg-elev)] text-[var(--ink-soft)] border-[var(--line)]";
+  const vl = v.toLowerCase();
+  for (const [kw, cls] of Object.entries(VERDICT_COLORS)) {
+    if (vl.includes(kw)) return cls;
+  }
+  return "bg-[var(--bg-elev)] text-[var(--ink-soft)] border-[var(--line)]";
+}
+
 function SourceCard({ c }: { c: Citation }) {
+  const href = c.pdf_url || c.url || null;
+  const tierLabel = c.tier === "SC" ? "Supreme Court" : c.tier === "HC" ? "High Court" : c.tier === "LM" ? "Landmark" : null;
+  const tierStyle = c.tier === "SC"
+    ? "bg-[#fce8e6] text-[#d93025] border-[#f5a9a3]"
+    : c.tier === "LM"
+    ? "bg-[#f3e8fd] text-[#8430ce] border-[#cfabee]"
+    : "bg-[#e8f0fe] text-[#1a73e8] border-[#a8c4f5]";
+
   const body = (
-    <>
-      <div className="flex items-baseline gap-2 mb-1 min-w-0">
-        <span className="font-mono text-[var(--accent)] text-xs shrink-0">[{c.n}]</span>
-        <span className="font-display text-sm leading-tight text-[var(--ink)] line-clamp-2 break-words min-w-0">
-          {c.title}
+    <div className="flex flex-col gap-2 min-w-0">
+      {/* Citation number + tier badge row */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono text-[10px] font-bold bg-[var(--accent)] text-white rounded px-1.5 py-0.5 shrink-0">
+          [{c.n}]
         </span>
+        {tierLabel && (
+          <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${tierStyle}`}>
+            {tierLabel}
+          </span>
+        )}
+        {c.verdict && (
+          <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${verdictColor(c.verdict)}`}>
+            {c.verdict.length > 18 ? c.verdict.slice(0, 18) + "…" : c.verdict}
+          </span>
+        )}
       </div>
-      <div className="text-[11px] text-[var(--ink-soft)] mb-2 break-words">
-        {[c.court, c.year, c.citation].filter(Boolean).join(" · ")}
+
+      {/* Title */}
+      <span className="font-display text-[13px] leading-snug text-[var(--ink)] line-clamp-2 break-words min-w-0 font-medium">
+        {c.title}
+      </span>
+
+      {/* Court · Year · Citation */}
+      <div className="flex flex-col gap-0.5">
+        {(c.court || c.year) && (
+          <span className="text-[11px] text-[var(--ink-soft)] break-words leading-snug">
+            {[c.court, c.year].filter(Boolean).join(" · ")}
+          </span>
+        )}
+        {c.citation && (
+          <span className="font-mono text-[10px] text-[var(--accent)] break-all leading-snug">
+            {c.citation}
+          </span>
+        )}
+        {c.judge && (
+          <span className="text-[10px] text-[var(--ink-soft)] italic truncate">
+            {c.judge}
+          </span>
+        )}
       </div>
+
+      {/* Excerpt */}
       {c.excerpt && (
-        <div className="text-xs text-[var(--ink-soft)] italic line-clamp-4 break-words">
-          “{c.excerpt}”
+        <div className="text-[11px] text-[var(--ink-soft)] italic line-clamp-3 break-words leading-relaxed border-l-2 border-[var(--accent-soft)] pl-2">
+          "{c.excerpt}"
         </div>
       )}
-    </>
+
+      {/* Open judgment link */}
+      {href && (
+        <div className="flex items-center gap-1 text-[10px] text-[var(--accent)] font-medium mt-0.5">
+          <ArrowUpRight size={10} />
+          <span>View judgment</span>
+        </div>
+      )}
+    </div>
   );
+
   return (
     <div
       data-n={c.n}
-      className="source-card bg-[var(--bg)] border border-[var(--line)] hover:border-[var(--accent-soft)] rounded-lg p-3 transition-colors min-w-0 overflow-hidden"
+      className="source-card group bg-[var(--bg)] border border-[var(--line)] hover:border-[var(--accent)] hover:shadow-[0_2px_12px_rgba(120,80,40,0.10)] rounded-xl p-3 transition-all duration-150 min-w-0 overflow-hidden"
     >
-      {c.pdf_url ? (
-        <a href={c.pdf_url} target="_blank" rel="noopener noreferrer" className="block min-w-0">
+      {href ? (
+        <a href={href} target="_blank" rel="noopener noreferrer" className="block min-w-0">
           {body}
         </a>
-      ) : (
-        body
-      )}
+      ) : body}
     </div>
   );
 }

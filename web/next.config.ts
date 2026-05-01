@@ -6,6 +6,11 @@ import type { NextConfig } from "next";
 const BACKEND = process.env.BACKEND_ORIGIN || "http://localhost:8080";
 
 const nextConfig: NextConfig = {
+  turbopack: {
+    // Pin workspace root to this directory so Turbopack doesn't walk up to
+    // the repo root and fail to find node_modules/tailwindcss etc.
+    root: __dirname,
+  },
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${BACKEND}/api/:path*` },
