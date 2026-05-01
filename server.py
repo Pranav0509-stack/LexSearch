@@ -30,6 +30,7 @@ from brief_service import answer_question, serialize_citations
 from validators import input_guards
 import vault_service
 import workflows
+import web_signals
 from fastapi import File, UploadFile, Form
 
 # ── Retrieval layer: FTS5 (primary) or BM25 (legacy fallback) ──────────
@@ -869,6 +870,32 @@ def api_languages():
          "native": v.split("(")[1].rstrip(")") if "(" in v else v}
         for k, v in LANGUAGES.items()
     ]}
+
+
+# ─────────────────────────────────────────────────────────────────────────
+# WEB SIGNALS — live legal news & developments
+# ─────────────────────────────────────────────────────────────────────────
+
+@app.get("/api/news")
+def api_news():
+    """Latest legal news from trusted Indian law sources."""
+    signals = web_signals.fetch_legal_news(max_items=20)
+    return {"signals": [s.to_dict() for s in signals], "sources": web_signals.available_sources()}
+
+
+@app.get("/api/news/search")
+def api_news_search(q: str = Query(default="", description="Search query")):
+    """Search legal news for a specific topic."""
+    if not q.strip():
+        return api_news()
+    signals = web_signals.search_web_signals(q.strip(), max_items=12)
+    return {"query": q, "signals": [s.to_dict() for s in signals]}
+
+
+@app.get("/api/news/sources")
+def api_news_sources():
+    """List available news signal sources."""
+    return {"sources": web_signals.available_sources()}
 
 
 @app.get("/api/analytics/court-efficiency")

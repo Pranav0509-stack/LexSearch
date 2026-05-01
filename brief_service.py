@@ -25,6 +25,7 @@ from typing import Any
 
 from llm import router
 from validators import answer_gates
+import web_signals
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,9 @@ Rules — non-negotiable:
 7. When the question mentions a specific state or city, prioritize cases
    from that jurisdiction in your answer.
 8. Always mention the court, year, and citation of each case you reference.
+9. If NEWS items are provided (tagged [NEWS-n]), you may reference them for
+   recent developments, but ALWAYS prioritize corpus judgments [1]-[10] for
+   legal analysis. News items supplement, never replace, case law citations.
 
 Output plain markdown. No preamble."""
 
@@ -168,11 +172,13 @@ def _citation_payload(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def _build_user_prompt(question: str, context: str, history_block: str, *, rewrite: bool = False) -> str:
+def _build_user_prompt(question: str, context: str, history_block: str, *, rewrite: bool = False, web_context: str = "") -> str:
     parts = []
     if history_block:
         parts.append(f"Prior conversation:\n{history_block}")
     parts.append(f"Retrieved cases (from 31.9M Indian judgment corpus):\n{context}")
+    if web_context:
+        parts.append(web_context)
     parts.append(f"Question: {question}")
     if rewrite:
         parts.append(REWRITE_NUDGE)
@@ -255,7 +261,19 @@ def answer_question(
 
     context = _build_context(hits)
     history_block = _history_for_prompt(history)
-    user_prompt = _build_user_prompt(question, context, history_block)
+
+    # ── Fetch live web signals for current legal developments
+    web_context = ""
+    web_signal_data: list[dict] = []
+    try:
+        web_context = web_signals.get_web_context_for_brief(question, max_signals=4)
+        if web_context:
+            web_signal_data = [s.to_dict() for s in web_signals.search_web_signals(question, max_items=4)]
+            logger.info("web_signals: found %d relevant signals for '%s'", len(web_signal_data), question[:50])
+    except Exception as e:
+        logger.debug("web_signals: failed: %s", e)
+
+    user_prompt = _build_user_prompt(question, context, history_block, web_context=web_context)
 
     # ── First pass — 1200 tokens for comprehensive answers
     try:
@@ -336,6 +354,7 @@ def answer_question(
         "validation": verdict.to_dict(),
         "refused": False,
         "grounding_pct": verdict.grounding_pct,
+        "web_signals": web_signal_data,
     }
 
 

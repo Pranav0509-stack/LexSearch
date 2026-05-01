@@ -1,48 +1,176 @@
-# LexSearch — Indian High Court Judgments
+# Sanhita — India's AI Legal Research Platform
 
-A personal legal research tool to search, read, and download Indian High Court judgments from the public [indian-high-court-judgments](https://github.com/vanga/indian-high-court-judgments) dataset (16.7M+ cases, CC-BY-4.0).
+**31.9M court judgments. 13.6M legal documents. 1.36M legal QA pairs. 2,383 statutes. 44.1M pending cases.**
 
-## Features
+The largest structured Indian legal corpus, searchable in under 50ms.
 
-- **8 Search Filters** — Court, Bench, Year, Case Title/Party, CNR Number, Judge Name, Case Type, Disposal Status
-- **In-Browser PDF Reading** — Read judgments directly in the browser with zoom, page navigation, and keyboard shortcuts
-- **Download** — Save relevant judgments as PDF with one click
-- **25 High Courts** — All Indian High Courts with their benches
-- **No Setup Required** — Pulls data live from public AWS S3, no database or API keys needed
+Built by [NyayaSathi AI](https://github.com/Nyayasathi-AI) — because Indian lawyers deserve better than hallucinated citations.
 
-## Tech Stack
+---
 
-- **Backend:** Python, FastAPI, Pandas, PyArrow, s3fs
-- **Frontend:** Vanilla HTML/CSS/JS, PDF.js
-- **Data:** AWS S3 public bucket (`indian-high-court-judgments`)
+## Why Sanhita Exists
 
-## Run Locally
+| | GPT-4 / Claude | Harvey AI | **Sanhita** |
+|---|---|---|---|
+| Indian case law | ~0 (hallucinates) | US/UK only | **31.9M real judgments** |
+| Structured metadata | None | Limited | **CNR, judge, bench, court, petitioner, respondent, verdict, PDF** |
+| Verified citations | No | Yes (US) | **Every citation links to a real judgment** |
+| NJDG pending cases | No | No | **44.1M records across 30 states** |
+| Indian statutes | Training data | US/UK | **2,383 indexed bare acts** |
+| Languages | English | English | **13 Indian languages** |
+| Price | $20-200/mo | $2,000/user/mo | **Free tier + Pro** |
+
+## Architecture
+
+```
+Sanhita Platform
+├── FastAPI Backend (53 API routes)
+│   ├── /api/cases/search — FTS5 BM25 search across 31.9M records (<50ms)
+│   ├── /api/brief/chat — RAG: FTS5 retrieval → LLM → 6-gate validator
+│   ├── /api/news — live legal news from 5 Indian law sources
+│   ├── /api/analytics/* — court efficiency, bail intelligence, corpus stats
+│   ├── /api/vault/* — document upload + multi-doc Q&A
+│   ├── /api/draft — legal document drafting (10 templates)
+│   └── /health — instant health check
+├── React Frontend (Next.js)
+│   ├── Sanhita Brief — AI assistant with citation cards
+│   ├── Court Search — advanced filters across 25 High Courts
+│   ├── Dashboard — corpus analytics & court efficiency
+│   ├── Document Vault — upload & query your case files
+│   └── Draft Generator — legal document templates
+├── LLM Router (4-provider chain with circuit breakers)
+│   ├── Anthropic Claude → Groq Llama 70B → Gemini → Cloudflare
+│   └── No-LLM fallback: returns structured case results (never refuses)
+├── 6-Gate Answer Validator
+│   ├── G1: cite_present — answer has [n] markers
+│   ├── G2: cite_resolves — markers map to real cases
+│   ├── G3: no_banned_phrases — no hallucination hedges
+│   ├── G4: grounding_floor — 60%+ sentences cited
+│   ├── G5: scope_check — no fabricated case names
+│   └── G6: section_check — statute refs verified
+└── SQLite FTS5 Database (84.7 GB)
+    ├── judgments (16.9M) — all 25 High Courts, 1950-2025
+    ├── legal_docs (13.6M) — KanoonGPT HC judgments
+    ├── legal_qa (1.36M) — question-answer pairs
+    ├── statutes (2,383) — IPC, CrPC, CPC, BNS, BNSS, BSA
+    └── njdg_* (44.1M) — pending case records
+```
+
+## Quick Start
 
 ```bash
+# 1. Clone
+git clone https://github.com/Nyayasathi-AI/Nyayasathi_main.git
+cd Nyayasathi_main
+
+# 2. Install
 pip install -r requirements.txt
+
+# 3. Symlink the database (from data_main repo)
+ln -s ../india-judgments-corpus/india_courts.db india_courts.db
+
+# 4. Run
 uvicorn server:app --reload --port 8080
 ```
 
-Open [http://localhost:8080](http://localhost:8080).
+Open [http://localhost:8080](http://localhost:8080). Login with demo code: `SNHT-DEMO-2026`
 
-The frontend calls the API at the same origin (relative paths like `/search`,
-`/pdf/…`), so nothing else needs configuring in dev. In production
-(`render.yaml`) the same pattern applies — the FastAPI app serves both the
-static files and the JSON endpoints.
+### Optional: Configure LLM for AI-composed answers
 
-## Deploy on Render (Free)
+```bash
+# Any ONE of these enables the Brief assistant's AI mode:
+export GROQ_API_KEY=gsk_...        # Free — https://console.groq.com/keys
+export GEMINI_API_KEY=AI...        # Free — https://aistudio.google.com/apikey
+export ANTHROPIC_API_KEY=sk-ant-...# Paid — best quality
+```
 
-1. Fork this repo
-2. Go to [render.com](https://render.com) → New → Blueprint
-3. Connect the repo — `render.yaml` handles the rest
+Without an LLM key, the assistant still returns structured case results from the 31.9M corpus — no refusals, 100% grounded.
 
-## Dataset Limitations
+## Key Features
 
-- Covers **High Courts only** — no Supreme Court, District Courts, or Tribunals
-- Updated **quarterly** from eCourts portal (not real-time)
-- Some older PDFs are scanned images — text search may not work on them
+### Sanhita Brief (AI Assistant)
+- Ask any Indian law question in natural language
+- Gets 10 relevant cases from 31.9M corpus via FTS5 BM25
+- LLM composes answer with mandatory [n] citations
+- 6-gate validator ensures every claim is grounded
+- Live web signals from Bar & Bench, LiveLaw, SC Observer, PRS India
+- 13 Indian languages: Hindi, Tamil, Telugu, Kannada, Malayalam, Marathi, Bengali, Gujarati, Punjabi, Odia, Assamese, Urdu
 
-## Data Source
+### Court Search
+- Search across 25 High Courts + Supreme Court
+- Filter by court, year, judge, case type, verdict, CNR
+- PDF viewer with in-browser reading
+- Related cases via citation graph
 
-[vanga/indian-high-court-judgments](https://github.com/vanga/indian-high-court-judgments) · [openjustice-in](https://github.com/openjustice-in)
+### Analytics Dashboard
+- Court efficiency metrics (disposal rates, avg time)
+- Bail intelligence (grant/rejection rates by court)
+- Corpus statistics (cases by year, court, verdict)
+- Document type distribution
 
+### Document Vault
+- Upload case files (PDF, DOCX)
+- Multi-document Q&A with grounded citations
+
+### Draft Generator
+- 10 legal document templates (bail applications, writ petitions, etc.)
+- Auto-fills with case citations from corpus
+
+## API Endpoints (53 routes)
+
+| Category | Endpoint | Description |
+|---|---|---|
+| Search | `GET /api/cases/search?q=...&court=...&year_from=...` | FTS5 search with filters |
+| Search | `GET /api/cases/latest` | Newest judgments |
+| Search | `GET /api/cases/{case_id}` | Single case detail |
+| Search | `GET /api/cases/related/{case_id}` | Citation graph — related cases |
+| Chat | `POST /api/brief/chat` | RAG: retrieve + compose + validate |
+| Chat | `GET /api/brief/threads` | List chat threads |
+| News | `GET /api/news` | Latest legal news (5 sources) |
+| News | `GET /api/news/search?q=...` | Search legal news |
+| Analytics | `GET /api/analytics/corpus-stats` | Corpus-wide statistics |
+| Analytics | `GET /api/analytics/court-efficiency` | Court disposal metrics |
+| Analytics | `GET /api/analytics/bail-intelligence` | Bail grant/rejection rates |
+| Vault | `POST /api/vault/upload` | Upload documents |
+| Vault | `POST /api/vault/ask` | Q&A over uploaded docs |
+| Draft | `POST /api/draft` | Generate legal documents |
+| Templates | `GET /api/templates` | List draft templates |
+| Auth | `POST /api/login` | Session login |
+| Health | `GET /health` | Server health + index stats |
+
+## Environment Variables
+
+See [`.env.example`](.env.example) for full list. Key variables:
+
+| Variable | Required | Description |
+|---|---|---|
+| `INDIA_COURTS_DB` | No | Path to SQLite DB (auto-detected) |
+| `GROQ_API_KEY` | No | Groq API key (free, primary LLM) |
+| `GEMINI_API_KEY` | No | Gemini API key (fallback LLM) |
+| `ANTHROPIC_API_KEY` | No | Claude API key (best quality) |
+| `LEXSEARCH_SECRET_KEY` | Prod | Session cookie signing key |
+| `LEXSEARCH_ADMIN_TOKEN` | Prod | Admin reload endpoint token |
+
+## Data Sources
+
+- [indian-high-court-judgments](https://github.com/vanga/indian-high-court-judgments) (CC-BY-4.0) — 16.9M HC judgments
+- [KanoonGPT](https://huggingface.co/datasets/Exploration-Lab/KanoonGPT) — 13.6M legal documents
+- [Indian Legal QA](https://huggingface.co/) — 1.36M question-answer pairs
+- [NJDG](https://njdg.ecourts.gov.in/) — 44.1M pending case records
+- Live feeds: Bar & Bench, LiveLaw, Supreme Court Observer, PRS India
+
+## Repos
+
+| Repo | Purpose |
+|---|---|
+| [Nyayasathi_main](https://github.com/Nyayasathi-AI/Nyayasathi_main) | Backend + Frontend (this repo) |
+| [data_main](https://github.com/Nyayasathi-AI/data_main) | Data pipeline, ingestors, SQLite DB scripts |
+| [plan_main](https://github.com/Nyayasathi-AI/plan_main) | Product roadmap, architecture plans |
+
+## License
+
+Proprietary. Data sources are individually licensed (see above).
+
+---
+
+Built by [Pranav](https://github.com/Pranav0509-stack) at [NyayaSathi AI](https://github.com/Nyayasathi-AI)
