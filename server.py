@@ -27,7 +27,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 # Phase 2 — auth + Brief assistant. Both modules degrade gracefully when
 # optional deps (google-generativeai) aren't installed.
 import auth
-from brief_service import answer_question, serialize_citations, generate_followups
+from brief_service import answer_question, answer_conversational, _needs_case_retrieval, serialize_citations, generate_followups
 from validators import input_guards
 import vault_service
 import workflows
@@ -1283,6 +1283,21 @@ def api_editor_insert_citation(
     return {"citation": citation_str}
 
 
+@app.get("/api/editor/clauses")
+def api_editor_clauses():
+    """List all ready-made legal clauses for quick insertion."""
+    return {"clauses": doc_editor.list_legal_clauses()}
+
+
+@app.get("/api/editor/clauses/{clause_id}")
+def api_editor_clause(clause_id: str):
+    """Get a specific legal clause by ID."""
+    clause = doc_editor.get_legal_clause(clause_id)
+    if not clause:
+        raise HTTPException(404, "Clause not found")
+    return clause
+
+
 @app.get("/api/analytics/court-efficiency")
 def api_court_efficiency(ls_session: Optional[str] = Cookie(default=None)):
     """Court efficiency: avg days to dispose, disposal rate per court."""
@@ -1546,7 +1561,7 @@ def api_get_thread(
 
 class ChatBody(BaseModel):
     thread_id: int = Field(..., ge=1)
-    question: str = Field(..., min_length=2, max_length=2000)
+    question: str = Field(..., min_length=2, max_length=4000)
     lang: str = Field(default="en", max_length=5)
     language: Optional[str] = Field(default=None, max_length=5)  # frontend sends this
     jurisdiction: Optional[str] = None
@@ -1592,32 +1607,42 @@ def api_brief_chat(
         })
 
     safe_question = guard.redacted_question or body.question
-
-    # Retrieve grounding hits — FTS5 (primary) or BM25 (legacy).
-    # Get up to 10 hits for better grounding coverage.
-    hits: list[dict] = []
-    idx = _ensure_bm25()
-    if idx is not None:
-        try:
-            if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
-                # FTS5 adapter returns Sanhita-compatible dicts directly
-                hits = idx.search(safe_question, limit=12)
-                logger.info("FTS5 retrieve for '%s': %d hits", safe_question[:50], len(hits))
-            else:
-                # Legacy BM25 path
-                results = idx.query(safe_question, k=10, tier=None)
-                hits = [doc_to_retrieve_hit(d, s, safe_question) for d, s in results]  # type: ignore[misc]
-        except Exception as e:
-            logger.warning("Retrieval failed in /api/brief/chat: %s", e)
-
-    # Compose the grounded answer (LLM or fallback).
     lang = body.language or body.lang or "en"
-    result = answer_question(safe_question, hits, history or [], lang=lang)
+
+    # ── Smart routing: only retrieve cases if the user is actually asking
+    # for case search / legal research. Conversational queries (greetings,
+    # general questions) get a direct LLM response without corpus search.
+    if _needs_case_retrieval(safe_question):
+        # Retrieve grounding hits — FTS5 (primary) or BM25 (legacy).
+        hits: list[dict] = []
+        idx = _ensure_bm25()
+        if idx is not None:
+            try:
+                if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+                    hits = idx.search(safe_question, limit=12)
+                    logger.info("FTS5 retrieve for '%s': %d hits", safe_question[:50], len(hits))
+                else:
+                    results = idx.query(safe_question, k=10, tier=None)
+                    hits = [doc_to_retrieve_hit(d, s, safe_question) for d, s in results]  # type: ignore[misc]
+            except Exception as e:
+                logger.warning("Retrieval failed in /api/brief/chat: %s", e)
+
+        result = answer_question(safe_question, hits, history or [], lang=lang)
+
+        # If retrieval returned zero hits, fall back to conversational mode
+        # so the user at least gets a helpful response instead of "no results"
+        if not hits:
+            logger.info("No retrieval hits — falling back to conversational for: '%s'", safe_question[:80])
+            result = answer_conversational(safe_question, history or [], lang=lang)
+    else:
+        # Conversational — no retrieval, direct LLM response
+        logger.info("Conversational mode for: '%s'", safe_question[:80])
+        result = answer_conversational(safe_question, history or [], lang=lang)
+
     if guard.notes:
         result["guard"] = guard.to_dict()
 
-    # Persist user + assistant turns. Store the REDACTED question — never
-    # write Aadhaar/PAN/etc. to the DB.
+    # Persist user + assistant turns.
     auth.append_message(body.thread_id, "user", safe_question, None)
     auth.append_message(
         body.thread_id,
@@ -1627,6 +1652,129 @@ def api_brief_chat(
     )
 
     return JSONResponse(result)
+
+
+# ── brief mode aliases ──────────────────────────────────────────────────
+# The frontend routes to different endpoints based on the active mode
+# (Search / Agent / Canvas). All currently share the same BM25 retrieval
+# pipeline. When we add real web-search or agentic loops, these stubs
+# become their own implementations.
+
+@app.post("/api/brief/web")
+def api_brief_web(
+    body: ChatBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Web-search mode — fetches from DuckDuckGo + RSS + BM25 corpus."""
+    import web_signals as ws
+
+    user = _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("chat", ip, max_hits=30, window_s=60):
+        raise HTTPException(429, "You're asking very quickly. Breathe.")
+
+    history = auth.get_thread_messages(body.thread_id, user["id"])
+    if history is None:
+        raise HTTPException(404, "Thread not found.")
+
+    guard = input_guards.check(body.question, history_len=len(history or []))
+    if not guard.allow:
+        auth.append_message(body.thread_id, "user", body.question, None)
+        auth.append_message(body.thread_id, "assistant", guard.refusal_message, serialize_citations([]))
+        return JSONResponse({
+            "answer_markdown": guard.refusal_message,
+            "citations": [], "web_citations": [],
+            "llm": {"provider": "guard", "model": "input_guards", "latency_ms": 0, "fallback_chain": []},
+            "refused": True, "guard": guard.to_dict(),
+        })
+
+    safe_question = guard.redacted_question or body.question
+
+    # 1. Web search: DuckDuckGo + RSS feeds
+    web_results: list[dict] = []
+    try:
+        ddg = ws.search_duckduckgo(safe_question, max_results=6)
+        rss = ws.search_web_signals(safe_question, max_items=4)
+        all_web = ddg + rss
+        # Deduplicate by URL
+        seen_urls: set[str] = set()
+        for s in all_web:
+            if s.url not in seen_urls:
+                seen_urls.add(s.url)
+                web_results.append(s.to_dict())
+        logger.info("web search: %d DDG + %d RSS = %d unique for '%s'",
+                     len(ddg), len(rss), len(web_results), safe_question[:50])
+    except Exception as e:
+        logger.warning("web search failed: %s", e)
+
+    # 2. BM25 corpus search (still ground with real cases)
+    hits: list[dict] = []
+    idx = _ensure_bm25()
+    if idx is not None:
+        try:
+            if _FTS5_AVAILABLE and isinstance(idx, FTS5Index):
+                hits = idx.search(safe_question, limit=8)
+            else:
+                results = idx.query(safe_question, k=8, tier=None)
+                hits = [doc_to_retrieve_hit(d, s, safe_question) for d, s in results]
+        except Exception as e:
+            logger.warning("BM25 retrieval failed in /api/brief/web: %s", e)
+
+    # 3. Build combined answer
+    lang = body.language or body.lang or "en"
+    result = answer_question(safe_question, hits, history or [], lang=lang)
+
+    # Add web citations to the result
+    result["web_citations"] = web_results[:10]
+
+    # Build a web-context summary for the no-LLM case
+    if not result.get("answer_markdown") or "no LLM provider" in result.get("answer_markdown", "").lower():
+        # Enhance no-LLM response with web results
+        web_md_parts = []
+        if web_results:
+            web_md_parts.append("\n\n---\n\n## 🌐 Web Results\n")
+            for i, wr in enumerate(web_results[:8], 1):
+                web_md_parts.append(
+                    f"**[{i}] [{wr['title']}]({wr['url']})**\n"
+                    f"*{wr.get('source_name', 'Web')}*"
+                    f"{(' · ' + wr['date']) if wr.get('date') else ''}\n\n"
+                    f"{wr.get('excerpt', '')[:200]}\n"
+                )
+        if web_md_parts:
+            result["answer_markdown"] = result.get("answer_markdown", "") + "".join(web_md_parts)
+
+    if guard.notes:
+        result["guard"] = guard.to_dict()
+
+    auth.append_message(body.thread_id, "user", safe_question, None)
+    auth.append_message(
+        body.thread_id, "assistant",
+        result["answer_markdown"],
+        serialize_citations(result.get("citations") or []),
+    )
+
+    return JSONResponse(result)
+
+
+@app.post("/api/brief/agent")
+def api_brief_agent(
+    body: ChatBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Agent mode — currently aliases to BM25 corpus search."""
+    return api_brief_chat(body, request, ls_session)
+
+
+@app.post("/api/brief/draft")
+def api_brief_draft(
+    body: ChatBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Canvas/draft mode — currently aliases to BM25 corpus search."""
+    return api_brief_chat(body, request, ls_session)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -1679,7 +1827,7 @@ def api_vault_delete(doc_id: int, ls_session: Optional[str] = Cookie(default=Non
 
 
 class VaultChatBody(BaseModel):
-    question: str = Field(..., min_length=2, max_length=2000)
+    question: str = Field(..., min_length=2, max_length=4000)
     doc_ids: Optional[list[int]] = None  # None = all docs
 
 
@@ -1709,6 +1857,69 @@ def api_vault_chat(
     hits = vault_service.rank_chunks(guard.redacted_question, chunks, k=8)
     result = vault_service.answer_over_vault(guard.redacted_question, hits, [])
     return JSONResponse(result)
+
+
+class VaultAnalyseBody(BaseModel):
+    doc_id: int
+    language: Optional[str] = None
+
+
+@app.post("/api/vault/analyse")
+def api_vault_analyse(
+    body: VaultAnalyseBody,
+    request: Request,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """One-click structured document analysis: parties, dates, obligations, risks."""
+    user = _require_user(ls_session)
+    ip = _client_ip(request)
+    if not auth.rate_limit("vault_analyse", ip, max_hits=10, window_s=60):
+        raise HTTPException(429, "Too many analysis requests.")
+
+    chunks = auth.vault_load_chunks(user["id"], [body.doc_id])
+    if not chunks:
+        raise HTTPException(404, "Document not found or empty.")
+
+    # Build full text from chunks
+    full_text = "\n\n".join(c.get("text", "") for c in chunks[:20])[:8000]
+
+    lang_name = ""
+    if body.language and body.language != "en":
+        from brief_service import LANGUAGES
+        lang_name = LANGUAGES.get(body.language, "")
+
+    system = """You are a legal document analyst. Analyze the document and provide a structured breakdown:
+
+## Parties
+- List all parties mentioned with their roles
+
+## Key Dates & Timelines
+- All important dates, deadlines, limitation periods
+
+## Obligations & Commitments
+- What each party is required to do
+
+## Risks & Red Flags
+- Potential legal risks, unfavorable clauses, missing provisions
+
+## Governing Law & Jurisdiction
+- Applicable law, jurisdiction, arbitration clause if any
+
+## Recommended Next Steps
+- What the advocate should do next
+
+Be precise and practical. Use Indian legal terminology."""
+
+    if lang_name:
+        system += f"\n\nRespond in {lang_name}."
+
+    try:
+        from llm import router as llm_router
+        resp = llm_router.generate(system, f"Analyze this document:\n\n{full_text}", temperature=0.2, max_tokens=1500)
+        return JSONResponse({"analysis_markdown": resp.text})
+    except Exception as e:
+        logger.error("vault analyse failed: %s", e)
+        raise HTTPException(500, f"Analysis failed: {str(e)[:100]}")
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -1864,6 +2075,33 @@ def api_workflows_run(
         return workflows.run_generic(body.key, body.text)
     except ValueError as e:
         raise HTTPException(400, str(e))
+
+
+# ── stub endpoints for frontend compatibility ────────────────────────────
+
+@app.get("/api/connectors")
+def api_connectors():
+    """Return connector availability — India-only, always available."""
+    return {"connectors": {"india_courts": True}}
+
+
+@app.get("/api/clients")
+def api_clients(
+    status: Optional[str] = Query(default=None),
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """NyayaSathi client queue — stub for now."""
+    _require_user(ls_session)
+    return {"clients": [], "total": 0}
+
+
+@app.post("/api/google/docs/create")
+def api_google_docs_create(
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Google Docs export — not yet implemented."""
+    _require_user(ls_session)
+    raise HTTPException(501, "Google Docs export coming soon.")
 
 
 # ── admin endpoints (bearer-token auth) ───────────────────────────────────

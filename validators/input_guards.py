@@ -23,8 +23,8 @@ import re
 from dataclasses import dataclass, field
 from typing import Optional
 
-MAX_QUESTION_CHARS = 2000
-MIN_QUESTION_CHARS = 4
+MAX_QUESTION_CHARS = 4000
+MIN_QUESTION_CHARS = 2
 
 # ── Prompt-injection patterns (case-insensitive). Curated, not a kitchen sink.
 INJECTION_PATTERNS = [
@@ -172,8 +172,9 @@ def _redact_pii(text: str) -> tuple[str, list[str]]:
 
 
 def _is_followup(text: str, history_len: int) -> bool:
-    # Short ("expand on [2]", "what about Delhi?") in an existing thread
-    return history_len > 0 and len(text.split()) <= 12
+    # Any message in an existing thread is treated as a follow-up
+    # (lawyers naturally pivot topics within a research session)
+    return history_len > 0
 
 
 def check(question: str, history_len: int = 0) -> GuardVerdict:
@@ -203,11 +204,32 @@ def check(question: str, history_len: int = 0) -> GuardVerdict:
             reason=f"injection:{m.group(0)[:40]}",
         )
 
-    # G_SCOPE — allow follow-ups in an existing thread without re-checking
-    if not _is_followup(q, history_len) and not LEGAL_RE.search(q):
+    # G_SCOPE — very permissive: allow greetings, general questions, follow-ups,
+    # and all non-Latin scripts (Hindi, Tamil, Telugu, etc. — if someone is
+    # writing in an Indian language, it's almost certainly a legal query).
+    is_conversational = bool(re.search(
+        r"\b(?:hi|hello|hey|thanks|thank you|good|help|tell|explain|what|how|why|who|when|where|please|can you|could you|show|list|give|summarize|compare|analyze|draft|review|translate)\b",
+        q, re.IGNORECASE
+    ))
+    # Detect non-Latin scripts (Devanagari, Tamil, Telugu, Kannada, Malayalam,
+    # Bengali, Gujarati, Gurmukhi, Odia, Arabic/Urdu)
+    has_indic_script = bool(re.search(
+        r"[ऀ-ॿ"    # Devanagari (Hindi, Marathi)
+        r"ঀ-৿"     # Bengali, Assamese
+        r"਀-੿"     # Gurmukhi (Punjabi)
+        r"઀-૿"     # Gujarati
+        r"଀-୿"     # Odia
+        r"஀-௿"     # Tamil
+        r"ఀ-౿"     # Telugu
+        r"ಀ-೿"     # Kannada
+        r"ഀ-ൿ"     # Malayalam
+        r"؀-ۿ]",   # Arabic/Urdu
+        q
+    ))
+    if not _is_followup(q, history_len) and not LEGAL_RE.search(q) and not is_conversational and not has_indic_script:
         return GuardVerdict(
             allow=False,
-            refusal_message="Sanhita is for Indian legal research. Try a question about a statute, a section, a judgment, a court process, or a fact pattern under Indian law.",
+            refusal_message="I'm Sanhita, your Indian legal research assistant. Ask me about any statute, case law, court process, or legal question under Indian law.",
             reason="off_scope",
         )
 

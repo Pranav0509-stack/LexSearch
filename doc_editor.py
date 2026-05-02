@@ -535,3 +535,139 @@ def list_doc_types() -> list[dict[str, Any]]:
 def get_template(doc_type: str) -> str:
     """Return the template for a document type."""
     return DOC_TYPES.get(doc_type, {}).get("template", "")
+
+
+# ── Legal Clause Library ──────────────────────────────────────────────────
+# Ready-made clauses that lawyers insert frequently. Google Docs/Word have
+# no equivalent — lawyers copy-paste from old files. This is the killer feature.
+
+LEGAL_CLAUSES = {
+    "prayer_general": {
+        "category": "Prayer",
+        "label": "General Prayer Clause",
+        "text": "It is, therefore, most respectfully prayed that this Hon'ble Court may be pleased to:\n\n(a) [Primary relief sought];\n(b) [Alternative relief];\n(c) Pass such other and further order(s) as this Hon'ble Court may deem fit and proper in the facts and circumstances of the case.\n\nAnd for this act of kindness the petitioner/applicant shall ever pray.",
+    },
+    "prayer_bail": {
+        "category": "Prayer",
+        "label": "Bail Prayer",
+        "text": "It is, therefore, most respectfully prayed that this Hon'ble Court may be pleased to:\n\n(a) Enlarge the applicant on bail in connection with Case/FIR No. [NUMBER] registered at P.S. [POLICE STATION];\n(b) Impose such conditions as this Hon'ble Court may deem fit;\n(c) Pass any other order(s) in the interest of justice.\n\nAnd for this act of kindness the applicant shall ever pray.",
+    },
+    "prayer_writ": {
+        "category": "Prayer",
+        "label": "Writ Petition Prayer",
+        "text": "It is, therefore, most respectfully prayed that this Hon'ble Court may be pleased to:\n\n(a) Issue a Writ of [Mandamus/Certiorari/Quo Warranto/Prohibition/Habeas Corpus];\n(b) Declare the impugned order/action dated [DATE] as null and void, being violative of Article [ARTICLE] of the Constitution;\n(c) Grant interim relief by way of stay of the impugned order;\n(d) Award costs of this petition;\n(e) Pass such other order(s) as this Hon'ble Court may deem fit and proper.",
+    },
+    "undertaking_bail": {
+        "category": "Undertaking",
+        "label": "Bail Undertaking",
+        "text": "The applicant hereby undertakes:\n\n(i) To cooperate with the investigation and appear before the Investigating Officer as and when required;\n(ii) Not to tamper with evidence or influence/threaten witnesses;\n(iii) Not to leave the jurisdiction of this Hon'ble Court without prior permission;\n(iv) To furnish bail bonds/surety as directed by this Hon'ble Court;\n(v) To mark attendance at the concerned police station as per the directions of this Hon'ble Court.",
+    },
+    "verification": {
+        "category": "Verification",
+        "label": "Standard Verification",
+        "text": "VERIFICATION\n\nI, [NAME], [S/o/D/o/W/o] [FATHER/HUSBAND NAME], aged [AGE] years, [OCCUPATION], resident of [ADDRESS], do hereby verify that the contents of the above [DOCUMENT TYPE] are true and correct to the best of my knowledge and belief.\n\nVerified at [PLACE] on this [DAY] day of [MONTH], [YEAR].\n\n\nDEPONENT",
+    },
+    "affidavit_header": {
+        "category": "Affidavit",
+        "label": "Affidavit Opening",
+        "text": "AFFIDAVIT\n\nI, [NAME], [S/o/D/o/W/o] [FATHER/HUSBAND NAME], aged about [AGE] years, [OCCUPATION], resident of [FULL ADDRESS], do hereby solemnly affirm and state on oath as under:\n\n1. That I am the [deponent/applicant/respondent] in the above matter and am fully conversant with the facts and circumstances of the case.\n\n2. That the statements made herein are true to my knowledge and belief and nothing material has been concealed.",
+    },
+    "non_joinder": {
+        "category": "Legal Clause",
+        "label": "Non-Joinder of Necessary Party",
+        "text": "It is submitted that no necessary party has been left unimpleaded. All persons who are necessary and proper parties to the present proceedings have been made parties hereto. The non-joinder of any party, if any, does not affect the merits of the case.",
+    },
+    "limitation_clause": {
+        "category": "Legal Clause",
+        "label": "Limitation Period Compliance",
+        "text": "The present [petition/application/suit] is within the period of limitation prescribed under [Section/Article] of the Limitation Act, 1963. The cause of action arose on [DATE] and the present proceedings have been filed within [PERIOD] therefrom. No part of the cause of action is barred by limitation.",
+    },
+    "cause_of_action": {
+        "category": "Legal Clause",
+        "label": "Cause of Action",
+        "text": "CAUSE OF ACTION:\n\nThe cause of action for filing the present [petition/suit/application] arose on [DATE] when [EVENT], and continues to subsist. The cause of action arose within the territorial jurisdiction of this Hon'ble Court as [REASON FOR JURISDICTION].",
+    },
+    "jurisdiction_clause": {
+        "category": "Legal Clause",
+        "label": "Territorial Jurisdiction",
+        "text": "JURISDICTION:\n\nThis Hon'ble Court has territorial jurisdiction to entertain and try the present [suit/petition/application] as the cause of action has arisen within the jurisdiction of this Hon'ble Court, the [defendant/respondent] resides/carries on business within the jurisdiction, and the subject matter of the dispute is situated within the jurisdiction of this Hon'ble Court.",
+    },
+    "no_other_remedy": {
+        "category": "Legal Clause",
+        "label": "No Other Remedy Available",
+        "text": "The [petitioner/applicant] submits that no other equally efficacious alternative remedy is available except to approach this Hon'ble Court under [Article/Section]. The petitioner has no other adequate remedy in the ordinary course of law.",
+    },
+    "interim_relief": {
+        "category": "Legal Clause",
+        "label": "Interim Relief / Stay",
+        "text": "APPLICATION FOR INTERIM RELIEF / STAY:\n\nPending the hearing and final disposal of this [petition/suit], it is prayed that this Hon'ble Court may be pleased to:\n\n(a) Stay the operation/implementation of the impugned order dated [DATE];\n(b) Direct the respondent(s) to maintain status quo;\n(c) Pass such interim order(s) as this Hon'ble Court may deem fit.\n\nGROUNDS FOR INTERIM RELIEF:\n(i) Prima facie case exists in favour of the applicant;\n(ii) Irreparable injury will be caused if interim relief is not granted;\n(iii) Balance of convenience lies in favour of the applicant.",
+    },
+    "res_judicata": {
+        "category": "Legal Clause",
+        "label": "Res Judicata / No Previous Filing",
+        "text": "The [petitioner/applicant] states that no previous petition or application has been filed by the petitioner before this Hon'ble Court or any other Court of competent jurisdiction on the same cause of action. The matter is not barred by the principles of res judicata or constructive res judicata.",
+    },
+    "vakalatnama_text": {
+        "category": "Format",
+        "label": "Vakalatnama",
+        "text": "VAKALATNAMA\n\nI/We [CLIENT NAME], [S/o/D/o/W/o] [PARENT NAME], resident of [ADDRESS], do hereby appoint and authorize [ADVOCATE NAME], Advocate, bearing Enrollment No. [BAR COUNCIL NO.], to appear, plead and act on my/our behalf in [CASE DESCRIPTION] before [COURT NAME] and to do all acts, deeds and things as may be necessary in connection with the above matter.\n\nI/We agree to ratify all acts done by the said Advocate.\n\nDated: [DATE]\nPlace: [PLACE]\n\n\n[Signature of Client]\n[Name of Client]\n\nAccepted:\n[Signature of Advocate]\n[Name of Advocate]\nEnrollment No.: [NUMBER]",
+    },
+    "memo_of_parties": {
+        "category": "Format",
+        "label": "Memorandum of Parties",
+        "text": "MEMORANDUM OF PARTIES\n\n1. [NAME], [S/o/D/o/W/o] [PARENT],\n   Aged [AGE] years, [OCCUPATION],\n   R/o [ADDRESS]\n   ... Petitioner/Plaintiff No. 1\n\nVERSUS\n\n1. [NAME], [DESIGNATION/OCCUPATION],\n   [OFFICE ADDRESS]\n   ... Respondent/Defendant No. 1\n\n2. [NAME], [DESIGNATION/OCCUPATION],\n   [OFFICE ADDRESS]\n   ... Respondent/Defendant No. 2",
+    },
+    "court_fee_valuation": {
+        "category": "Format",
+        "label": "Court Fee & Valuation",
+        "text": "COURT FEE AND VALUATION:\n\nThe present suit/petition is valued at Rs. [AMOUNT]/- for the purpose of court fee and jurisdiction.\n\nCourt fee of Rs. [FEE AMOUNT]/- has been affixed on the plaint/petition as per the provisions of the Court Fees Act, 1870 / [STATE] Court Fees Act.",
+    },
+}
+
+
+def list_legal_clauses() -> list[dict[str, str]]:
+    """Return all legal clauses grouped by category."""
+    return [
+        {"id": k, "category": v["category"], "label": v["label"]}
+        for k, v in LEGAL_CLAUSES.items()
+    ]
+
+
+def get_legal_clause(clause_id: str) -> dict[str, str] | None:
+    """Return a specific clause by ID."""
+    c = LEGAL_CLAUSES.get(clause_id)
+    if not c:
+        return None
+    return {"id": clause_id, **c}
+
+
+def ai_generate_cause_title(
+    case_type: str, petitioner: str, respondent: str,
+    court: str, case_no: str = "", year: str = ""
+) -> str:
+    """Generate a properly formatted cause title for Indian courts."""
+    year_str = year or "[YEAR]"
+    case_no_str = case_no or "_____ of " + year_str
+
+    if "criminal" in case_type.lower() or "bail" in case_type.lower():
+        prefix = "CRIMINAL MISC. APPLICATION NO."
+    elif "writ" in case_type.lower():
+        prefix = "WRIT PETITION (CIVIL) NO."
+    elif "appeal" in case_type.lower():
+        prefix = "CIVIL/CRIMINAL APPEAL NO."
+    else:
+        prefix = "CIVIL SUIT NO."
+
+    return f"""IN THE HON'BLE {court.upper()}
+
+{prefix} {case_no_str}
+
+IN THE MATTER OF:
+
+{petitioner}
+... Petitioner/Applicant
+
+VERSUS
+
+{respondent}
+... Respondent"""

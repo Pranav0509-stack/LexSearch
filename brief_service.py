@@ -205,7 +205,8 @@ def _citation_payload(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
         elif tier == "SC" and h.get("pdf_name") and h.get("year"):
             pdf_url = f"/sc-pdf/{h['year']}/{urllib.parse.quote(h['pdf_name'])}"
         url = h.get("url") or pdf_url
-        doc_type = _classify_doc_type(h)
+        doc_type_raw = _classify_doc_type(h)
+        doc_type_label = _DOC_TYPE_LABELS.get(doc_type_raw, "Judgment")
 
         # Include full_text and explanation for richer UI rendering
         full_text = (h.get("full_text") or "").strip()
@@ -223,7 +224,7 @@ def _citation_payload(hits: list[dict[str, Any]]) -> list[dict[str, Any]]:
             "full_text": full_text[:6000] if full_text else "",
             "explanation": explanation[:2000] if explanation else "",
             "tier": tier,
-            "doc_type": doc_type,
+            "doc_type": doc_type_label,
             "pdf_url": pdf_url,
             "url": url,
             "score": h.get("score"),
@@ -252,6 +253,155 @@ def _build_user_prompt(question: str, context: str, history_block: str, *, rewri
             "you can and note what additional research is needed."
         )
     return "\n\n".join(parts)
+
+
+import re as _re
+
+# ── Conversational system prompt (no retrieval needed) ─────────────────
+CONVERSATIONAL_PROMPT = """You are Sanhita, India's AI legal research assistant powered by a corpus of
+31.9 million court judgments, 13.6M legal documents, 1.36M legal Q&A, and 2,383 statutes.
+
+You are having a friendly, helpful conversation with a legal professional or citizen.
+The user is NOT asking you to find specific cases right now — they may be greeting you,
+asking a general question, or having a discussion.
+
+RULES:
+1. Be warm, professional, and concise.
+2. If the user greets you, respond warmly and tell them what you can help with.
+3. For general legal knowledge questions, answer from your training knowledge.
+4. Do NOT make up case citations or section numbers you aren't sure about.
+5. If the user asks something that would benefit from searching the corpus, suggest
+   they ask you to "find cases" or "search for judgments" on that topic.
+6. Use Indian legal vocabulary: "advocate", "matter", "reportable", etc.
+7. Never say "as an AI" or "I think" or "in my opinion".
+8. Keep responses focused and helpful — 100-300 words for conversational replies.
+
+You speak naturally like a knowledgeable legal research assistant, not a search engine."""
+
+
+def _needs_case_retrieval(question: str) -> bool:
+    """Detect whether the user is asking to FIND/SEARCH for cases, or just chatting.
+
+    Returns True if the query looks like a case-search request.
+    Returns False for greetings, general knowledge, conversational queries.
+    """
+    q = question.strip().lower()
+
+    # Short greetings — no retrieval
+    if len(q) < 15 and _re.match(r'^(hi|hello|hey|namaste|namaskar|good\s+(morning|afternoon|evening)|thanks|thank you|ok|okay|sure|yes|no|help)\b', q):
+        return False
+
+    # Explicit case/judgment search intent
+    SEARCH_SIGNALS = [
+        r'\b(?:find|search|look\s*up|show|get|fetch|retrieve|pull)\b.*\b(?:case|judgment|ruling|order|decision|precedent)\b',
+        r'\b(?:case|judgment|ruling|order)\b.*\b(?:find|search|about|regarding|related|on|for)\b',
+        r'\b(?:leading|landmark|recent|latest)\s+(?:case|judgment|ruling|decision|precedent)\b',
+        r'\bcase\s+law\b',
+        r'\bcite\b.*\b(?:case|judgment|authority|precedent)\b',
+        r'\bsection\s+\d+\b',
+        r'\b(?:IPC|CrPC|CPC|BNS|BNSS|BSA|NI\s+Act|NDPS|POCSO|IT\s+Act)\b',
+        r'\barticle\s+\d+\b',
+        r'\b(?:bail|writ|mandamus|certiorari|habeas\s+corpus|injunction|anticipatory)\b',
+        r'\bunder\s+(?:the\s+)?(?:section|article|rule|act)\b',
+        r'\b(?:vs?\.?|versus)\b',
+        r'\b(?:petitioner|respondent|appellant|complainant)\b',
+        r'\b(?:FIR|charge\s*sheet|chargesheet)\b',
+        r'\b(?:Supreme\s+Court|High\s+Court|District\s+Court|Tribunal|NCLT|NCLAT)\b',
+        r'\b(?:conviction|acquittal|compensation|damages?|penalty|sentence|imprison)\b',
+        r'\b(?:divorce|custody|maintenance|alimony|dowry|498[aA])\b',
+        r'\b(?:arbitration|mediation|ADR)\b',
+        r'\b(?:what\s+is\s+the\s+(?:law|provision|procedure|penalty|punishment)\b)',
+        r'\bhow\s+to\s+(?:file|register|apply|approach|challenge)\b',
+        r'\b(?:grounds?\s+for|procedure\s+for|requirements?\s+for)\b',
+    ]
+
+    for pattern in SEARCH_SIGNALS:
+        if _re.search(pattern, q, _re.IGNORECASE):
+            return True
+
+    # If the query is long (> 30 words) and mentions legal terms, probably needs retrieval
+    words = q.split()
+    if len(words) > 30:
+        return True
+
+    # Default: short/medium queries without explicit search intent → conversational
+    return False
+
+
+def answer_conversational(
+    question: str,
+    history: list[dict[str, Any]],
+    lang: str = "en",
+) -> dict[str, Any]:
+    """Answer a conversational query WITHOUT retrieving cases from the corpus."""
+    available = router.available_providers()
+
+    if not available:
+        return {
+            "answer_markdown": (
+                "Hello! I'm **Sanhita**, your AI legal research assistant.\n\n"
+                "I have access to **31.9 million Indian court judgments** from all 25 High Courts, "
+                "13.6M legal documents, 1.36M legal Q&A pairs, and 2,383 statutes.\n\n"
+                "**Try asking me to:**\n"
+                "- Find cases on bail under NDPS Act\n"
+                "- Search for Section 138 NI Act judgments\n"
+                "- Explain grounds for a writ petition under Article 226\n"
+                "- Look up motor accident compensation formula\n\n"
+                "Just ask, and I'll search the corpus for relevant authorities."
+            ),
+            "citations": [],
+            "llm": {"provider": "none", "model": "", "latency_ms": 0, "fallback_chain": []},
+            "validation": {"passed": True, "confidence": 1.0, "reasons": ["conversational — no retrieval"]},
+            "refused": False,
+            "grounding_pct": 1.0,
+            "followups": [
+                "Find landmark cases on bail under NDPS Act",
+                "What is the procedure to file a writ petition?",
+                "Search for recent cheque bounce judgments",
+            ],
+        }
+
+    sys_prompt = CONVERSATIONAL_PROMPT
+    if lang and lang != "en" and lang in LANGUAGES:
+        sys_prompt += f"\n\nRespond in {LANGUAGES[lang]}."
+
+    history_block = _history_for_prompt(history)
+    user_prompt = question
+    if history_block:
+        user_prompt = f"Prior conversation:\n{history_block}\n\nUser: {question}"
+
+    try:
+        resp = router.generate(sys_prompt, user_prompt, temperature=0.5, max_tokens=1000)
+    except Exception as e:
+        logger.error("conversational generate failed: %s", e)
+        return {
+            "answer_markdown": (
+                "Hello! I'm **Sanhita**, your AI legal research assistant. "
+                "I can search through 31.9 million Indian court judgments. "
+                "Ask me to find cases, explain legal provisions, or research any topic in Indian law."
+            ),
+            "citations": [],
+            "llm": {"provider": "error", "model": "", "latency_ms": 0, "fallback_chain": []},
+            "validation": {"passed": True, "confidence": 1.0, "reasons": [str(e)]},
+            "refused": False,
+            "grounding_pct": 1.0,
+            "followups": [
+                "Find cases on anticipatory bail",
+                "What are the grounds for divorce under Hindu Marriage Act?",
+                "Search for Section 498A IPC judgments",
+            ],
+        }
+
+    followups = generate_followups(question, resp.text, lang)
+    return {
+        "answer_markdown": resp.text,
+        "citations": [],
+        "llm": resp.to_dict(),
+        "validation": {"passed": True, "confidence": 1.0, "reasons": ["conversational — no retrieval needed"]},
+        "refused": False,
+        "grounding_pct": 1.0,
+        "followups": followups,
+    }
 
 
 def answer_question(

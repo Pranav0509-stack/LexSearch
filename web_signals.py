@@ -318,6 +318,109 @@ def get_web_context_for_brief(query: str, max_signals: int = 4) -> str:
     return "\n".join(lines)
 
 
+# ── DuckDuckGo HTML search ───────────────────────────────────────────────
+
+class _DuckDuckGoParser(HTMLParser):
+    """Extract result titles, URLs, and snippets from DuckDuckGo HTML search."""
+
+    def __init__(self):
+        super().__init__()
+        self.results: list[dict[str, str]] = []
+        self._in_result_link = False
+        self._in_snippet = False
+        self._current: dict[str, str] = {}
+        self._text_buf: list[str] = []
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]):
+        attr_dict = dict(attrs)
+        classes = (attr_dict.get("class") or "").split()
+
+        # Result title link: <a class="result__a" href="...">
+        if tag == "a" and "result__a" in classes:
+            self._in_result_link = True
+            self._text_buf = []
+            raw_href = attr_dict.get("href", "")
+            # DuckDuckGo wraps URLs in a redirect; extract the actual URL
+            url = raw_href
+            if "uddg=" in raw_href:
+                import urllib.parse
+                parsed = urllib.parse.parse_qs(urllib.parse.urlparse(raw_href).query)
+                url = parsed.get("uddg", [raw_href])[0]
+            self._current["url"] = url
+
+        # Snippet: <a class="result__snippet" ...> or <td class="result__snippet">
+        if "result__snippet" in classes:
+            self._in_snippet = True
+            self._text_buf = []
+
+    def handle_endtag(self, tag: str):
+        if self._in_result_link and tag == "a":
+            self._in_result_link = False
+            self._current["title"] = " ".join(self._text_buf).strip()
+            self._text_buf = []
+
+        if self._in_snippet and tag in ("a", "td"):
+            self._in_snippet = False
+            self._current["snippet"] = " ".join(self._text_buf).strip()
+            self._text_buf = []
+            # A snippet closes a full result
+            if self._current.get("title") and self._current.get("url"):
+                self.results.append(self._current)
+            self._current = {}
+
+    def handle_data(self, data: str):
+        if self._in_result_link or self._in_snippet:
+            self._text_buf.append(data.strip())
+
+
+def search_duckduckgo(query: str, max_results: int = 8) -> list[WebSignal]:
+    """
+    Search DuckDuckGo HTML for Indian law results.
+    Returns up to max_results WebSignal objects. Cached 30 minutes.
+    """
+    cache_key = f"ddg:{query[:100]}"
+    cached = _get_cached(cache_key)
+    if cached is not None:
+        return [WebSignal(**s) for s in cached]
+
+    import urllib.parse
+    search_query = f"{query} India law"
+    url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote_plus(search_query)}"
+    req = urllib.request.Request(url, headers={
+        "User-Agent": "Mozilla/5.0 (compatible; Sanhita/1.0; +https://sanhita.law)",
+    })
+
+    signals: list[WebSignal] = []
+    try:
+        with urllib.request.urlopen(req, timeout=10, context=_SSL_CTX) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+
+        parser = _DuckDuckGoParser()
+        parser.feed(html)
+
+        for item in parser.results[:max_results]:
+            title = item.get("title", "")
+            snippet = item.get("snippet", "")
+            result_url = item.get("url", "")
+            if not title or not result_url:
+                continue
+            relevance = _score_relevance(query, title, snippet)
+            signals.append(WebSignal(
+                title=title,
+                url=result_url,
+                source="duckduckgo",
+                source_name="DuckDuckGo",
+                excerpt=snippet[:300],
+                date="",
+                relevance=relevance,
+            ))
+    except Exception as e:
+        logger.warning("search_duckduckgo failed: %s", e)
+
+    _set_cache(cache_key, [s.to_dict() for s in signals])
+    return signals
+
+
 def available_sources() -> list[dict[str, str]]:
     """List configured web signal sources."""
     return [
