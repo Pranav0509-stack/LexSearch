@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 // Single-input access-code login. The backend (`/api/login`) sets the
 // httpOnly `ls_session` cookie on success — we just navigate to /app.
-// Preview demo code: SNHT-DEMO-2026.
 export default function LoginPage() {
   const router = useRouter();
   const [code, setCode] = useState("");
@@ -36,13 +35,16 @@ export default function LoginPage() {
   return (
     <main className="min-h-screen flex items-center justify-center px-6 paper-grain">
       <div className="w-full max-w-md">
-        <div className="text-center mb-12">
+        <div className="text-center mb-10">
           <div className="font-display text-5xl tracking-tight text-[var(--ink)]">
             Sanhita
           </div>
           <div className="mt-2 text-sm tracking-[0.18em] uppercase text-[var(--ink-soft)]">
-            Research counsel · Asia
+            AI Legal Research for India
           </div>
+          <p className="mt-4 text-xs text-[var(--ink-soft)] max-w-xs mx-auto leading-relaxed">
+            31.9M court judgments &middot; 25 High Courts &middot; 1950&ndash;2025
+          </p>
         </div>
 
         <form
@@ -57,7 +59,7 @@ export default function LoginPage() {
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="SNHT-DEMO-2026"
+              placeholder="XXXX-XXXX-XXXX"
               className="w-full bg-transparent border-b border-[var(--line-strong)] focus:border-[var(--accent)] py-3 text-lg tracking-wider outline-none transition-colors font-mono"
               autoFocus
               autoComplete="off"
@@ -74,20 +76,15 @@ export default function LoginPage() {
             disabled={busy || !code.trim()}
             className="mt-8 w-full py-3 rounded-xl bg-[var(--ink)] text-[var(--bg)] font-medium tracking-wide hover:bg-[var(--accent)] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
-            {busy ? "Signing in…" : "Enter chambers"}
+            {busy ? "Signing in..." : "Enter"}
           </button>
-
-          <p className="mt-6 text-xs text-center text-[var(--ink-soft)]">
-            Preview access:{" "}
-            <code className="bg-[var(--highlight)] px-1.5 py-0.5 rounded">
-              SNHT-DEMO-2026
-            </code>
-          </p>
         </form>
 
-        <p className="mt-8 text-center text-xs text-[var(--ink-soft)] italic">
-          &ldquo;Where the law speaks, we listen.&rdquo;
-        </p>
+        <div className="mt-8 text-center">
+          <p className="text-[10px] text-[var(--ink-soft)] tracking-wider uppercase">
+            Gated beta &middot; By invitation only
+          </p>
+        </div>
       </div>
     </main>
   );
