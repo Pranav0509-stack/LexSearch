@@ -597,7 +597,8 @@ def _startup_load_index() -> None:
     # Phase 2: ensure the SQLite schema exists before any request lands.
     try:
         auth.init_db()
-        logger.info("auth db ready at %s", auth.DB_PATH)
+        auth.seed_demo_code()
+        logger.info("auth db ready at %s (demo code active)", auth.DB_PATH)
     except Exception as e:
         logger.error("auth.init_db failed: %s", e)
 

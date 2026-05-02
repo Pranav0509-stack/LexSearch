@@ -186,6 +186,41 @@ def init_db() -> None:
         )
 
 
+# ── demo code ────────────────────────────────────────────────────────────────
+
+DEMO_CODE = os.environ.get("SANHITA_DEMO_CODE", "SNHT-DEMO-2026")
+
+
+def seed_demo_code() -> None:
+    """Ensure the demo access code exists in the database.
+
+    Called on startup so YC reviewers (or anyone with the code) can log in
+    immediately without going through the access-request flow.
+    """
+    code_hash = _hash_code(DEMO_CODE)
+    with _db_lock, db() as c:
+        existing = c.execute(
+            "SELECT id, revoked_at FROM access_codes WHERE code_hash = ?",
+            (code_hash,),
+        ).fetchone()
+        if existing:
+            # Un-revoke if it was revoked
+            if existing["revoked_at"]:
+                c.execute(
+                    "UPDATE access_codes SET revoked_at = NULL WHERE id = ?",
+                    (existing["id"],),
+                )
+                logger.info("Demo code re-activated (id=%s)", existing["id"])
+            return
+        now = int(time.time())
+        c.execute(
+            """INSERT INTO access_codes (code_hash, email, name, request_id, created_at)
+               VALUES (?, ?, ?, NULL, ?)""",
+            (code_hash, "demo@sanhita.law", "YC Demo", now),
+        )
+        logger.info("Demo code seeded: %s", DEMO_CODE)
+
+
 # ── vault helpers ───────────────────────────────────────────────────────────
 
 def vault_create_doc(user_id: int, filename: str, mime: str, size_bytes: int) -> int:
