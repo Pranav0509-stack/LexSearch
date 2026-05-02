@@ -25,10 +25,15 @@ import {
   Cpu,
   Mail,
   FileDown,
+  PenLine,
   Sparkles,
   Scale,
   LayoutDashboard,
   FileText,
+  Eye,
+  Download,
+  ChevronDown,
+  Search,
 } from "lucide-react";
 import { PromptInputBox } from "@/components/ui/ai-prompt-box";
 import { renderMarkdown } from "./markdown";
@@ -55,17 +60,7 @@ const SOURCES: { value: string; icon: string; label: string }[] = [
   { value: "statutes", icon: "📜", label: "Statutes & Acts" },
 ];
 
-// Reasoning model picker. The `value` maps to llm.router.generate's
-// `prefer` kwarg ("gemini" | "anthropic" | "groq" | "cloudflare"). Empty
-// value = router default (Gemini Flash). Labels are user-facing — keep
-// them short, concrete, and brand-aligned with each provider's own naming.
-const MODELS: { value: string; label: string }[] = [
-  { value: "",          label: "Auto · Gemini" },
-  { value: "gemini",    label: "Gemini 2.5 Flash" },
-  { value: "anthropic", label: "Claude Sonnet 4.5" },
-  { value: "groq",      label: "Llama 3.3 70B" },
-  { value: "cloudflare",label: "Workers AI" },
-];
+// Model is fixed to Gemini — no picker shown to users.
 
 const SUGGESTIONS: { q: string; tag: string }[] = [
   {
@@ -126,6 +121,7 @@ interface Citation {
   verdict?: string;
   judge?: string;
   score?: number;
+  doc_type?: string; // "Judgment" | "Legal Document" | "Statute" | "Legal Q&A"
 }
 
 interface TraceStep {
@@ -136,10 +132,21 @@ interface TraceStep {
   error?: string;
 }
 
+interface WebCitation {
+  title: string;
+  url: string;
+  source: string;
+  source_name: string;
+  excerpt: string;
+  date?: string;
+  relevance?: number;
+}
+
 interface Message {
   role: "user" | "assistant";
   content: string;
   citations?: Citation[];
+  web_citations?: WebCitation[];
   llm?: { provider?: string; model?: string; latency_ms?: number };
   validation?: { confidence?: number; reasons?: string[] };
   refused?: boolean;
@@ -240,14 +247,8 @@ export default function AppPage() {
       : ""
   );
   const [languages, setLanguages] = useState<LanguageOpt[]>([]);
-  // Model preference. Empty = let the router pick (default: Gemini Flash).
-  // Persisted in localStorage so the user's pick survives reloads. The
-  // backend honours this via the `prefer` arg on llm.router.generate.
-  const [model, setModel] = useState<string>(
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("sanhita.model") || ""
-      : ""
-  );
+  // Model is fixed — no user picker.
+  const model = "";
   // Count of `new` NyayaSathi leads — drives the sidebar badge.
   const [newClientCount, setNewClientCount] = useState(0);
   // Mobile drawer state. Sidebar is permanent on >= md; on phone it slides
@@ -421,11 +422,9 @@ export default function AppPage() {
             }
           : {
               chat: [
-                { ms: 0, label: "Searching the case-law index…" },
-                { ms: 900, label: "Ranking the strongest authorities…" },
-                { ms: 2200, label: "Drafting the memo…" },
-                { ms: 6500, label: "Checking citations resolve…" },
-                { ms: 10000, label: "Final pass on grounding…" },
+                { ms: 0, label: "Understanding your query…" },
+                { ms: 800, label: "Preparing response…" },
+                { ms: 3000, label: "Composing answer…" },
               ],
             };
       const phases = Object.values(phasesByMode)[0]!;
@@ -480,6 +479,7 @@ export default function AppPage() {
             role: "assistant",
             content: data.answer_markdown,
             citations: data.citations,
+            web_citations: data.web_citations,
             llm: data.llm,
             validation: data.validation,
             refused: !!data.refused,
@@ -521,12 +521,7 @@ export default function AppPage() {
     else window.localStorage.removeItem("sanhita.lang");
   }, [language]);
 
-  // Persist model preference across reloads.
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (model) window.localStorage.setItem("sanhita.model", model);
-    else window.localStorage.removeItem("sanhita.model");
-  }, [model]);
+  // Model is fixed — no persistence needed.
 
   const lastCitations = useMemo<Citation[]>(() => {
     for (let i = messages.length - 1; i >= 0; i--) {
@@ -631,80 +626,54 @@ export default function AppPage() {
           </div>
 
           {mode === "assistant" && (
-            // Compact pill row — single line. Each chip is icon + value
-            // with no trailing chevron padding; the native <select> arrow
-            // is hidden on the closed state and only revealed on hover.
-            // Tighter horizontal rhythm (gap-1.5) so all 4 selectors +
-            // citations toggle fit on a 14" laptop without wrapping.
-            <div className="flex items-center gap-1.5 flex-wrap min-w-0 toolbar-pills">
-              <span className="pill" title="India — 30M+ judgments">
-                <Globe size={12} className="text-[var(--ink-soft)] shrink-0" />
-                <span className="shrink-0">🇮🇳</span>
-                <span className="text-xs opacity-70">India</span>
-              </span>
-
-              <label className="pill" title="Source databases">
-                <LibraryIcon size={12} className="text-[var(--accent)] shrink-0" />
+            <div className="flex items-center gap-2 min-w-0">
+              {/* Database source selector */}
+              <label className="inline-flex items-center gap-1.5 bg-[var(--bg-elev)] border border-[var(--line)] rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-[var(--accent)] transition-colors" title="Source database">
+                <Database size={13} className="text-[var(--accent)] shrink-0" />
                 <select
                   value={source}
                   onChange={(e) => setSource(e.target.value)}
-                  className="pill-select"
+                  className="bg-transparent text-xs text-[var(--ink)] outline-none cursor-pointer appearance-none pr-3"
                 >
-                  {SOURCES.map((s) => {
-                    const single = !s.value.includes(",") && s.value;
-                    const disabled = single ? connectors[single] === false : false;
-                    return (
-                      <option key={s.value} value={s.value} disabled={disabled}>
-                        {s.label}
-                        {disabled ? " (no key)" : ""}
-                      </option>
-                    );
-                  })}
-                </select>
-              </label>
-
-              <label className="pill" title="Reasoning model">
-                <Cpu size={12} className="text-[var(--ink-soft)] shrink-0" />
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="pill-select"
-                >
-                  {MODELS.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
+                  {SOURCES.map((s) => (
+                    <option key={s.value} value={s.value}>
+                      {s.label}
                     </option>
                   ))}
                 </select>
+                <ChevronDown size={10} className="text-[var(--ink-soft)] -ml-2 shrink-0" />
               </label>
 
+              {/* Language selector */}
               {languages.length > 0 && (
-                <label className="pill" title="Reply language">
-                  <Languages size={12} className="text-[var(--ink-soft)] shrink-0" />
+                <label className="inline-flex items-center gap-1.5 bg-[var(--bg-elev)] border border-[var(--line)] rounded-lg px-2.5 py-1.5 cursor-pointer hover:border-[var(--accent)] transition-colors" title="Reply language">
+                  <Languages size={13} className="text-[var(--ink-soft)] shrink-0" />
                   <select
                     value={language}
                     onChange={(e) => setLanguage(e.target.value)}
-                    className="pill-select"
+                    className="bg-transparent text-xs text-[var(--ink)] outline-none cursor-pointer appearance-none pr-3"
                   >
                     {languages.map((l) => (
                       <option key={l.code} value={l.code === "en" ? "" : l.code}>
-                        {l.native} {l.code !== "en" ? `(${l.label})` : ""}
+                        {l.native}
                       </option>
                     ))}
                   </select>
+                  <ChevronDown size={10} className="text-[var(--ink-soft)] -ml-2 shrink-0" />
                 </label>
               )}
 
+              {/* Sources / Citations toggle */}
               <button
-                className="pill pill-button"
+                className="inline-flex items-center gap-1.5 bg-[var(--bg-elev)] border border-[var(--line)] rounded-lg px-2.5 py-1.5 hover:border-[var(--accent)] transition-colors text-xs text-[var(--ink)]"
                 onClick={() => setRailOpen((v) => !v)}
                 aria-label="Toggle citations"
                 title="Show sources / citations"
               >
-                {railOpen ? <PanelRightClose size={12} /> : <PanelRightOpen size={12} />}
+                {railOpen ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
                 <span className="hidden sm:inline">
                   {lastCitations.length > 0
-                    ? `${lastCitations.length}`
+                    ? `${lastCitations.length} Sources`
                     : "Sources"}
                 </span>
               </button>
@@ -724,6 +693,13 @@ export default function AppPage() {
             suggestions={SUGGESTIONS}
             railOpen={railOpen}
             onCloseRail={() => setRailOpen(false)}
+            onOpenInEditor={(content) => {
+              if (typeof window !== "undefined") {
+                window.sessionStorage.setItem("editor_draft_content", content);
+                window.sessionStorage.setItem("editor_draft_title", "Research Note");
+              }
+              setMode("editor");
+            }}
           />
         )}
         {mode === "vault" && <VaultPane />}
@@ -911,6 +887,7 @@ function AssistantPane({
   suggestions,
   railOpen,
   onCloseRail,
+  onOpenInEditor,
 }: {
   messages: Message[];
   thinking: boolean;
@@ -921,6 +898,7 @@ function AssistantPane({
   suggestions: { q: string; tag: string }[];
   railOpen: boolean;
   onCloseRail: () => void;
+  onOpenInEditor?: (content: string) => void;
 }) {
   const empty = messages.length === 0;
 
@@ -937,7 +915,7 @@ function AssistantPane({
           ) : (
             <div className="max-w-3xl mx-auto flex flex-col gap-6 min-w-0">
               {messages.map((m, i) => (
-                <ChatBubble key={i} m={m} onPickFollowup={(q) => onSend(q)} />
+                <ChatBubble key={i} m={m} onPickFollowup={(q) => onSend(q)} onOpenInEditor={onOpenInEditor} />
               ))}
               {thinking && <ThinkingPanel phases={thinkingPhases} />}
             </div>
@@ -954,7 +932,7 @@ function AssistantPane({
             <PromptInputBox
               onSend={onSend}
               isLoading={thinking}
-              placeholder="Ask Sanhita — cite-grounded answers from 31.9M Indian judgments"
+              placeholder="Ask Sanhita"
             />
           </div>
         </div>
@@ -1080,7 +1058,7 @@ function EmptyState({
   );
 }
 
-function ChatBubble({ m, onPickFollowup }: { m: Message; onPickFollowup?: (q: string) => void }) {
+function ChatBubble({ m, onPickFollowup, onOpenInEditor }: { m: Message; onPickFollowup?: (q: string) => void; onOpenInEditor?: (content: string) => void }) {
   const [copied, setCopied] = useState(false);
   const [savingDoc, setSavingDoc] = useState(false);
   const [savedDoc, setSavedDoc] = useState<string | null>(null);
@@ -1209,6 +1187,34 @@ function ChatBubble({ m, onPickFollowup }: { m: Message; onPickFollowup?: (q: st
         dangerouslySetInnerHTML={{ __html: renderMarkdown(m.content) }}
       />
 
+      {/* Web citations — shown when the web search mode returned sources */}
+      {m.web_citations && m.web_citations.length > 0 && (
+        <div className="mt-2 bg-[var(--bg-elev)] border border-[var(--line)] rounded-xl px-4 py-3">
+          <div className="text-[10px] tracking-[0.18em] uppercase text-[var(--ink-soft)] mb-2 flex items-center gap-1.5">
+            <span>🌐</span> Web Sources ({m.web_citations.length})
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {m.web_citations.slice(0, 6).map((wc, i) => (
+              <a
+                key={i}
+                href={wc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-start gap-2 text-[12px] hover:bg-[var(--bg)] rounded-lg px-2 py-1.5 transition-colors group"
+              >
+                <span className="text-[var(--accent)] font-mono text-[10px] mt-0.5 shrink-0">[{i + 1}]</span>
+                <div className="min-w-0">
+                  <div className="text-[var(--ink)] group-hover:text-[var(--accent)] font-medium truncate">{wc.title}</div>
+                  <div className="text-[10px] text-[var(--ink-soft)]">
+                    {wc.source_name}{wc.date ? ` · ${wc.date}` : ""}
+                  </div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Action row — Copy / Email / Save-as-Doc. Lawyers want the
           answer OUT of the chat: into a draft email, into a shared Doc,
           or simply paste into Word. Hidden for refusals. */}
@@ -1241,6 +1247,16 @@ function ChatBubble({ m, onPickFollowup }: { m: Message; onPickFollowup?: (q: st
               {savingDoc ? "Saving…" : savedDoc ?? "Save as Doc"}
             </span>
           </button>
+          {onOpenInEditor && (
+            <button
+              onClick={() => onOpenInEditor(m.content)}
+              className="flex items-center gap-1.5 hover:text-[var(--ink)] transition-colors"
+              title="Open in Draft Editor to edit and refine"
+            >
+              <PenLine size={12} />
+              <span>Edit in Draft</span>
+            </button>
+          )}
         </div>
       )}
 
@@ -1382,6 +1398,7 @@ function verdictColor(v?: string): string {
 }
 
 function SourceCard({ c }: { c: Citation }) {
+  const [showPdf, setShowPdf] = useState(false);
   const href = c.pdf_url || c.url || null;
   const tierLabel = c.tier === "SC" ? "Supreme Court" : c.tier === "HC" ? "High Court" : c.tier === "LM" ? "Landmark" : null;
   const tierStyle = c.tier === "SC"
@@ -1390,76 +1407,119 @@ function SourceCard({ c }: { c: Citation }) {
     ? "bg-[#f3e8fd] text-[#8430ce] border-[#cfabee]"
     : "bg-[#e8f0fe] text-[#1a73e8] border-[#a8c4f5]";
 
-  const body = (
-    <div className="flex flex-col gap-2 min-w-0">
-      {/* Citation number + tier badge row */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="font-mono text-[10px] font-bold bg-[var(--accent)] text-white rounded px-1.5 py-0.5 shrink-0">
-          [{c.n}]
-        </span>
-        {tierLabel && (
-          <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${tierStyle}`}>
-            {tierLabel}
-          </span>
-        )}
-        {c.verdict && (
-          <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${verdictColor(c.verdict)}`}>
-            {c.verdict.length > 18 ? c.verdict.slice(0, 18) + "…" : c.verdict}
-          </span>
-        )}
-      </div>
-
-      {/* Title */}
-      <span className="font-display text-[13px] leading-snug text-[var(--ink)] line-clamp-2 break-words min-w-0 font-medium">
-        {c.title}
-      </span>
-
-      {/* Court · Year · Citation */}
-      <div className="flex flex-col gap-0.5">
-        {(c.court || c.year) && (
-          <span className="text-[11px] text-[var(--ink-soft)] break-words leading-snug">
-            {[c.court, c.year].filter(Boolean).join(" · ")}
-          </span>
-        )}
-        {c.citation && (
-          <span className="font-mono text-[10px] text-[var(--accent)] break-all leading-snug">
-            {c.citation}
-          </span>
-        )}
-        {c.judge && (
-          <span className="text-[10px] text-[var(--ink-soft)] italic truncate">
-            {c.judge}
-          </span>
-        )}
-      </div>
-
-      {/* Excerpt */}
-      {c.excerpt && (
-        <div className="text-[11px] text-[var(--ink-soft)] italic line-clamp-3 break-words leading-relaxed border-l-2 border-[var(--accent-soft)] pl-2">
-          "{c.excerpt}"
-        </div>
-      )}
-
-      {/* Open judgment link */}
-      {href && (
-        <div className="flex items-center gap-1 text-[10px] text-[var(--accent)] font-medium mt-0.5">
-          <ArrowUpRight size={10} />
-          <span>View judgment</span>
-        </div>
-      )}
-    </div>
-  );
+  // Document type styling
+  const DOC_TYPE_STYLE: Record<string, string> = {
+    "Judgment": "bg-[#e8f0fe] text-[#1a73e8]",
+    "Legal Document": "bg-[#fef7e0] text-[#b5770d]",
+    "Statute": "bg-[#e6f4ea] text-[#1e8e3e]",
+    "Legal Q&A": "bg-[#f3e8fd] text-[#8430ce]",
+  };
+  const docType = c.doc_type || "Judgment";
+  const docTypeStyle = DOC_TYPE_STYLE[docType] || DOC_TYPE_STYLE["Judgment"];
 
   return (
     <div
       data-n={c.n}
       className="source-card group bg-[var(--bg)] border border-[var(--line)] hover:border-[var(--accent)] hover:shadow-[0_2px_12px_rgba(120,80,40,0.10)] rounded-xl p-3 transition-all duration-150 min-w-0 overflow-hidden"
     >
-      {href ? (
-        <a href={href} target="_blank" rel="noopener noreferrer" className="block min-w-0">
-          {body}
-        </a>
-      ) : body}
+      <div className="flex flex-col gap-2 min-w-0">
+        {/* Badge row: citation number + doc type + tier + verdict */}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="font-mono text-[10px] font-bold bg-[var(--accent)] text-white rounded px-1.5 py-0.5 shrink-0">
+            [{c.n}]
+          </span>
+          <span className={`text-[9px] font-semibold uppercase tracking-wider rounded px-1.5 py-0.5 shrink-0 ${docTypeStyle}`}>
+            {docType}
+          </span>
+          {tierLabel && (
+            <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${tierStyle}`}>
+              {tierLabel}
+            </span>
+          )}
+          {c.verdict && (
+            <span className={`text-[9px] font-semibold uppercase tracking-wider border rounded px-1.5 py-0.5 shrink-0 ${verdictColor(c.verdict)}`}>
+              {c.verdict.length > 18 ? c.verdict.slice(0, 18) + "…" : c.verdict}
+            </span>
+          )}
+        </div>
+
+        {/* Title */}
+        <span className="font-display text-[13px] leading-snug text-[var(--ink)] line-clamp-2 break-words min-w-0 font-medium">
+          {c.title}
+        </span>
+
+        {/* Court · Year · Citation */}
+        <div className="flex flex-col gap-0.5">
+          {(c.court || c.year) && (
+            <span className="text-[11px] text-[var(--ink-soft)] break-words leading-snug">
+              {[c.court, c.year].filter(Boolean).join(" · ")}
+            </span>
+          )}
+          {c.citation && (
+            <span className="font-mono text-[10px] text-[var(--accent)] break-all leading-snug">
+              {c.citation}
+            </span>
+          )}
+          {c.judge && (
+            <span className="text-[10px] text-[var(--ink-soft)] italic truncate">
+              {c.judge}
+            </span>
+          )}
+        </div>
+
+        {/* Excerpt */}
+        {c.excerpt && (
+          <div className="text-[11px] text-[var(--ink-soft)] italic line-clamp-3 break-words leading-relaxed border-l-2 border-[var(--accent-soft)] pl-2">
+            &ldquo;{c.excerpt}&rdquo;
+          </div>
+        )}
+
+        {/* Action buttons: View PDF inline + Download + Open externally */}
+        {href && (
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={() => setShowPdf(!showPdf)}
+              className="flex items-center gap-1 text-[10px] text-[var(--accent)] font-medium hover:underline"
+              title="View document inline"
+            >
+              <Eye size={11} />
+              <span>{showPdf ? "Hide" : "View"}</span>
+            </button>
+            <a
+              href={href}
+              download
+              className="flex items-center gap-1 text-[10px] text-[var(--ink-soft)] hover:text-[var(--accent)] font-medium"
+              title="Download PDF"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download size={11} />
+              <span>Download</span>
+            </a>
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 text-[10px] text-[var(--ink-soft)] hover:text-[var(--accent)] font-medium"
+              title="Open in new tab"
+            >
+              <ArrowUpRight size={11} />
+              <span>Open</span>
+            </a>
+          </div>
+        )}
+
+        {/* Inline PDF viewer */}
+        {showPdf && href && (
+          <div className="mt-2 rounded-lg overflow-hidden border border-[var(--line)]" style={{ height: "400px" }}>
+            <iframe
+              src={href}
+              className="w-full h-full"
+              title={`PDF: ${c.title}`}
+              style={{ border: "none" }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

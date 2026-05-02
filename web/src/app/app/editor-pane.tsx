@@ -172,6 +172,9 @@ export default function EditorPane() {
   const [showTableMenu, setShowTableMenu] = useState(false);
   const [zoom, setZoom] = useState(100);
   const [showComments, setShowComments] = useState(false);
+  const [showClausePanel, setShowClausePanel] = useState(false);
+  const [clauses, setClauses] = useState<Array<{id: string; category: string; label: string}>>([]);
+  const [clauseSearch, setClauseSearch] = useState("");
   const [lineHeight, setLineHeight] = useState("1.5");
   const [marginSize, setMarginSize] = useState<"normal" | "narrow" | "wide">("normal");
   const [bubbleMenuPos, setBubbleMenuPos] = useState<{ x: number; y: number } | null>(null);
@@ -260,10 +263,31 @@ export default function EditorPane() {
 
   // ── Load docs + doc types ─────────────────────────────────────────────────
   useEffect(() => {
-    // Backend returns { documents: [...] }
     api("/api/editor/docs").then(d => setDocs(d.documents || [])).catch(() => {});
     api("/api/editor/doc-types").then(d => setDocTypes(d.doc_types || [])).catch(() => {});
   }, []);
+
+  // Load legal clauses when panel opens
+  useEffect(() => {
+    if (showClausePanel && clauses.length === 0) {
+      api("/api/editor/clauses").then(d => setClauses(d.clauses || [])).catch(() => {});
+    }
+  }, [showClausePanel]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const insertClause = useCallback(async (clauseId: string) => {
+    if (!editor) return;
+    try {
+      const c = await api(`/api/editor/clauses/${clauseId}`);
+      if (c.text) {
+        const html = c.text.split("\n").map((l: string) => {
+          if (!l.trim()) return "";
+          return `<p>${l}</p>`;
+        }).filter((l: string) => l).join("");
+        editor.chain().focus().insertContent(html).run();
+        setSaveStatus("unsaved");
+      }
+    } catch (e) { console.error(e); }
+  }, [editor]);
 
   // When activeDoc changes (e.g. after create), push its content into the editor.
   // We can't do this inside openDoc because the editor might not be mounted yet.
@@ -612,6 +636,7 @@ export default function EditorPane() {
               { label: "Find & replace", action: () => setShowFindReplace(v => !v) },
             ]},
             { label: "Insert", items: [
+              { label: "⚖️ Legal Clause Library", action: () => setShowClausePanel(v => !v) },
               { label: "Image from URL", action: () => setShowImageModal(true) },
               { label: "Link", action: () => setShowLinkModal(true) },
               { label: "Table", action: () => setShowTableMenu(v => !v) },
@@ -995,6 +1020,59 @@ export default function EditorPane() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Legal Clause Library panel ────────────────────────────────────── */}
+        {showClausePanel && (
+          <div className="w-[300px] shrink-0 bg-white border-l border-[#e0e0e0] flex flex-col overflow-hidden">
+            <div className="px-4 py-3 border-b border-[#e0e0e0] flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span>⚖️</span>
+                <span className="font-medium text-sm">Legal Clauses</span>
+              </div>
+              <button onClick={() => setShowClausePanel(false)} className="text-[#5f6368] hover:bg-[#f1f3f4] rounded p-1">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div className="px-3 py-2 border-b border-[#e0e0e0]">
+              <input
+                value={clauseSearch}
+                onChange={e => setClauseSearch(e.target.value)}
+                placeholder="Search clauses..."
+                className="w-full text-sm border border-[#dadce0] rounded-lg px-3 py-1.5 focus:outline-none focus:border-[#1a73e8]"
+              />
+            </div>
+            <div className="flex-1 overflow-y-auto px-3 py-2">
+              {(() => {
+                const filtered = clauses.filter(c =>
+                  !clauseSearch || c.label.toLowerCase().includes(clauseSearch.toLowerCase()) || c.category.toLowerCase().includes(clauseSearch.toLowerCase())
+                );
+                const groups = filtered.reduce<Record<string, typeof filtered>>((acc, c) => {
+                  (acc[c.category] = acc[c.category] || []).push(c);
+                  return acc;
+                }, {});
+                return Object.entries(groups).map(([cat, items]) => (
+                  <div key={cat} className="mb-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-wider text-[#9aa0a6] px-1 mb-1">{cat}</div>
+                    {items.map(c => (
+                      <button
+                        key={c.id}
+                        onClick={() => insertClause(c.id)}
+                        className="w-full text-left text-xs px-2 py-2 rounded hover:bg-[#e8f0fe] transition-colors flex items-center gap-2 group"
+                      >
+                        <span className="text-[#1a73e8] opacity-0 group-hover:opacity-100 transition-opacity text-[10px]">+</span>
+                        <span className="text-[#202124]">{c.label}</span>
+                      </button>
+                    ))}
+                  </div>
+                ));
+              })()}
+              {clauses.length === 0 && <p className="text-xs text-[#9aa0a6] text-center py-4">Loading clauses...</p>}
+            </div>
+            <div className="px-3 py-2 border-t border-[#e0e0e0]">
+              <p className="text-[10px] text-[#9aa0a6]">Click a clause to insert it at cursor position. Customize the [PLACEHOLDERS] after insertion.</p>
             </div>
           </div>
         )}

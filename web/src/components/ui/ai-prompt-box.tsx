@@ -550,10 +550,60 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
     }
   };
 
-  const handleStartRecording = () => {};
-  const handleStopRecording = (duration: number) => {
+  // ── Web Speech API for voice input ──
+  const recognitionRef = React.useRef<any>(null);
+
+  const handleStartRecording = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Speech recognition is not supported in this browser. Please use Chrome.");
+      setIsRecording(false);
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = "en-IN"; // Default to Indian English; supports Hindi too
+    recognition.maxAlternatives = 1;
+
+    let finalTranscript = "";
+
+    recognition.onresult = (event: any) => {
+      let interim = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript + " ";
+        } else {
+          interim = transcript;
+        }
+      }
+      // Show live transcription in the input
+      setInput(finalTranscript + interim);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.warn("Speech recognition error:", event.error);
+      if (event.error !== "aborted") {
+        setIsRecording(false);
+      }
+    };
+
+    recognition.onend = () => {
+      // Don't auto-restart — user controls via the button
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  };
+
+  const handleStopRecording = (_duration: number) => {
+    if (recognitionRef.current) {
+      recognitionRef.current.stop();
+      recognitionRef.current = null;
+    }
     setIsRecording(false);
-    onSend(`[Voice message - ${duration} seconds]`, []);
+    // Don't auto-send — let user review the transcription first
   };
 
   const hasContent = input.trim() !== "" || files.length > 0;

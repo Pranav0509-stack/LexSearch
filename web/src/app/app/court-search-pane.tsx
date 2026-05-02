@@ -30,6 +30,10 @@ import {
   TrendingUp,
   Award,
   Network,
+  Download,
+  Eye,
+  MessageSquare,
+  FileDown,
 } from "lucide-react";
 
 /* ── Types ─────────────────────────────────────────────────── */
@@ -91,6 +95,7 @@ interface UseInChatPayload {
 }
 
 type Tab = "search" | "latest" | "judge";
+type DocTypeFilter = "ALL" | DocType;
 
 /* ── Constants ─────────────────────────────────────────────── */
 
@@ -139,6 +144,14 @@ const DOC_TYPE_LABELS: Record<DocType, string> = {
   STATUTE: "Statute",
   LEGAL_QA: "Legal Q&A",
 };
+
+const DOC_TYPE_FILTER_TABS: { key: DocTypeFilter; label: string; count: string }[] = [
+  { key: "ALL", label: "All", count: formatNum(CORPUS_STATS.total) },
+  { key: "JUDGMENT", label: "Judgments", count: formatNum(CORPUS_STATS.judgments) },
+  { key: "LEGAL_DOC", label: "Legal Documents", count: formatNum(CORPUS_STATS.legal_docs) },
+  { key: "STATUTE", label: "Statutes", count: formatNum(CORPUS_STATS.statutes) },
+  { key: "LEGAL_QA", label: "Legal Q&A", count: formatNum(CORPUS_STATS.legal_qa) },
+];
 
 const DOC_TYPE_COLORS: Record<DocType, { bg: string; text: string; border: string }> = {
   JUDGMENT: { bg: "bg-amber-50", text: "text-amber-700", border: "border-amber-200" },
@@ -207,6 +220,12 @@ export default function CourtSearchPane({
   const [searchTime, setSearchTime] = useState<number | null>(null);
   const [totalResults, setTotalResults] = useState<number>(0);
 
+  // Document type filter
+  const [docTypeFilter, setDocTypeFilter] = useState<DocTypeFilter>("ALL");
+
+  // PDF viewer in drawer
+  const [showPdf, setShowPdf] = useState(false);
+
   // Advanced filters
   const [showFilters, setShowFilters] = useState(false);
   const [courtCode, setCourtCode] = useState("");
@@ -224,6 +243,15 @@ export default function CourtSearchPane({
   const [comparing, setComparing] = useState(false);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Filter hits by doc type client-side
+  const filteredHits = useMemo(() => {
+    if (docTypeFilter === "ALL") return hits;
+    return hits.filter((h) => {
+      const dt = h.doc_type || classifyDocType(h);
+      return dt === docTypeFilter;
+    });
+  }, [hits, docTypeFilter]);
 
   const activeFilterCount = [courtCode, yearFrom, yearTo, verdict].filter(Boolean).length;
 
@@ -359,7 +387,10 @@ export default function CourtSearchPane({
       const r = await fetch(`/api/cases/${encodeURIComponent(case_id)}`, {
         credentials: "same-origin",
       });
-      if (r.ok) setOpenCase(await r.json());
+      if (r.ok) {
+        setOpenCase(await r.json());
+        setShowPdf(false);
+      }
     } catch {
       /* drawer fails silently */
     }
@@ -443,7 +474,7 @@ export default function CourtSearchPane({
                 )}
               </button>
             )}
-            {hits.length > 1 && (
+            {filteredHits.length > 1 && (
               <button
                 onClick={() => {
                   setCompareMode(!compareMode);
@@ -460,6 +491,28 @@ export default function CourtSearchPane({
               </button>
             )}
           </div>
+
+          {/* ── Document type filter tabs ─────────────── */}
+          {tab !== "judge" && (
+            <div className="mt-2 flex items-center gap-1 overflow-x-auto pb-0.5 scrollbar-none">
+              {DOC_TYPE_FILTER_TABS.map((dt) => (
+                <button
+                  key={dt.key}
+                  onClick={() => setDocTypeFilter(dt.key)}
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg transition-colors text-[11px] whitespace-nowrap ${
+                    docTypeFilter === dt.key
+                      ? "bg-[var(--accent)]/10 text-[var(--accent)] font-medium border border-[var(--accent)]/30"
+                      : "text-[var(--ink-soft)] hover:text-[var(--ink)] hover:bg-[var(--bg-elev)]"
+                  }`}
+                >
+                  <span>{dt.label}</span>
+                  <span className={`text-[9px] ${docTypeFilter === dt.key ? "opacity-80" : "opacity-50"}`}>
+                    {dt.count}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* ── Search bar ─────────────────────────────── */}
           {tab === "search" && (
@@ -626,10 +679,11 @@ export default function CourtSearchPane({
         {tab !== "judge" && (
         <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-12 py-4 min-w-0">
           {/* Search results meta bar */}
-          {!loading && hits.length > 0 && (
+          {!loading && filteredHits.length > 0 && (
             <div className="flex items-center gap-3 mb-3 text-xs text-[var(--ink-soft)]">
               <span className="font-medium">
-                {hits.length} results
+                {filteredHits.length} results
+                {docTypeFilter !== "ALL" && hits.length !== filteredHits.length && ` (${hits.length} total)`}
                 {totalResults > hits.length && ` of ${formatNum(totalResults)}`}
               </span>
               {searchTime !== null && (
@@ -654,13 +708,15 @@ export default function CourtSearchPane({
               </span>
             </div>
           )}
-          {!loading && hits.length === 0 && (
+          {!loading && filteredHits.length === 0 && (
             <div className="text-center py-12">
               <Scale size={32} className="mx-auto text-[var(--ink-soft)] opacity-30 mb-3" />
               <p className="text-sm text-[var(--ink-soft)]">
                 {tab === "search"
                   ? q.trim()
-                    ? "No cases matched. Try different keywords or adjust filters."
+                    ? docTypeFilter !== "ALL"
+                      ? `No ${DOC_TYPE_LABELS[docTypeFilter as DocType] || ""} results matched. Try "All" or different keywords.`
+                      : "No cases matched. Try different keywords or adjust filters."
                     : "Search across 31.9M Indian court records — judgments, statutes, legal QA."
                   : "Latest cases will appear here."}
               </p>
@@ -711,7 +767,7 @@ export default function CourtSearchPane({
           )}
 
           <ul className="flex flex-col gap-3 max-w-3xl mx-auto">
-            {hits.map((h) => (
+            {filteredHits.map((h) => (
               <CaseCard
                 key={h.case_id}
                 hit={h}
@@ -828,26 +884,50 @@ export default function CourtSearchPane({
               </button>
             </div>
 
-            {/* PDF actions */}
-            {openCase.url && (
-              <div className="flex items-center gap-3 flex-wrap">
-                <a
-                  href={openCase.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-[var(--accent)] hover:underline"
-                >
-                  <ExternalLink size={11} /> View PDF
-                </a>
-                <a
-                  href={`${openCase.url}${openCase.url.includes("?") ? "&" : "?"}download=true`}
-                  className="inline-flex items-center gap-1 text-xs text-[var(--ink-soft)] hover:text-[var(--ink)] border border-[var(--line)] rounded px-2 py-0.5 bg-[var(--bg)] transition-colors"
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Download PDF
-                </a>
-              </div>
-            )}
+            {/* PDF actions + inline viewer */}
+            {(openCase.url || openCase.pdf_link) && (() => {
+              const pdfUrl = openCase.pdf_link || openCase.url!;
+              return (
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <button
+                      onClick={() => setShowPdf(!showPdf)}
+                      className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg transition-colors ${
+                        showPdf
+                          ? "bg-[var(--accent)] text-white"
+                          : "bg-[var(--bg)] border border-[var(--line)] text-[var(--accent)] hover:border-[var(--accent)]"
+                      }`}
+                    >
+                      <Eye size={12} /> {showPdf ? "Hide PDF" : "View PDF"}
+                    </button>
+                    <a
+                      href={pdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--bg)] border border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)] hover:border-[var(--accent-soft)] transition-colors"
+                    >
+                      <ExternalLink size={12} /> Open in Tab
+                    </a>
+                    <a
+                      href={`${pdfUrl}${pdfUrl.includes("?") ? "&" : "?"}download=true`}
+                      className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--bg)] border border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)] hover:border-[var(--accent-soft)] transition-colors"
+                    >
+                      <Download size={12} /> Download PDF
+                    </a>
+                  </div>
+                  {showPdf && (
+                    <div className="border border-[var(--line)] rounded-xl overflow-hidden bg-[var(--bg)]">
+                      <iframe
+                        src={pdfUrl}
+                        title="PDF Viewer"
+                        className="w-full border-0"
+                        style={{ height: "60vh" }}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
 
             {/* ── Verdict Section ── */}
             {openCase.verdict && (
@@ -1061,19 +1141,20 @@ function CaseCard({
             {hit.title || hit.case_id}
           </button>
 
-          {/* Court + citation + judge */}
-          <div className="text-xs text-[var(--ink-soft)] mt-1 flex items-center gap-1.5 flex-wrap">
+          {/* Court · Year metadata */}
+          <div className="text-xs text-[var(--ink-soft)] mt-1 flex items-center gap-1 flex-wrap">
             {hit.court && <span>{hit.court}</span>}
+            {hit.year && <span>· {hit.year}</span>}
             {hit.citation && (
-              <span className="text-[var(--accent)] font-mono text-[10px]">
-                {hit.citation}
-              </span>
+              <>
+                <span>·</span>
+                <span className="text-[var(--accent)] font-mono text-[10px]">
+                  {hit.citation}
+                </span>
+              </>
             )}
             {hit.judge && (
-              <span className="text-[var(--ink-soft)]">· {hit.judge}</span>
-            )}
-            {hit.date_decided && (
-              <span className="text-[var(--ink-soft)]">· {hit.date_decided}</span>
+              <span>· {hit.judge}</span>
             )}
           </div>
 
@@ -1093,55 +1174,47 @@ function CaseCard({
             </div>
           )}
 
-          {/* Excerpt */}
+          {/* Excerpt — 2 lines max */}
           {hit.excerpt && (
-            <p className="text-xs text-[var(--ink-soft)] mt-2 line-clamp-3 leading-relaxed">
+            <p className="text-xs text-[var(--ink-soft)] mt-2 line-clamp-2 leading-relaxed">
               {hit.excerpt}
             </p>
           )}
 
-          {/* Source tag + actions */}
-          <div className="flex items-center gap-3 mt-2.5 text-[11px] text-[var(--ink-soft)] flex-wrap">
+          {/* Quick action buttons */}
+          <div className="flex items-center gap-2 mt-3 flex-wrap">
             {hit.has_full_text && (
               <span className="px-1.5 py-0.5 rounded bg-green-50 border border-green-200 text-[9px] text-green-700 uppercase tracking-wider shrink-0">
                 Full text
               </span>
             )}
-            <button
-              onClick={onOpen}
-              className="hover:text-[var(--ink)] transition-colors shrink-0"
-            >
-              Open
-            </button>
-            {onUseInChat && (
+            <div className="flex items-center gap-1 ml-auto">
               <button
-                onClick={onUseInChat}
-                className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors shrink-0"
+                onClick={onOpen}
+                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg)] border border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--ink)] hover:border-[var(--accent-soft)] transition-colors"
               >
-                Use in Assistant <ArrowUpRight size={11} />
+                <Eye size={11} /> View
               </button>
-            )}
-            {hit.url && (
-              <div className="ml-auto flex items-center gap-2 shrink-0">
+              {hit.url && (
                 <a
                   href={hit.url}
                   target="_blank"
                   rel="noreferrer"
-                  className="flex items-center gap-1 hover:text-[var(--accent)] transition-colors"
+                  className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg)] border border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--accent)] hover:border-[var(--accent-soft)] transition-colors"
                   title="View judgment PDF"
                 >
-                  <ExternalLink size={11} /> View PDF
+                  <FileDown size={11} /> PDF
                 </a>
-                <a
-                  href={`${hit.url}${hit.url.includes("?") ? "&" : "?"}download=true`}
-                  className="flex items-center gap-1 hover:text-[var(--ink)] transition-colors px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] text-[10px]"
-                  title="Download judgment as PDF"
+              )}
+              {onUseInChat && (
+                <button
+                  onClick={onUseInChat}
+                  className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-lg bg-[var(--bg)] border border-[var(--line)] text-[var(--ink-soft)] hover:text-[var(--accent)] hover:border-[var(--accent-soft)] transition-colors"
                 >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                  Download
-                </a>
-              </div>
-            )}
+                  <MessageSquare size={11} /> Use in Chat
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
