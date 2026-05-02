@@ -1,11 +1,88 @@
+# Render Blueprint — Sanhita v2.
+#
+# Visit https://render.com/deploy?repo=https://github.com/Pranav0509-stack/sanhita
+# in a browser. Render reads this file and creates two services:
+#
+#   1. sanhita-backend    — FastAPI + uvicorn on a Docker image, BM25
+#                          index pre-built in the build step. Listens on
+#                          $PORT, exposes /api/* and /socket.io.
+#   2. sanhita-frontend    — Next.js dev/start, points BACKEND_ORIGIN at
+#                          the backend's public URL. Same-origin from the
+#                          browser's POV; Render's edge handles the proxy.
+#
+# Plus a 5GB persistent disk for `bm25.pkl` / `lexsearch.db` so SQLite
+# state survives redeploys until the Postgres flip.
+
 services:
+  # ── Backend (FastAPI + Socket.io) ────────────────────────────────
   - type: web
-    name: lexsearch
-    runtime: python
-    rootDir: legal-site
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn server:app --host 0.0.0.0 --port $PORT
+    name: sanhita-backend
+    runtime: docker
+    plan: starter
+    region: oregon                   # closest to Cloudflare's primary
+    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    disk:
+      name: bm25-data
+      mountPath: /data
+      sizeGB: 5
     envVars:
-      - key: PYTHON_VERSION
-        value: "3.11.9"
-    plan: free
+      - key: PORT
+        value: "8080"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: LEXSEARCH_BM25_ENABLED
+        value: "true"
+      - key: LEXSEARCH_BM25_LAZY
+        value: "true"
+      - key: LEXSEARCH_BM25_PATH
+        value: "/data/bm25.pkl"
+      - key: LEXSEARCH_BM25_MAX_DOCS
+        value: "200000"
+      - key: LEXSEARCH_DB_PATH
+        value: "/data/lexsearch.db"
+      - key: GEMINI_MODEL
+        value: "gemini-2.5-flash"
+      - key: GROQ_MODEL
+        value: "llama-3.3-70b-versatile"
+      - key: LLM_TIMEOUT_S
+        value: "22"
+      # Required — paste at deploy time. Render prompts for any
+      # `sync: false` var that has no value.
+      - key: GEMINI_API_KEY
+        sync: false
+      # Optional — leave blank if you don't want web search /
+      # Postgres / Anthropic fallback.
+      - key: TAVILY_API_KEY
+        sync: false
+      - key: SERPER_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      # Admin token used by /admin/reload — change before sharing.
+      - key: LEXSEARCH_ADMIN_TOKEN
+        generateValue: true
+
+  # ── Frontend (Next.js) ───────────────────────────────────────────
+  - type: web
+    name: sanhita-frontend
+    runtime: node
+    plan: starter
+    region: oregon
+    rootDir: web
+    buildCommand: npm install && npm run build
+    startCommand: npm run start -- --port $PORT --hostname 0.0.0.0
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # Wire the frontend at the backend's public URL. Render fills
+      # this in automatically from the backend service.
+      - key: BACKEND_ORIGIN
+        fromService:
+          name: sanhita-backend
+          type: web
+          property: hostport
