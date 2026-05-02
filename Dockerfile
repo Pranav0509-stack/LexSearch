@@ -7,10 +7,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy backend code
-COPY server.py auth.py brief_service.py vault_service.py workflows.py ./
+COPY server.py auth.py brief_service.py vault_service.py workflows.py doc_editor.py web_signals.py chat.py retrieval.py ./
 COPY llm/ llm/
 COPY validators/ validators/
 COPY assets/ assets/
+COPY scripts/ scripts/
 COPY *.html *.js *.css ./
 
 # Port is set by Railway/Render via $PORT env var
