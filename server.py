@@ -1935,6 +1935,7 @@ class AiWriteSectionBody(BaseModel):
     instruction: str
     doc_type: str = ""
     context: str = ""
+    prefer: Optional[str] = None   # "anthropic" / "gemini" / "groq" / "cloudflare"
 
 class AiSuggestCasesBody(BaseModel):
     argument: str
@@ -2052,7 +2053,8 @@ def api_editor_ai_improve(body: AiImproveBody, ls_session: Optional[str] = Cooki
 def api_editor_ai_write(body: AiWriteSectionBody, ls_session: Optional[str] = Cookie(default=None)):
     """AI: write a complete section based on instruction."""
     _require_user(ls_session)
-    text = doc_editor.ai_write_section(body.instruction, body.doc_type, body.context)
+    text = doc_editor.ai_write_section(body.instruction, body.doc_type,
+                                        body.context, prefer=body.prefer)
     return {"text": text}
 
 

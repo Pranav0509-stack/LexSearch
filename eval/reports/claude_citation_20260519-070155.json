@@ -1,0 +1,154 @@
+{
+  "timestamp": "20260519-070155",
+  "prefer": "gemini",
+  "top_k": 6,
+  "n_questions": 6,
+  "passed": 5,
+  "pass_rate": 0.833,
+  "banned_phrase_count": 0,
+  "markers_out_of_range_count": 0,
+  "corpus_citation_totals": {
+    "legal_qa": 7,
+    "legal_docs": 8,
+    "pipeline_docs": 6,
+    "judgments": 4,
+    "statutes": 1
+  },
+  "elapsed_s": 34.8,
+  "scores": [
+    {
+      "qid": "SRCH-NI-138-1",
+      "question": "section 138 negotiable instruments cheque dishonour",
+      "answer": "Section 138 of the Negotiable Instruments Act, 1881, pertains to the dishonour of a cheque [E2, E1]. A case under this Section may arise when a cheque, such as one issued for loan repayment, is dishonoured [E2].\n\nUpon the dishonour of a cheque, Clause (b) of the proviso to Section 138 of the Negotiable Instruments Act mandates that the payee or the holder must make a demand for payment [E4]. This demand is to be made by giving written notice to the drawer of the cheque after its return as unpaid [E4]. Such notice must be given within the time prescribed under Clause (b) of the proviso to Section 138 [E4]. For instance, if a cheque was dishonoured on 2nd July 1996, a notice dated 16th July 1996 would be considered within the prescribed time [E4].\n\nProceedings under Section 138 of the Negotiable Instruments Act can lead to a petitioner being summoned to face trial [E5].",
+      "sources_count": 6,
+      "markers_emitted": [
+        2,
+        4,
+        5
+      ],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 1.0,
+      "per_corpus_cites": {
+        "legal_qa": 1,
+        "legal_docs": 4,
+        "pipeline_docs": 1
+      },
+      "elapsed_ms": 7766,
+      "error": null
+    },
+    {
+      "qid": "SRCH-NI-138-2",
+      "question": "cheque bounce 30 days notice cure period",
+      "answer": "The provided grounding sources do not contain information regarding the \"cheque bounce 30 days notice cure period\" (not in corpus). The sources primarily consist of cause-titles and procedural details of various cases heard in the High Court of Judicature at Bombay and the Supreme Court of India [E1], [E2], [E3], [E4], [E5], [E6].",
+      "sources_count": 6,
+      "markers_emitted": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 0.3333333333333333,
+      "per_corpus_cites": {
+        "pipeline_docs": 2,
+        "legal_docs": 2,
+        "judgments": 2
+      },
+      "elapsed_ms": 4012,
+      "error": null
+    },
+    {
+      "qid": "SRCH-NI-138-3",
+      "question": "presumption section 139 NI Act consideration",
+      "answer": "Under the Negotiable Instruments Act, 1881 [E1], Section 118(a) presumes that every negotiable instrument, including a cheque, was made or drawn for consideration [E2]. Section 139 presumes that the holder of the cheque received",
+      "sources_count": 6,
+      "markers_emitted": [
+        1,
+        2
+      ],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 0.5,
+      "per_corpus_cites": {
+        "statutes": 1,
+        "legal_qa": 1
+      },
+      "elapsed_ms": 9576,
+      "error": null
+    },
+    {
+      "qid": "SRCH-BAIL-1",
+      "question": "anticipatory bail section 438 CrPC sushila aggarwal",
+      "answer": "An individual already in custody cannot reasonably request anticipatory bail under Section 438 of the Code of Criminal Procedure (CrPC) [E1]. This is because a person in custody would be unable to comply with the condition of being available for interrogation, which is a requirement for anticipatory bail [E1].\n\nApplications for anticipatory bail under Section 438 CrPC are typically filed before the High Court, as exemplified by cases such as *Rajesh Kumar Sharma vs C.B.I.* [E3] and *Punit Kumar Pal vs State Of U.P And 2 Others* [E5] before the Allahabad High Court.\n\nThe provided grounding sources do not contain any information regarding \"Sushila Aggarwal\" (not in corpus).",
+      "sources_count": 6,
+      "markers_emitted": [
+        1,
+        3,
+        5
+      ],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 0.3333333333333333,
+      "per_corpus_cites": {
+        "legal_qa": 2,
+        "pipeline_docs": 2
+      },
+      "elapsed_ms": 4258,
+      "error": null
+    },
+    {
+      "qid": "SRCH-BAIL-2",
+      "question": "regular bail section 439 CrPC triple test",
+      "answer": "The \"triple test\" for regular bail under Section 439 CrPC is not described in the provided grounding sources (not in corpus).",
+      "sources_count": 0,
+      "markers_emitted": [],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 0.0,
+      "per_corpus_cites": {},
+      "elapsed_ms": 2577,
+      "error": null
+    },
+    {
+      "qid": "SRCH-BAIL-3",
+      "question": "default bail section 167 CrPC chargesheet",
+      "answer": "Default bail under Section 167(2) of the Code of Criminal Procedure (CrPC) is a significant legal provision that allows a defendant to be granted bail if the prosecution fails to file a chargesheet within the stipulated time [E1].\n\nKey aspects related to default bail and chargesheet under Section 167 CrPC include:\n1.  **Time Period Calculation**: The legal significance of including or excluding the day of remand when calculating the time period for default bail under Section 167(2) CrPC affects whether a defendant is granted default bail [E1].\n2.  **Filing of Chargesheet**: The filing of a chargesheet is considered sufficient compliance with the provisions of Section 167 [E3]. This was observed in the case of *MANJEET SINGH v. STATE OF HARYANA* [E3].\n3.  **Consequence of Failure to Furnish Surety**: If an accused, having been granted bail under Section 167(2) CrPC, fails to furnish surety within the prescribed 90/60 days period, the bail order is deemed to have extinguished, and the accused can be detained in custody [E5].\n\nThe Supreme Court of India has addressed matters related to criminal jurisdiction in cases such as *RITU CHHABARIA v. UNION OF INDIA & ORS.* [E2] and *CENTRAL BUREAU OF INVESTIGATION v. KAPIL WADHAWAN & ANR.* [E6]. The Gujarat High Court also dealt with a criminal miscellaneous application in *JYOTIBEN VINODBHAI v. STATE OF GUJARAT* [E4].",
+      "sources_count": 6,
+      "markers_emitted": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "markers_resolved": true,
+      "markers_out_of_range": [],
+      "no_citation_for_claims": false,
+      "banned_phrase": null,
+      "text_overlap_pct": 0.5,
+      "per_corpus_cites": {
+        "legal_qa": 3,
+        "judgments": 2,
+        "legal_docs": 2,
+        "pipeline_docs": 1
+      },
+      "elapsed_ms": 6579,
+      "error": null
+    }
+  ]
+}

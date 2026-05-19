@@ -469,14 +469,20 @@ def ai_improve(text: str, doc_type: str = "") -> str:
         return text
 
 
-def ai_write_section(instruction: str, doc_type: str = "", context: str = "") -> str:
+def ai_write_section(instruction: str, doc_type: str = "", context: str = "",
+                     prefer: str | None = None) -> str:
     """Write a complete section based on instruction.
 
-    Note: context is allowed up to 8K chars (was 400). Workflows pass the full
-    contract / FIR / matter brief as context, so a hard 400-char cap was
-    truncating the input before the LLM ever saw it. 8K covers ~2K tokens of
-    context plus the instruction — comfortably within Gemini Flash's 128K
-    window with room left for the response.
+    Args:
+        instruction: the task the LLM should perform.
+        doc_type: hint for the system prompt (e.g. "contract" / "pleading").
+        context: source material — up to 8K chars (Workflows pass full
+            FIRs / contracts here). 400-char caps from earlier truncated
+            input before the LLM saw it.
+        prefer: provider override — "anthropic" / "gemini" / "groq" /
+            "cloudflare". Router cascade falls back if the preferred
+            provider isn't configured. Used by the citation bench to
+            test Claude vs Gemini grounding behaviour.
     """
     doc_label = DOC_TYPES.get(doc_type, {}).get("label", "Legal Document")
     prompt = f"""Document type: {doc_label}
@@ -485,7 +491,8 @@ Document context:
 
 Task: {instruction}"""
     try:
-        resp = router.generate(_EDITOR_SYSTEM, prompt, temperature=0.25, max_tokens=1500)
+        resp = router.generate(_EDITOR_SYSTEM, prompt, temperature=0.25,
+                               max_tokens=1500, prefer=prefer)
         return resp.text
     except Exception as e:
         logger.error("ai_write_section failed: %s", e)

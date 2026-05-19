@@ -151,11 +151,37 @@ def _call_gemini(system: str, user: str, *, temperature: float, max_tokens: int)
     warnings.filterwarnings("ignore", category=FutureWarning)
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system)
+    # Gemini 2.5 Flash with thinking enabled raises a long thinking trace
+    # and sometimes the SDK's .text accessor returns "" because the trace
+    # is in non-text parts. We extract by walking candidates → content →
+    # parts → text manually so we never lose the real answer.
     resp = model.generate_content(
         user,
         generation_config={"temperature": temperature, "max_output_tokens": max_tokens},
     )
-    return (getattr(resp, "text", "") or "").strip()
+    # Path 1 — easy case, .text works.
+    txt = (getattr(resp, "text", "") or "").strip()
+    if txt:
+        return txt
+    # Path 2 — walk candidates manually. Gemini 2.5 thinking traces are in
+    # parts where .text is set; we join everything we find.
+    pieces: list[str] = []
+    for cand in (getattr(resp, "candidates", None) or []):
+        content = getattr(cand, "content", None)
+        if not content:
+            continue
+        for part in (getattr(content, "parts", None) or []):
+            part_text = getattr(part, "text", "") or ""
+            if part_text:
+                pieces.append(part_text)
+    out = "".join(pieces).strip()
+    if out:
+        return out
+    # Path 3 — last resort, see if prompt_feedback explains why empty
+    pf = getattr(resp, "prompt_feedback", None)
+    if pf and getattr(pf, "block_reason", None):
+        raise RuntimeError(f"gemini blocked: {pf.block_reason}")
+    return ""
 
 
 def _call_groq(system: str, user: str, *, temperature: float, max_tokens: int) -> str:
