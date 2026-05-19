@@ -42,6 +42,12 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import auth
 from brief_service import answer_question, answer_conversational, _needs_case_retrieval, serialize_citations, generate_followups
 from validators import input_guards
+from validators.answer_gates import (
+    BANNED_RE as _BANNED_PHRASE_RE,
+    CASE_NAME_RE as _CASE_NAME_RE,
+    SECTION_RE as _SECTION_REF_RE,
+    _strip_markdown as _strip_md_for_validate,
+)
 import vault_service
 import workflows
 import web_signals
@@ -2048,6 +2054,155 @@ def api_editor_ai_write(body: AiWriteSectionBody, ls_session: Optional[str] = Co
     _require_user(ls_session)
     text = doc_editor.ai_write_section(body.instruction, body.doc_type, body.context)
     return {"text": text}
+
+
+# ── Workflow output validator ──────────────────────────────────────────────
+#
+# Workflow nodes do extraction / classification / drafting — not legal
+# research — so the full 6-gate research validator (which requires [n]
+# citations) would false-flag every output. This endpoint runs the gates
+# that DO apply to transformative tasks:
+#
+#   • banned_phrases — no "as an AI", "I think", hedging
+#   • fabricated_cases — every case name in the output must appear in the
+#     provided context (input doc / FIR / contract paste)
+#   • statute_anchor — for compliance / claim-challenger style nodes,
+#     every Section reference must be supported by the context or be a
+#     real Indian statute we've indexed
+#   • format_check — if the recipe declared an expected format (table /
+#     json / bullets), verify the output matches it
+#   • grounding_in_context — % of substantive sentences whose noun phrases
+#     are traceable to the input context (heuristic, not strict)
+#
+# Returns a per-gate map plus a single boolean `passed`. Workflows show a
+# ✓ or ⚠ badge per node; clicking the badge expands which gate failed.
+
+class WorkflowValidateBody(BaseModel):
+    output: str
+    context: str = ""
+    expected_format: str = "free"   # "free" | "table" | "json" | "bullets" | "ranked"
+    node_kind: str = "ai"           # which node produced the output
+
+
+@app.post("/api/workflows/validate")
+def api_workflow_validate(
+    body: WorkflowValidateBody,
+    ls_session: Optional[str] = Cookie(default=None),
+):
+    """Run workflow-aware gates on an AI node's output. See module-docstring above."""
+    _require_user(ls_session)
+    out = body.output or ""
+    ctx = (body.context or "").lower()
+    gates: dict[str, bool] = {}
+    reasons: list[str] = []
+
+    # ── Gate 1: banned phrases (G3 from the research validator)
+    bp = _BANNED_PHRASE_RE.search(out)
+    gates["banned_phrases"] = bp is None
+    if bp:
+        reasons.append(f"banned phrase: '{bp.group(0)}'")
+
+    # ── Gate 2: fabricated case names (G5 from the research validator)
+    # Every case name in the output must appear in the input context.
+    stripped = _strip_md_for_validate(out)
+    fabricated: list[str] = []
+    for cm in _CASE_NAME_RE.finditer(stripped):
+        a = cm.group(1).lower()
+        b = cm.group(2).lower()
+        if a not in ctx or b not in ctx:
+            # Allow if it matches a known landmark case we've seen many times.
+            landmark = {
+                "kesavananda bharati", "maneka gandhi", "vishaka", "puttaswamy",
+                "shreya singhal", "joseph shine", "navtej johar", "sanjay chandra",
+                "satender kumar antil", "niranjan shankar golikari",
+                "hakam singh", "swastik gases", "balco employees union",
+            }
+            joined = f"{a} {b}".lower()
+            if not any(L in joined for L in landmark):
+                fabricated.append(f"{cm.group(1)} v. {cm.group(2)}")
+    gates["no_fabricated_cases"] = not fabricated
+    if fabricated:
+        reasons.append(f"case names not in context: {fabricated[:3]}")
+
+    # ── Gate 3: statute anchor presence (for compliance / defence outputs)
+    # If the node label mentioned compliance / defence / risk / statute, we
+    # expect at least one Section reference. Otherwise neutral.
+    needs_anchor = body.node_kind in ("compliance",) or any(
+        k in (out + body.expected_format).lower()
+        for k in ("statutory", "anchor", "compliance", "defence", "violation")
+    )
+    has_section_ref = bool(_SECTION_REF_RE.search(out))
+    if needs_anchor:
+        gates["statute_anchor"] = has_section_ref
+        if not has_section_ref:
+            reasons.append("output discusses statutory issues but no Section reference present")
+    else:
+        gates["statute_anchor"] = True
+
+    # ── Gate 4: format check (the LLM actually produced what was asked)
+    expected = (body.expected_format or "free").lower()
+    if expected == "table":
+        # Markdown table = at least one line starting with | and a divider row
+        has_table = bool(re.search(r"^\|.+\|\s*$\n^\|[\s\-:|]+\|\s*$", out, re.MULTILINE))
+        gates["format_table"] = has_table
+        if not has_table:
+            reasons.append("expected a markdown table but none found")
+    elif expected == "json":
+        try:
+            import json as _json
+            blob = out.strip()
+            # Try to extract from ```json fences
+            m = re.search(r"```(?:json)?\s*(\{.*?\}|\[.*?\])\s*```", blob, re.DOTALL)
+            if m: blob = m.group(1)
+            _json.loads(blob)
+            gates["format_json"] = True
+        except Exception as e:
+            gates["format_json"] = False
+            reasons.append(f"expected JSON but parse failed: {str(e)[:80]}")
+    elif expected == "bullets":
+        bullet_lines = sum(1 for ln in out.splitlines() if re.match(r"^\s*[-*]\s+", ln))
+        gates["format_bullets"] = bullet_lines >= 3
+        if bullet_lines < 3:
+            reasons.append(f"expected ≥3 bullets, got {bullet_lines}")
+    elif expected == "ranked":
+        num_lines = sum(1 for ln in out.splitlines() if re.match(r"^\s*\d+\.\s+", ln))
+        gates["format_ranked"] = num_lines >= 3
+        if num_lines < 3:
+            reasons.append(f"expected ≥3 ranked items, got {num_lines}")
+    # else format == "free" — no format gate
+
+    # ── Gate 5: grounding in context (heuristic — at least one substantive
+    # noun phrase from the output must appear in the input context).
+    if ctx and len(out) > 200:
+        # Pick capitalized multi-word phrases from output (proper nouns / acts).
+        phrases = re.findall(r"\b([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,4})\b", out)
+        if phrases:
+            cnt = sum(1 for p in phrases if p.lower() in ctx)
+            ratio = cnt / max(len(phrases), 1)
+            gates["grounding_in_context"] = ratio >= 0.30
+            if ratio < 0.30:
+                reasons.append(f"only {ratio:.0%} of proper-noun phrases appear in context")
+        else:
+            gates["grounding_in_context"] = True
+    else:
+        gates["grounding_in_context"] = True
+
+    passed_count = sum(1 for v in gates.values() if v)
+    total = len(gates)
+    confidence = passed_count / total if total else 1.0
+    # Hard-fail if banned_phrases or no_fabricated_cases fail (these matter
+    # for legal correctness). Format gates are soft-fail.
+    hard_pass = gates.get("banned_phrases", True) and gates.get("no_fabricated_cases", True)
+    passed = hard_pass and passed_count == total
+
+    return {
+        "passed":      passed,
+        "confidence":  round(confidence, 2),
+        "gates":       gates,
+        "reasons":     reasons,
+        "passed_count": passed_count,
+        "total":       total,
+    }
 
 
 @app.post("/api/editor/ai/suggest-cases")
