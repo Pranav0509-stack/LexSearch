@@ -459,14 +459,22 @@ def ai_improve(text: str, doc_type: str = "") -> str:
 
 
 def ai_write_section(instruction: str, doc_type: str = "", context: str = "") -> str:
-    """Write a complete section based on instruction."""
+    """Write a complete section based on instruction.
+
+    Note: context is allowed up to 8K chars (was 400). Workflows pass the full
+    contract / FIR / matter brief as context, so a hard 400-char cap was
+    truncating the input before the LLM ever saw it. 8K covers ~2K tokens of
+    context plus the instruction — comfortably within Gemini Flash's 128K
+    window with room left for the response.
+    """
     doc_label = DOC_TYPES.get(doc_type, {}).get("label", "Legal Document")
     prompt = f"""Document type: {doc_label}
-Document context: {context[:400] if context else 'Not provided'}
+Document context:
+{context[:8000] if context else 'Not provided'}
 
-Write this section: {instruction}"""
+Task: {instruction}"""
     try:
-        resp = router.generate(_EDITOR_SYSTEM, prompt, temperature=0.25, max_tokens=800)
+        resp = router.generate(_EDITOR_SYSTEM, prompt, temperature=0.25, max_tokens=1500)
         return resp.text
     except Exception as e:
         logger.error("ai_write_section failed: %s", e)

@@ -44,14 +44,18 @@ Sanhita Platform
 │   ├── Court Search — filter-driven auto-rerun, 6 source tabs incl. tribunals
 │   ├── Drafter Studio — 26 templates (4 verbatim Govt forms first, then statute-anchored)
 │   ├── Editor — TipTap with full toolbar + Export menu (HTML/MD/TXT/Print/Clipboard)
-│   ├── Workflows — n8n-style drag-drop canvas + 17 prebuilt recipes
+│   ├── Workflows — n8n-style drag-drop canvas + 27 prebuilt recipes
 │   │     · 12 Indian-litigation procedural (cheque-bounce §138, bail pipeline,
 │   │       civil-suit bundle, §80 CPC, §34 setaside, quashing §482, morning
 │   │       cause-list, limitation tracker, order-copy fetcher, client
 │   │       onboarding, cross-exam prep, bill of costs)
-│   │     · 5 transactional (Agreement Audit ICA+FEMA, Chronology of Events,
-│   │       Compliance Gap 8-plugin, Due Diligence M&A, Focused Summarizer) —
-│   │       inspired by Lexity's Clickflows but anchored to Indian statutes
+│   │     · 15 transactional / compliance — covers EVERY Lexity Clickflow
+│   │       (Agreement Audit · Chronology of Events · Compliance Gap ·
+│   │        Due Diligence · Focused Summarizer · Closing Checklist ·
+│   │        Privilege Review · Playbook Audit · Matter Triage ·
+│   │        Claim Challenger · New Case Assessment · Quick Agreement
+│   │        Analyzer · Loan Compliance Tracker · Execution-vs-Final Diff ·
+│   │        Chain of Ownership) — all anchored to Indian statutes
 │   ├── Document Vault — upload & query your case files
 │   └── Clients / Legal Aid / History panes
 ├── LLM Router (4-provider chain with circuit breakers)
@@ -96,6 +100,8 @@ Sanhita Platform
 | **Acronym aliasing in search** | RBI / SEBI / NCLAT / IBC / CrPC / BNS / 19 more expand to full-name OR-groups so the documents corpus is reachable by acronym |
 | **+5 transactional workflows** | Agreement Audit (14-dim, FEMA-aware) · Chronology of Events · Compliance Gap (8 plugins) · Due Diligence M&A · Focused Summarizer — the Indian-flavoured answer to Lexity's Clickflows |
 | **Hardened criminal recipes** | Cheque-bounce §138 + Bail pipeline now include citator gate (no overruled cites surface), WhatsApp client tracker, and Vault snapshot for reuse on appeal |
+| **+10 Lexity-parity workflows** | Closing Checklist · Privilege Review (§126 IEA) · Playbook Audit · Matter Triage · Claim Challenger · New Case Assessment · Quick Agreement Analyzer · Loan Compliance Tracker · Execution-vs-Final Diff · Chain of Ownership — every Lexity Clickflow now has an India-anchored counterpart |
+| **Workflow runner hardening** | `executeNode` never breaks the chain on a single backend miss; soft-fail rows show what would have run; "pick best body" finds the right input field automatically (no more "missing brief_facts") |
 
 ## Quick Start
 

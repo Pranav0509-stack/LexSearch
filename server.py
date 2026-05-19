@@ -4,6 +4,18 @@ FastAPI backend: search API + PDF proxy from public AWS S3.
 Run: uvicorn server:app --reload --port 8080
 """
 
+# Load .env BEFORE any module that reads env vars at import-time.
+# llm/router.py captures GEMINI_API_KEY / ANTHROPIC_API_KEY / GROQ_API_KEY
+# in module globals when imported, so the .env file has to be parsed first
+# or the LLM calls silently fall back to empty responses.
+try:
+    from dotenv import load_dotenv  # type: ignore
+    load_dotenv()
+except ImportError:
+    # python-dotenv is optional; if it's not installed we rely on the
+    # caller to have exported env vars themselves (e.g. via launch.json).
+    pass
+
 import io
 import logging
 import os
