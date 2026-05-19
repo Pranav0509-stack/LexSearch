@@ -1,8 +1,8 @@
 # Sanhita — India's AI Legal Research Platform
 
-**31.9M court judgments. 13.6M legal documents. 1.36M legal QA pairs. 2,383 statutes. 44.1M pending cases.**
+**83M+ indexed legal records. 16.9M HC judgments. 53.3M HC + district registry rows. 11.6M curated docs. 1.31M legal Q&A. 2,333 statutes. 2K tribunal / regulator orders.**
 
-The largest structured Indian legal corpus, searchable in under 50ms.
+The largest structured Indian legal corpus, searchable in under 50 ms warm, sub-3 s cold across all 6 corpora.
 
 Built by [NyayaSathi AI](https://github.com/Nyayasathi-AI) — because Indian lawyers deserve better than hallucinated citations.
 
@@ -12,11 +12,12 @@ Built by [NyayaSathi AI](https://github.com/Nyayasathi-AI) — because Indian la
 
 | | GPT-4 / Claude | Harvey AI | **Sanhita** |
 |---|---|---|---|
-| Indian case law | ~0 (hallucinates) | US/UK only | **31.9M real judgments** |
+| Indian case law | ~0 (hallucinates) | US/UK only | **83M+ real records, 6 corpora** |
 | Structured metadata | None | Limited | **CNR, judge, bench, court, petitioner, respondent, verdict, PDF** |
 | Verified citations | No | Yes (US) | **Every citation links to a real judgment** |
 | NJDG pending cases | No | No | **44.1M records across 30 states** |
-| Indian statutes | Training data | US/UK | **2,383 indexed bare acts** |
+| Indian statutes | Training data | US/UK | **2,333 indexed bare acts** |
+| Tribunal coverage | No | No | **NCLAT, RBI, SEBI, PRS, IndiaCode** |
 | Languages | English | English | **13 Indian languages** |
 | Price | $20-200/mo | $2,000/user/mo | **Free tier + Pro** |
 
@@ -24,37 +25,67 @@ Built by [NyayaSathi AI](https://github.com/Nyayasathi-AI) — because Indian la
 
 ```
 Sanhita Platform
-├── FastAPI Backend (53 API routes)
-│   ├── /api/cases/search — FTS5 BM25 search across 31.9M records (<50ms)
-│   ├── /api/brief/chat — RAG: FTS5 retrieval → LLM → 6-gate validator
-│   ├── /api/news — live legal news from 5 Indian law sources
-│   ├── /api/analytics/* — court efficiency, bail intelligence, corpus stats
+├── FastAPI Backend
+│   ├── /api/cases/smart-search — HybridSearchEngine: BM25 ⨁ FAISS over 6 corpora
+│   │     · parallel fan-out across tables (6 worker threads, own SQLite handles)
+│   │     · FTS5 `rank` short-circuit replaces per-row bm25() calls
+│   │     · cold-cache "bail" + ALL sources: 2.6 s  (was >60 s sequential)
+│   ├── /api/cases/latest — cross-corpus newest, round-robined 4-per-source
+│   ├── /api/brief/chat     — legacy RAG: retrieval → LLM → 6-gate validator
+│   ├── /api/brief/chat-v2  — planner + multi-corpus retrieve + synth + validator
+│   │     · sub-question decomposition · practice-area auto-classify
+│   │     · returns {answer_markdown, citations, sub_questions, validation}
+│   ├── /api/contract/* — draft, review, redline, compliance, quick-edit
 │   ├── /api/vault/* — document upload + multi-doc Q&A
-│   ├── /api/draft — legal document drafting (10 templates)
-│   └── /health — instant health check
-├── React Frontend (Next.js)
-│   ├── Sanhita Brief — AI assistant with citation cards
-│   ├── Court Search — advanced filters across 25 High Courts
-│   ├── Dashboard — corpus analytics & court efficiency
+│   ├── /api/legal-aid/* — intake form + admin queue
+│   └── /api/analytics/* — court efficiency, bail intelligence, corpus stats
+├── React Frontend (Next.js 16, Turbopack)
+│   ├── Assistant — chat hitting /api/brief/chat-v2 (planner+validator)
+│   ├── Court Search — filter-driven auto-rerun, 6 source tabs incl. tribunals
+│   ├── Drafter Studio — 26 templates (4 verbatim Govt forms first, then statute-anchored)
+│   ├── Editor — TipTap with full toolbar + Export menu (HTML/MD/TXT/Print/Clipboard)
+│   ├── Workflows — n8n-style drag-drop canvas + 12 prebuilt recipes
 │   ├── Document Vault — upload & query your case files
-│   └── Draft Generator — legal document templates
+│   └── Clients / Legal Aid / History panes
 ├── LLM Router (4-provider chain with circuit breakers)
-│   ├── Anthropic Claude → Groq Llama 70B → Gemini → Cloudflare
+│   ├── Gemini Flash → Anthropic Claude → Groq Llama 70B → Cloudflare
 │   └── No-LLM fallback: returns structured case results (never refuses)
-├── 6-Gate Answer Validator
+├── Reasoner pipeline (scripts/assistant/legal_reasoner.py)
+│   ├── Planner LLM → sub-questions + practice area
+│   ├── Retrieve evidence per sub-question via HybridSearchEngine
+│   ├── Synthesise answer with inline [E1..En] markers
+│   └── Validate via 6 answer gates (cite_present / resolves / banned / grounding / scope / section)
+├── 6-Gate Answer Validator (validators/answer_gates.py)
 │   ├── G1: cite_present — answer has [n] markers
 │   ├── G2: cite_resolves — markers map to real cases
 │   ├── G3: no_banned_phrases — no hallucination hedges
 │   ├── G4: grounding_floor — 60%+ sentences cited
 │   ├── G5: scope_check — no fabricated case names
 │   └── G6: section_check — statute refs verified
-└── SQLite FTS5 Database (84.7 GB)
-    ├── judgments (16.9M) — all 25 High Courts, 1950-2025
-    ├── legal_docs (13.6M) — KanoonGPT HC judgments
-    ├── legal_qa (1.36M) — question-answer pairs
-    ├── statutes (2,383) — IPC, CrPC, CPC, BNS, BNSS, BSA
-    └── njdg_* (44.1M) — pending case records
+└── SQLite + FTS5 + FAISS (152 GB on disk, WAL + mmap 8 GiB)
+    ├── judgments      (16.9M) — all 25 High Courts, 1950-2025
+    ├── pipeline_docs  (53.3M) — HC + district + tribunal registry
+    ├── legal_docs     (11.6M) — KanoonGPT HC text, SC, statutes-as-cases
+    ├── legal_qa       ( 1.31M) — question-answer pairs
+    ├── statutes       ( 2,333) — IPC, CrPC, CPC, BNS, BNSS, BSA, India Code
+    ├── documents      ( 2,038) — NCLAT, RBI, SEBI, PRS, IndiaCode acts
+    └── njdg_*         (44.1M) — pending case records
 ```
+
+## What landed in the May 18 release
+
+| Change | Why it matters |
+|---|---|
+| **Parallel BM25 fan-out** across 6 corpora (`scripts/search/engine.py`) | Cold-cache "bail" ALL-sources: **>60 s → 2.6 s** (UI no longer times out) |
+| **FTS5 `rank` short-circuit** replaces per-row `bm25()` | Individual table cold time **30 s → 3-7 s** |
+| **`documents` corpus exposed** (NCLAT/RBI/SEBI/PRS/IndiaCode) | Previously invisible; now searchable + appears in Latest tab |
+| **`/api/brief/chat-v2`** wraps the legal_reasoner pipeline | Chat now gets sub-question planning + 6-gate validation + 83M-row grounding |
+| **`api_cases_latest` cross-corpus union** | Latest tab was judgments-only — now shows 4 per corpus, date-sorted |
+| **Auto-rerun on filter change** in Court Search | Year / source / engine changes now refire the query (250 ms debounce) |
+| **Tabs surface all 6 corpora** | All Sources · HC Judgments · Case Records · Legal Docs · Statutes · Legal Q&A · Tribunals & Regulators |
+| **Drafter quick-edit messaging** | Refusal-with-reason now renders as a friendly tip, not an error |
+| **Editor Export menu** | HTML / Markdown / TXT / Print → PDF / Copy-all (replaces broken empty-onClick button) |
+| **Template sort by authority** | 4 verbatim Govt forms (RTI, CPC Form 1, CPC Form 4, NCLT IBC §7) now sort first |
 
 ## Quick Start
 

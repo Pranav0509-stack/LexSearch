@@ -1,0 +1,358 @@
+{
+  "ts": "20260517-124435",
+  "n": 12,
+  "pass": 8,
+  "score": 0.8889999999999999,
+  "elapsed_s": 8.9,
+  "threshold": 0.8,
+  "results": [
+    {
+      "id": "SRCH-NI-138-1",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 410
+    },
+    {
+      "id": "SRCH-NI-138-2",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "5/5 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: negotiable instruments"
+          ]
+        }
+      },
+      "elapsed_ms": 1220
+    },
+    {
+      "id": "SRCH-NI-138-3",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "unresolved citation: 'Basalingappa v. Mudibasappa'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 1039
+    },
+    {
+      "id": "SRCH-BAIL-1",
+      "kind": "search",
+      "category": "Bail",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "3/3 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 640
+    },
+    {
+      "id": "SRCH-BAIL-2",
+      "kind": "search",
+      "category": "Bail",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 439"
+          ]
+        }
+      },
+      "elapsed_ms": 106
+    },
+    {
+      "id": "SRCH-BAIL-3",
+      "kind": "search",
+      "category": "Bail",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 549
+    },
+    {
+      "id": "SRCH-QUASH-1",
+      "kind": "search",
+      "category": "Quashing",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 701
+    },
+    {
+      "id": "SRCH-QUASH-2",
+      "kind": "search",
+      "category": "Quashing",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 32
+    },
+    {
+      "id": "SRCH-ARB-34-1",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 34"
+          ]
+        }
+      },
+      "elapsed_ms": 947
+    },
+    {
+      "id": "SRCH-ARB-34-2",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 146
+    },
+    {
+      "id": "SRCH-ARB-34-3",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 187
+    },
+    {
+      "id": "SRCH-ARB-11-1",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 2887
+    }
+  ]
+}

@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 
 # ── System prompt: the soul of Sanhita ─────────────────────────────────
 SYSTEM_PROMPT = """You are Sanhita Brief, an AI legal research assistant for Indian advocates.
-You are backed by India's largest structured corpus: 31.9 million court judgments across
+You are backed by India's largest structured corpus: 83 million Indian legal records across
 25 High Courts (1950-2025), 13.6 million legal documents, 1.36 million legal QA pairs,
 and 2,383 indexed statutes.
 
@@ -259,7 +259,7 @@ import re as _re
 
 # ── Conversational system prompt (no retrieval needed) ─────────────────
 CONVERSATIONAL_PROMPT = """You are Sanhita, India's AI legal research assistant powered by a corpus of
-31.9 million court judgments, 13.6M legal documents, 1.36M legal Q&A, and 2,383 statutes.
+83 million Indian legal records, 13.6M legal documents, 1.36M legal Q&A, and 2,383 statutes.
 
 You are having a friendly, helpful conversation with a legal professional or citizen.
 The user is NOT asking you to find specific cases right now — they may be greeting you,
@@ -340,7 +340,7 @@ def answer_conversational(
         return {
             "answer_markdown": (
                 "Hello! I'm **Sanhita**, your AI legal research assistant.\n\n"
-                "I have access to **31.9 million Indian court judgments** from all 25 High Courts, "
+                "I have access to **83 million Indian legal records** from all 25 High Courts, "
                 "13.6M legal documents, 1.36M legal Q&A pairs, and 2,383 statutes.\n\n"
                 "**Try asking me to:**\n"
                 "- Find cases on bail under NDPS Act\n"
@@ -377,7 +377,7 @@ def answer_conversational(
         return {
             "answer_markdown": (
                 "Hello! I'm **Sanhita**, your AI legal research assistant. "
-                "I can search through 31.9 million Indian court judgments. "
+                "I can search through 83 million Indian legal records. "
                 "Ask me to find cases, explain legal provisions, or research any topic in Indian law."
             ),
             "citations": [],
@@ -624,7 +624,7 @@ def _build_no_llm_response(question: str, hits: list[dict[str, Any]]) -> str:
     lines = [
         f"## {len(top)} Results Found\n",
         f"*{type_summary}*\n",
-        f"*Ranked by BM25 relevance from 31.9M Indian court records.*\n",
+        f"*Ranked by BM25 relevance from 83M Indian legal records.*\n",
         "---\n",
     ]
 

@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OfficeApp xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+           xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+           xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+           xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+           xsi:type="TaskPaneApp">
+
+  <Id>4b4c4d4e-1234-4abc-9def-123456789abc</Id>
+  <Version>0.1.0</Version>
+  <ProviderName>Sanhita</ProviderName>
+  <DefaultLocale>en-IN</DefaultLocale>
+  <DisplayName DefaultValue="Sanhita Drafter"/>
+  <Description DefaultValue="Indian-law drafter, statute lookup, compliance check, and quick-edit inside Microsoft Word. Uses Sanhita's 70M-row corpus + 26 statutory / govt-form templates."/>
+  <IconUrl DefaultValue="http://localhost:3001/icon-64.png"/>
+  <HighResolutionIconUrl DefaultValue="http://localhost:3001/icon-128.png"/>
+  <SupportUrl DefaultValue="https://sanhita.ai/support"/>
+
+  <Hosts>
+    <Host Name="Document"/>
+  </Hosts>
+
+  <DefaultSettings>
+    <SourceLocation DefaultValue="http://localhost:3001/taskpane.html"/>
+  </DefaultSettings>
+
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Document">
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="GetStarted.Title"/>
+            <Description resid="GetStarted.Description"/>
+            <LearnMoreUrl resid="GetStarted.LearnMoreUrl"/>
+          </GetStarted>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="SanhitaGroup">
+                <Label resid="Sanhita.Group.Label"/>
+                <Icon>
+                  <bt:Image size="16" resid="Sanhita.Icon.16"/>
+                  <bt:Image size="32" resid="Sanhita.Icon.32"/>
+                  <bt:Image size="80" resid="Sanhita.Icon.80"/>
+                </Icon>
+                <Control xsi:type="Button" id="OpenSanhitaButton">
+                  <Label resid="Sanhita.Open.Label"/>
+                  <Supertip>
+                    <Title resid="Sanhita.Open.Label"/>
+                    <Description resid="Sanhita.Open.Tooltip"/>
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Sanhita.Icon.16"/>
+                    <bt:Image size="32" resid="Sanhita.Icon.32"/>
+                    <bt:Image size="80" resid="Sanhita.Icon.80"/>
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>SanhitaTaskpane</TaskpaneId>
+                    <SourceLocation resid="Sanhita.Taskpane.Url"/>
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Sanhita.Icon.16" DefaultValue="http://localhost:3001/icon-16.png"/>
+        <bt:Image id="Sanhita.Icon.32" DefaultValue="http://localhost:3001/icon-32.png"/>
+        <bt:Image id="Sanhita.Icon.80" DefaultValue="http://localhost:3001/icon-80.png"/>
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="GetStarted.LearnMoreUrl"  DefaultValue="https://sanhita.ai/word"/>
+        <bt:Url id="Sanhita.Taskpane.Url"     DefaultValue="http://localhost:3001/taskpane.html"/>
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="GetStarted.Title"      DefaultValue="Sanhita is ready"/>
+        <bt:String id="Sanhita.Group.Label"   DefaultValue="Sanhita"/>
+        <bt:String id="Sanhita.Open.Label"    DefaultValue="Open Sanhita"/>
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="GetStarted.Description" DefaultValue="Draft, review, and compliance-check Indian legal documents inside Word."/>
+        <bt:String id="Sanhita.Open.Tooltip"   DefaultValue="Open the Sanhita task pane to draft from a template, look up a statute, check DPDP / RBI / SEBI / IBC compliance, or polish selected text."/>
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

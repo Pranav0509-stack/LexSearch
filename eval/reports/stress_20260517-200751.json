@@ -1,0 +1,53 @@
+[
+  {
+    "name": "smart-search (50 parallel hybrid)",
+    "n": 50,
+    "ok": 50,
+    "errors": 0,
+    "p50_ms": 43270.6,
+    "p95_ms": 43898.0,
+    "p99_ms": 43898.4,
+    "max_ms": 43898.4,
+    "mean_ms": 35199.0,
+    "extra": {
+      "hits_total": 226
+    },
+    "errs_sample": []
+  },
+  {
+    "name": "PDF proxy (20 parallel S3 streams)",
+    "n": 20,
+    "ok": 20,
+    "errors": 0,
+    "p50_ms": 490.9,
+    "p95_ms": 813.8,
+    "p99_ms": 813.8,
+    "max_ms": 813.8,
+    "mean_ms": 478.3,
+    "extra": {},
+    "errs_sample": []
+  },
+  {
+    "name": "compliance XL (5\u00d7 10K-word body)",
+    "n": 5,
+    "ok": 5,
+    "errors": 0,
+    "p50_ms": 16.9,
+    "p95_ms": 17.8,
+    "p99_ms": 17.8,
+    "max_ms": 17.8,
+    "mean_ms": 16.0,
+    "extra": {
+      "findings_seen": 5,
+      "body_chars": 111000,
+      "body_words": 17400
+    },
+    "errs_sample": []
+  },
+  {
+    "name": "quick-edit Gemini (5 polish + 3 cite + 2 shorten)",
+    "n": 10,
+    "errors": 10,
+    "no_data": true
+  }
+]

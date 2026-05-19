@@ -1,0 +1,69 @@
+[
+  {
+    "name": "smart-search (50 parallel hybrid)",
+    "n": 50,
+    "ok": 50,
+    "errors": 0,
+    "p50_ms": 9237.2,
+    "p95_ms": 16605.9,
+    "p99_ms": 17377.8,
+    "max_ms": 17377.8,
+    "mean_ms": 8556.2,
+    "extra": {
+      "hits_total": 229
+    },
+    "errs_sample": []
+  },
+  {
+    "name": "PDF proxy (20 parallel S3 streams)",
+    "n": 20,
+    "ok": 20,
+    "errors": 0,
+    "p50_ms": 361.4,
+    "p95_ms": 729.5,
+    "p99_ms": 729.5,
+    "max_ms": 729.5,
+    "mean_ms": 409.3,
+    "extra": {},
+    "errs_sample": []
+  },
+  {
+    "name": "compliance XL (5\u00d7 10K-word body)",
+    "n": 5,
+    "ok": 5,
+    "errors": 0,
+    "p50_ms": 15.3,
+    "p95_ms": 15.9,
+    "p99_ms": 15.9,
+    "max_ms": 15.9,
+    "mean_ms": 14.3,
+    "extra": {
+      "findings_seen": 5,
+      "body_chars": 111000,
+      "body_words": 17400
+    },
+    "errs_sample": []
+  },
+  {
+    "name": "quick-edit Gemini (5 polish + 3 cite + 2 shorten)",
+    "n": 10,
+    "ok": 6,
+    "errors": 4,
+    "p50_ms": 10921.2,
+    "p95_ms": 11263.7,
+    "p99_ms": 11263.7,
+    "max_ms": 11263.7,
+    "mean_ms": 10163.6,
+    "extra": {
+      "models": [
+        "gemini-2.5-flash"
+      ]
+    },
+    "errs_sample": [
+      "cite unchanged: ANTHROPIC_API_KEY not set",
+      "cite unchanged: ANTHROPIC_API_KEY not set",
+      "shorten unchanged: ANTHROPIC_API_KEY not set",
+      "cite unchanged: ANTHROPIC_API_KEY not set"
+    ]
+  }
+]

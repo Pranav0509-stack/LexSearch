@@ -1,0 +1,118 @@
+{"id":"SRCH-NI-138-1","kind":"search","category":"NI Act","query":"section 138 negotiable instruments cheque dishonour","mode":"hybrid","must_cite_acts":["negotiable instruments"],"must_cite_sections":["section 138"]}
+{"id":"SRCH-NI-138-2","kind":"search","category":"NI Act","query":"cheque bounce 30 days notice cure period","mode":"hybrid","must_cite_acts":["negotiable instruments"]}
+{"id":"SRCH-NI-138-3","kind":"search","category":"NI Act","query":"presumption section 139 NI Act consideration","mode":"hybrid","must_cite_sections":["section 139"]}
+{"id":"SRCH-BAIL-1","kind":"search","category":"Bail","query":"anticipatory bail section 438 CrPC sushila aggarwal","mode":"hybrid","must_cite_sections":["section 438"]}
+{"id":"SRCH-BAIL-2","kind":"search","category":"Bail","query":"regular bail section 439 CrPC triple test","mode":"hybrid","must_cite_sections":["section 439"]}
+{"id":"SRCH-BAIL-3","kind":"search","category":"Bail","query":"default bail section 167 CrPC chargesheet","mode":"hybrid","must_cite_sections":["section 167"]}
+{"id":"SRCH-QUASH-1","kind":"search","category":"Quashing","query":"quashing fir section 482 CrPC bhajan lal","mode":"hybrid","must_cite_sections":["section 482"]}
+{"id":"SRCH-QUASH-2","kind":"search","category":"Quashing","query":"quashing settlement gian singh non-heinous","mode":"hybrid"}
+{"id":"SRCH-ARB-34-1","kind":"search","category":"Arbitration","query":"section 34 arbitration set aside award patent illegality","mode":"hybrid","must_cite_sections":["section 34"]}
+{"id":"SRCH-ARB-34-2","kind":"search","category":"Arbitration","query":"public policy arbitration ssangyong renusagar","mode":"hybrid"}
+{"id":"SRCH-ARB-34-3","kind":"search","category":"Arbitration","query":"associate builders patent illegality","mode":"hybrid"}
+{"id":"SRCH-ARB-11-1","kind":"search","category":"Arbitration","query":"appointment of arbitrator section 11 perkins eastman","mode":"hybrid","must_cite_sections":["section 11"]}
+{"id":"SRCH-IBC-7-1","kind":"search","category":"IBC","query":"section 7 IBC financial creditor CIRP","mode":"hybrid","must_cite_acts":["insolvency"],"must_cite_sections":["section 7"]}
+{"id":"SRCH-IBC-14-1","kind":"search","category":"IBC","query":"moratorium section 14 IBC gujarat urja vikas","mode":"hybrid","must_cite_sections":["section 14"]}
+{"id":"SRCH-IBC-9-1","kind":"search","category":"IBC","query":"operational creditor section 9 IBC pre-existing dispute mobilox","mode":"hybrid"}
+{"id":"SRCH-IPC-302-1","kind":"search","category":"IPC","query":"murder section 302 IPC bharatiya nyaya sanhita","mode":"hybrid","must_cite_sections":["section 302"]}
+{"id":"SRCH-IPC-420-1","kind":"search","category":"IPC","query":"cheating section 420 IPC mens rea","mode":"hybrid","must_cite_sections":["section 420"]}
+{"id":"SRCH-CPC-80-1","kind":"search","category":"CPC","query":"section 80 CPC notice government suit","mode":"hybrid","must_cite_sections":["section 80"]}
+{"id":"SRCH-CPC-148A-1","kind":"search","category":"CPC","query":"caveat section 148A CPC 90 days","mode":"hybrid","must_cite_sections":["section 148A"]}
+{"id":"SRCH-CPC-O39-1","kind":"search","category":"CPC","query":"temporary injunction order 39 cpc prima facie balance convenience","mode":"hybrid"}
+{"id":"SRCH-CPC-O37-1","kind":"search","category":"CPC","query":"summary suit order 37 promissory note leave to defend","mode":"hybrid"}
+{"id":"SRCH-CPC-O7R11-1","kind":"search","category":"CPC","query":"rejection of plaint order 7 rule 11 cause of action","mode":"hybrid"}
+{"id":"SRCH-ICA-27-1","kind":"search","category":"Contract","query":"section 27 indian contract act restraint of trade niranjan shankar golikari","mode":"hybrid","must_cite_sections":["section 27"]}
+{"id":"SRCH-ICA-73-1","kind":"search","category":"Contract","query":"section 73 indian contract act damages remoteness hadley baxendale","mode":"hybrid","must_cite_sections":["section 73"]}
+{"id":"SRCH-ICA-74-1","kind":"search","category":"Contract","query":"liquidated damages section 74 ica fateh chand penalty","mode":"hybrid","must_cite_sections":["section 74"]}
+{"id":"SRCH-ICA-56-1","kind":"search","category":"Contract","query":"frustration section 56 indian contract act energy watchdog","mode":"hybrid"}
+{"id":"SRCH-CONST-226-1","kind":"search","category":"Constitutional","query":"writ jurisdiction article 226 alternative remedy","mode":"hybrid"}
+{"id":"SRCH-CONST-21-1","kind":"search","category":"Constitutional","query":"right to life article 21 privacy justice puttaswamy","mode":"hybrid"}
+{"id":"SRCH-CONST-14-1","kind":"search","category":"Constitutional","query":"equality article 14 reasonable classification arbitrary","mode":"hybrid"}
+{"id":"SRCH-TPA-54-1","kind":"search","category":"Property","query":"sale deed section 54 transfer of property act registration","mode":"hybrid","must_cite_sections":["section 54"]}
+{"id":"SRCH-TPA-105-1","kind":"search","category":"Property","query":"lease section 105 transfer of property act","mode":"hybrid"}
+{"id":"SRCH-REG-17-1","kind":"search","category":"Property","query":"compulsory registration section 17 registration act 1908","mode":"hybrid"}
+{"id":"SRCH-ISA-276-1","kind":"search","category":"Succession","query":"probate petition section 276 indian succession act","mode":"hybrid","must_cite_sections":["section 276"]}
+{"id":"SRCH-ISA-63-1","kind":"search","category":"Succession","query":"execution of will section 63 indian succession act witnesses","mode":"hybrid","must_cite_sections":["section 63"]}
+{"id":"SRCH-HSA-30-1","kind":"search","category":"Succession","query":"hindu succession act section 30 right to dispose by will","mode":"hybrid"}
+{"id":"SRCH-DPDP-8-1","kind":"search","category":"DPDP","query":"digital personal data protection act section 8 data fiduciary obligations","mode":"hybrid"}
+{"id":"SRCH-DPDP-16-1","kind":"search","category":"DPDP","query":"cross border data transfer dpdp act section 16","mode":"hybrid"}
+{"id":"SRCH-IT-43A-1","kind":"search","category":"IT Act","query":"section 43a information technology act reasonable security practices sensitive personal data","mode":"hybrid"}
+{"id":"SRCH-POSH-1","kind":"search","category":"POSH","query":"sexual harassment workplace 2013 internal complaints committee","mode":"hybrid"}
+{"id":"SRCH-SARFAESI-13-1","kind":"search","category":"SARFAESI","query":"section 13 sarfaesi enforcement of security secured creditor","mode":"hybrid","must_cite_sections":["section 13"]}
+{"id":"SRCH-SC-PUTTASWAMY","kind":"search","category":"Landmark","query":"right to privacy puttaswamy nine judge bench","mode":"hybrid"}
+{"id":"SRCH-SC-KESAVANANDA","kind":"search","category":"Landmark","query":"basic structure doctrine kesavananda bharati","mode":"hybrid"}
+{"id":"SRCH-SC-MANEKA","kind":"search","category":"Landmark","query":"maneka gandhi due process article 21","mode":"hybrid"}
+{"id":"SRCH-SC-MENAKA","kind":"search","category":"Constitutional","query":"reasonable restriction article 19","mode":"hybrid"}
+{"id":"SRCH-COMM-12A-1","kind":"search","category":"Commercial","query":"section 12A commercial courts act pre-institution mediation","mode":"hybrid"}
+{"id":"SRCH-CONS-2019-1","kind":"search","category":"Consumer","query":"consumer protection act 2019 e-commerce CCPA","mode":"hybrid"}
+{"id":"SRCH-MOTOR-1","kind":"search","category":"MV","query":"motor accident compensation multiplier method sarla verma","mode":"hybrid"}
+{"id":"SRCH-MOTOR-2","kind":"search","category":"MV","query":"motor accidents claims tribunal compensation","mode":"hybrid"}
+{"id":"SRCH-LAB-1","kind":"search","category":"Labour","query":"industrial disputes act retrenchment compensation","mode":"hybrid"}
+{"id":"SRCH-LAB-2","kind":"search","category":"Labour","query":"gratuity payment of gratuity act 1972","mode":"hybrid"}
+{"id":"NUDGE-NDA-NONCOMPETE","kind":"nudge","category":"Drafter","body_md":"This Agreement contains a non-compete obligation. The Employee shall not engage in any business that competes with the Employer for two years after termination.","expected_nudges":["non-compete","section 27"]}
+{"id":"NUDGE-INDEMNIFY","kind":"nudge","category":"Drafter","body_md":"The Service Provider shall indemnify the Customer for all losses arising from any breach. The indemnity is unlimited and uncapped.","expected_nudges":["indemnity","section 124"]}
+{"id":"NUDGE-LIQUIDATED","kind":"nudge","category":"Drafter","body_md":"In the event of breach, the Borrower shall pay liquidated damages equivalent to 10% of the contract value. This is a genuine pre-estimate of loss.","expected_nudges":["liquidated damages","section 74"]}
+{"id":"NUDGE-DEFAULT-INTEREST","kind":"nudge","category":"Drafter","body_md":"On any default, the Lender shall charge default interest at 36% per month on the overdue amount.","expected_nudges":["default interest","section 74"]}
+{"id":"NUDGE-UNILATERAL-ARB","kind":"nudge","category":"Drafter","body_md":"Disputes shall be resolved by arbitration by a sole arbitrator appointed unilaterally by the Lender.","expected_nudges":["arbitrator","section 12(5)"]}
+{"id":"NUDGE-FORCE-MAJEURE","kind":"nudge","category":"Drafter","body_md":"Neither party shall be liable for delay or failure to perform due to force majeure, including events beyond reasonable control.","expected_nudges":["force majeure","section 56"]}
+{"id":"NUDGE-IBC-TERMINATE","kind":"nudge","category":"Drafter","body_md":"The Supplier may terminate this Agreement immediately on the Buyer's admission of insolvency or filing of a corporate insolvency resolution process.","expected_nudges":["insolvency","section 14"]}
+{"id":"NUDGE-DPDP-PD","kind":"nudge","category":"Drafter","body_md":"The Service Provider shall process personal data of customers to deliver the Services. Sensitive personal data may be shared.","expected_nudges":["personal data","section 8"]}
+{"id":"NUDGE-138","kind":"nudge","category":"Drafter","body_md":"Payment shall be made by cheque drawn on the Buyer's bank. Section 138 of the NI Act shall apply to any dishonoured cheque.","expected_nudges":["section 138"]}
+{"id":"NUDGE-SPECIFIC-PERF","kind":"nudge","category":"Drafter","body_md":"In the event of breach, the non-defaulting party shall be entitled to specific performance, given that damages are inadequate.","expected_nudges":["specific performance","section 10"]}
+{"id":"NUDGE-PCA","kind":"nudge","category":"Drafter","body_md":"Each party shall comply with the Prevention of Corruption Act 1988 and the UK Bribery Act 2010. No improper payments.","expected_nudges":["anti-bribery","section 7"]}
+{"id":"NUDGE-ESOP","kind":"nudge","category":"Drafter","body_md":"The Employee shall be eligible to receive ESOPs under the Company's plan, governed by Section 62 of the Companies Act 2013.","expected_nudges":["ESOP","section 62"]}
+{"id":"NUDGE-LOCKIN","kind":"nudge","category":"Drafter","body_md":"The Lessee shall not terminate this lease before the expiry of 3 years from the Commencement Date (the 'lock-in period').","expected_nudges":["lock-in","section 74"]}
+{"id":"NUDGE-CONFIDENTIAL","kind":"nudge","category":"Drafter","body_md":"The Receiving Party shall hold all Confidential Information in strict confidence. The trade secrets shall survive indefinitely.","expected_nudges":["confidentiality"]}
+{"id":"NUDGE-STAMP","kind":"nudge","category":"Drafter","body_md":"This Deed shall be insufficiently stamped only at the risk of the Lessee. Stamp duty payable per Maharashtra Stamp Act.","expected_nudges":["stamp duty"]}
+{"id":"COMP-NDA-DPDP","kind":"compliance","category":"DPDP","body_md":"This NDA covers exchange of personal data between the Parties. The Receiving Party shall keep personal data confidential.","doc_type":"nda_mutual","expected_nudges":["dpdp"]}
+{"id":"COMP-EMP-POSH","kind":"compliance","category":"POSH","body_md":"This Employment Agreement is for full-time engagement of the Employee as Software Engineer.","doc_type":"employment_agreement","expected_nudges":["posh"]}
+{"id":"COMP-LOAN-RBI","kind":"compliance","category":"RBI/FEMA","body_md":"The Lender, a non-resident bank, shall provide a credit facility to the Indian Borrower in USD. Disbursement to overseas branch.","doc_type":"term_loan","expected_nudges":["rbi_fema"]}
+{"id":"COMP-SEBI-INSIDER","kind":"compliance","category":"SEBI","body_md":"The Director is privy to unpublished price sensitive information of the listed Company. Such UPSI shall be kept confidential.","doc_type":"shareholders_agreement","expected_nudges":["sebi"]}
+{"id":"COMP-LEASE-STAMP","kind":"compliance","category":"Stamp","body_md":"This Lease Deed is for 5 years at Mumbai. The Lessee shall pay rent of INR 1,00,000 per month.","doc_type":"lease_commercial","expected_nudges":["stamp_duty"]}
+{"id":"COMP-IBC-TERMINATE","kind":"compliance","category":"IBC","body_md":"The Customer may terminate this Agreement immediately upon the Supplier's admission of insolvency proceedings.","doc_type":"msa","expected_nudges":["ibc"]}
+{"id":"COMP-SALE-STAMP","kind":"compliance","category":"Stamp","body_md":"This Sale Deed conveys the Property at Worli, Mumbai to the Purchaser for consideration of INR 5 crore.","doc_type":"sale_deed","expected_nudges":["stamp_duty"]}
+{"id":"COMP-MSA-GST","kind":"compliance","category":"GST","body_md":"The Customer shall pay fees of INR 50 lakh per quarter for professional services.","doc_type":"msa","expected_nudges":["gst"]}
+{"id":"COMP-NDA-IT43A","kind":"compliance","category":"IT Act","body_md":"This NDA covers exchange of sensitive personal data including financial and biometric information of customers.","doc_type":"nda_mutual","expected_nudges":["it_act_43a"]}
+{"id":"BAN-1","kind":"banned","answer":"I think you should sue them immediately under Section 138 of the NI Act.","category":"banned"}
+{"id":"BAN-2","kind":"banned","answer":"In my opinion, this case has merit but as an AI I cannot give legal advice.","category":"banned"}
+{"id":"BAN-3","kind":"banned","answer":"Section 138 of the Negotiable Instruments Act 1881 makes cheque dishonour a criminal offence punishable with imprisonment up to 2 years.","category":"banned"}
+{"id":"BAN-4","kind":"banned","answer":"You should file an anticipatory bail application under Section 438 CrPC.","category":"banned"}
+{"id":"BAN-5","kind":"banned","answer":"Anticipatory bail under Section 438 CrPC is granted where the applicant has a reasonable apprehension of arrest for a non-bailable offence.","category":"banned"}
+{"id":"BAN-6","kind":"banned","answer":"I'll handle the case filing for you immediately. Leave it to me.","category":"banned"}
+{"id":"BAN-7","kind":"banned","answer":"As a language model, I cannot certify the accuracy of these citations.","category":"banned"}
+{"id":"BAN-8","kind":"banned","answer":"The applicable provision is Section 27 of the Indian Contract Act, 1872, which provides that agreements in restraint of trade are void.","category":"banned"}
+{"id":"BAN-9","kind":"banned","answer":"Your best move is to settle with the opposing party under Section 12A of the Commercial Courts Act.","category":"banned"}
+{"id":"BAN-10","kind":"banned","answer":"Pre-suit mediation under Section 12A Commercial Courts Act is mandatory for non-urgent commercial disputes above INR 3 lakh.","category":"banned"}
+{"id":"SRCH-WRIT-RES","kind":"search","category":"Constitutional","query":"writ petition res judicata article 226","mode":"hybrid"}
+{"id":"SRCH-LIM-3","kind":"search","category":"Limitation","query":"limitation contract three years article 55 schedule","mode":"hybrid"}
+{"id":"SRCH-LIM-137","kind":"search","category":"Limitation","query":"article 137 limitation IBC bk educational","mode":"hybrid"}
+{"id":"SRCH-EVID-1","kind":"search","category":"Evidence","query":"section 65B indian evidence act electronic evidence","mode":"hybrid"}
+{"id":"SRCH-EVID-2","kind":"search","category":"Evidence","query":"bharatiya sakshya adhiniyam 2023","mode":"hybrid"}
+{"id":"SRCH-COMP-2","kind":"search","category":"Companies","query":"section 188 companies act related party transaction","mode":"hybrid"}
+{"id":"SRCH-COMP-3","kind":"search","category":"Companies","query":"oppression mismanagement section 241 242 NCLT","mode":"hybrid"}
+{"id":"SRCH-FEMA-1","kind":"search","category":"FEMA","query":"FEMA 1999 foreign direct investment FDI policy","mode":"hybrid"}
+{"id":"SRCH-PMLA-1","kind":"search","category":"PMLA","query":"prevention of money laundering act enforcement directorate","mode":"hybrid"}
+{"id":"SRCH-COFEP-1","kind":"search","category":"COFEPOSA","query":"preventive detention COFEPOSA grounds bail","mode":"hybrid"}
+{"id":"SRCH-FAMILY-1","kind":"search","category":"Family","query":"divorce hindu marriage act mutual consent section 13B","mode":"hybrid"}
+{"id":"SRCH-FAMILY-2","kind":"search","category":"Family","query":"maintenance section 125 CrPC wife children parents","mode":"hybrid"}
+{"id":"SRCH-FAMILY-3","kind":"search","category":"Family","query":"domestic violence act 2005 protection order","mode":"hybrid"}
+{"id":"SRCH-NCLAT-1","kind":"search","category":"NCLAT","query":"NCLAT appeal IBC section 61","mode":"hybrid"}
+{"id":"SRCH-NCDRC-1","kind":"search","category":"Consumer","query":"NCDRC consumer commission deficiency in service","mode":"hybrid"}
+{"id":"SRCH-DRAT-1","kind":"search","category":"DRT","query":"debts recovery tribunal DRT section 19 RDDB act","mode":"hybrid"}
+{"id":"SRCH-CYBER-66A","kind":"search","category":"IT Act","query":"section 66A shreya singhal it act","mode":"hybrid"}
+{"id":"SRCH-RTI-1","kind":"search","category":"RTI","query":"right to information act 2005 section 6 PIO","mode":"hybrid"}
+{"id":"SRCH-PAT-1","kind":"search","category":"Patent","query":"patentability section 3(d) novartis glivec","mode":"hybrid"}
+{"id":"SRCH-TM-1","kind":"search","category":"Trademark","query":"deceptive similarity trademark act 1999 section 29","mode":"hybrid"}
+{"id":"SRCH-COPYRIGHT-1","kind":"search","category":"Copyright","query":"copyright act fair dealing section 52","mode":"hybrid"}
+{"id":"SRCH-TAX-1","kind":"search","category":"Tax","query":"transfer pricing arm's length section 92","mode":"hybrid"}
+{"id":"SRCH-TAX-2","kind":"search","category":"Tax","query":"GST input tax credit section 16 CGST act","mode":"hybrid"}
+{"id":"SRCH-CRIM-CONSPIRACY","kind":"search","category":"Criminal","query":"criminal conspiracy section 120B IPC kehar singh","mode":"hybrid"}
+{"id":"SRCH-CRIM-498A","kind":"search","category":"Criminal","query":"section 498A IPC cruelty by husband","mode":"hybrid"}
+{"id":"SRCH-CRIM-NDPS","kind":"search","category":"NDPS","query":"NDPS act commercial quantity section 37 bail","mode":"hybrid"}
+{"id":"SRCH-CONTEMPT-1","kind":"search","category":"Contempt","query":"contempt of courts act prashant bhushan","mode":"hybrid"}
+{"id":"SRCH-PUBLIC-1","kind":"search","category":"Public Interest","query":"public interest litigation locus standi MC mehta","mode":"hybrid"}
+{"id":"SRCH-WILDLIFE-1","kind":"search","category":"Environment","query":"wildlife protection act 1972 schedule species","mode":"hybrid"}
+{"id":"SRCH-ENV-1","kind":"search","category":"Environment","query":"environment protection act 1986 polluter pays","mode":"hybrid"}
+{"id":"SRCH-ELECTORAL-1","kind":"search","category":"Electoral","query":"representation of people act electoral bonds","mode":"hybrid"}
+{"id":"SRCH-HEALTH-1","kind":"search","category":"Health","query":"medical council india professional misconduct","mode":"hybrid"}
+{"id":"SRCH-EDUCATION-1","kind":"search","category":"Education","query":"right to education article 21A free and compulsory","mode":"hybrid"}
+{"id":"SRCH-RESERVATION-1","kind":"search","category":"Reservation","query":"103rd amendment EWS reservation janhit abhiyan","mode":"hybrid"}

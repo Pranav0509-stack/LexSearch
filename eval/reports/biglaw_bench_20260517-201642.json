@@ -1,0 +1,3019 @@
+{
+  "ts": "20260517-201642",
+  "n": 118,
+  "pass": 75,
+  "score": 0.7768474576271187,
+  "elapsed_s": 137.0,
+  "threshold": 0.8,
+  "results": [
+    {
+      "id": "SRCH-NI-138-1",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 6017
+    },
+    {
+      "id": "SRCH-NI-138-2",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "5/5 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: negotiable instruments"
+          ]
+        }
+      },
+      "elapsed_ms": 1218
+    },
+    {
+      "id": "SRCH-NI-138-3",
+      "kind": "search",
+      "category": "NI Act",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "unresolved citation: 'Basalingappa v. Mudibasappa'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 1197
+    },
+    {
+      "id": "SRCH-BAIL-1",
+      "kind": "search",
+      "category": "Bail",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "3/3 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 678
+    },
+    {
+      "id": "SRCH-BAIL-2",
+      "kind": "search",
+      "category": "Bail",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 439"
+          ]
+        }
+      },
+      "elapsed_ms": 109
+    },
+    {
+      "id": "SRCH-BAIL-3",
+      "kind": "search",
+      "category": "Bail",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 561
+    },
+    {
+      "id": "SRCH-QUASH-1",
+      "kind": "search",
+      "category": "Quashing",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 738
+    },
+    {
+      "id": "SRCH-QUASH-2",
+      "kind": "search",
+      "category": "Quashing",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 35
+    },
+    {
+      "id": "SRCH-ARB-34-1",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 34"
+          ]
+        }
+      },
+      "elapsed_ms": 994
+    },
+    {
+      "id": "SRCH-ARB-34-2",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 194
+    },
+    {
+      "id": "SRCH-ARB-34-3",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 212
+    },
+    {
+      "id": "SRCH-ARB-11-1",
+      "kind": "search",
+      "category": "Arbitration",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 3334
+    },
+    {
+      "id": "SRCH-IBC-7-1",
+      "kind": "search",
+      "category": "IBC",
+      "passed": false,
+      "score": 0.833,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing: insolvency"
+          ]
+        }
+      },
+      "elapsed_ms": 604
+    },
+    {
+      "id": "SRCH-IBC-14-1",
+      "kind": "search",
+      "category": "IBC",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 14"
+          ]
+        }
+      },
+      "elapsed_ms": 243
+    },
+    {
+      "id": "SRCH-IBC-9-1",
+      "kind": "search",
+      "category": "IBC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 62
+    },
+    {
+      "id": "SRCH-IPC-302-1",
+      "kind": "search",
+      "category": "IPC",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 302"
+          ]
+        }
+      },
+      "elapsed_ms": 63
+    },
+    {
+      "id": "SRCH-IPC-420-1",
+      "kind": "search",
+      "category": "IPC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "4/4 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 463
+    },
+    {
+      "id": "SRCH-CPC-80-1",
+      "kind": "search",
+      "category": "CPC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 1232
+    },
+    {
+      "id": "SRCH-CPC-148A-1",
+      "kind": "search",
+      "category": "CPC",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 148A"
+          ]
+        }
+      },
+      "elapsed_ms": 84
+    },
+    {
+      "id": "SRCH-CPC-O39-1",
+      "kind": "search",
+      "category": "CPC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1068
+    },
+    {
+      "id": "SRCH-CPC-O37-1",
+      "kind": "search",
+      "category": "CPC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1521
+    },
+    {
+      "id": "SRCH-CPC-O7R11-1",
+      "kind": "search",
+      "category": "CPC",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 7467
+    },
+    {
+      "id": "SRCH-ICA-27-1",
+      "kind": "search",
+      "category": "Contract",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 3831
+    },
+    {
+      "id": "SRCH-ICA-73-1",
+      "kind": "search",
+      "category": "Contract",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 73"
+          ]
+        }
+      },
+      "elapsed_ms": 740
+    },
+    {
+      "id": "SRCH-ICA-74-1",
+      "kind": "search",
+      "category": "Contract",
+      "passed": false,
+      "score": 0.667,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 74"
+          ]
+        }
+      },
+      "elapsed_ms": 92
+    },
+    {
+      "id": "SRCH-ICA-56-1",
+      "kind": "search",
+      "category": "Contract",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 167
+    },
+    {
+      "id": "SRCH-CONST-226-1",
+      "kind": "search",
+      "category": "Constitutional",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 4636
+    },
+    {
+      "id": "SRCH-CONST-21-1",
+      "kind": "search",
+      "category": "Constitutional",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "6/6 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2020
+    },
+    {
+      "id": "SRCH-CONST-14-1",
+      "kind": "search",
+      "category": "Constitutional",
+      "passed": false,
+      "score": 0.833,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "unresolved citation: 'Construction\\nV. Markendeya'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1311
+    },
+    {
+      "id": "SRCH-TPA-54-1",
+      "kind": "search",
+      "category": "Property",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 3409
+    },
+    {
+      "id": "SRCH-TPA-105-1",
+      "kind": "search",
+      "category": "Property",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2857
+    },
+    {
+      "id": "SRCH-REG-17-1",
+      "kind": "search",
+      "category": "Property",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1187
+    },
+    {
+      "id": "SRCH-ISA-276-1",
+      "kind": "search",
+      "category": "Succession",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "unresolved citation: 'Maharaj versus Public'"
+          ]
+        },
+        "statute": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing: section 276"
+          ]
+        }
+      },
+      "elapsed_ms": 2255
+    },
+    {
+      "id": "SRCH-ISA-63-1",
+      "kind": "search",
+      "category": "Succession",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "4/4 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 3796
+    },
+    {
+      "id": "SRCH-HSA-30-1",
+      "kind": "search",
+      "category": "Succession",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 4438
+    },
+    {
+      "id": "SRCH-DPDP-8-1",
+      "kind": "search",
+      "category": "DPDP",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1111
+    },
+    {
+      "id": "SRCH-DPDP-16-1",
+      "kind": "search",
+      "category": "DPDP",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 36
+    },
+    {
+      "id": "SRCH-IT-43A-1",
+      "kind": "search",
+      "category": "IT Act",
+      "passed": false,
+      "score": 0.833,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "unresolved citation: 'orientation\\nv. Medical'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1377
+    },
+    {
+      "id": "SRCH-POSH-1",
+      "kind": "search",
+      "category": "POSH",
+      "passed": false,
+      "score": 0.833,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "unresolved citation: 'Gaur vs Water'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1117
+    },
+    {
+      "id": "SRCH-SARFAESI-13-1",
+      "kind": "search",
+      "category": "SARFAESI",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 required cites present"
+          ]
+        }
+      },
+      "elapsed_ms": 3309
+    },
+    {
+      "id": "SRCH-SC-PUTTASWAMY",
+      "kind": "search",
+      "category": "Landmark",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1800
+    },
+    {
+      "id": "SRCH-SC-KESAVANANDA",
+      "kind": "search",
+      "category": "Landmark",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 235
+    },
+    {
+      "id": "SRCH-SC-MANEKA",
+      "kind": "search",
+      "category": "Landmark",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "5/5 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 750
+    },
+    {
+      "id": "SRCH-SC-MENAKA",
+      "kind": "search",
+      "category": "Constitutional",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 4936
+    },
+    {
+      "id": "SRCH-COMM-12A-1",
+      "kind": "search",
+      "category": "Commercial",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 37
+    },
+    {
+      "id": "SRCH-CONS-2019-1",
+      "kind": "search",
+      "category": "Consumer",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 46
+    },
+    {
+      "id": "SRCH-MOTOR-1",
+      "kind": "search",
+      "category": "MV",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 732
+    },
+    {
+      "id": "SRCH-MOTOR-2",
+      "kind": "search",
+      "category": "MV",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 12758
+    },
+    {
+      "id": "SRCH-LAB-1",
+      "kind": "search",
+      "category": "Labour",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2121
+    },
+    {
+      "id": "SRCH-LAB-2",
+      "kind": "search",
+      "category": "Labour",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "4/4 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 5770
+    },
+    {
+      "id": "NUDGE-NDA-NONCOMPETE",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 27"
+          ]
+        }
+      },
+      "elapsed_ms": 13
+    },
+    {
+      "id": "NUDGE-INDEMNIFY",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 124"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-LIQUIDATED",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 74"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-DEFAULT-INTEREST",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 74"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-UNILATERAL-ARB",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 12(5)"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-FORCE-MAJEURE",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 56"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-IBC-TERMINATE",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 14"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "NUDGE-DPDP-PD",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 8"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-138",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: section 138"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-SPECIFIC-PERF",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 10"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-PCA",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 7"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-ESOP",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 62"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-LOCKIN",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": false,
+      "score": 0.5,
+      "scores": {
+        "nudge": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "missing nudge: section 74"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-CONFIDENTIAL",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "nudge": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 expected nudges fired"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "NUDGE-STAMP",
+      "kind": "nudge",
+      "category": "Drafter",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "nudge": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 expected nudges fired"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "COMP-NDA-DPDP",
+      "kind": "compliance",
+      "category": "DPDP",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: dpdp"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "COMP-EMP-POSH",
+      "kind": "compliance",
+      "category": "POSH",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: posh"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "COMP-LOAN-RBI",
+      "kind": "compliance",
+      "category": "RBI/FEMA",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: rbi_fema"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "COMP-SEBI-INSIDER",
+      "kind": "compliance",
+      "category": "SEBI",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: sebi"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "COMP-LEASE-STAMP",
+      "kind": "compliance",
+      "category": "Stamp",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: stamp_duty"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "COMP-IBC-TERMINATE",
+      "kind": "compliance",
+      "category": "IBC",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: ibc"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "COMP-SALE-STAMP",
+      "kind": "compliance",
+      "category": "Stamp",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: stamp_duty"
+          ]
+        }
+      },
+      "elapsed_ms": 12
+    },
+    {
+      "id": "COMP-MSA-GST",
+      "kind": "compliance",
+      "category": "GST",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: gst"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "COMP-NDA-IT43A",
+      "kind": "compliance",
+      "category": "IT Act",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "compliance": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "missing nudge: it_act_43a"
+          ]
+        }
+      },
+      "elapsed_ms": 11
+    },
+    {
+      "id": "BAN-1",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: 'i think'",
+            "banned phrase: 'you should sue'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-2",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: 'as an ai'",
+            "banned phrase: 'in my opinion'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-3",
+      "kind": "banned",
+      "category": "banned",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-4",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: 'you should file'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-5",
+      "kind": "banned",
+      "category": "banned",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-6",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: \"i'll handle\"",
+            "banned phrase: 'leave it to me'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-7",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: 'as a language model'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-8",
+      "kind": "banned",
+      "category": "banned",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-9",
+      "kind": "banned",
+      "category": "banned",
+      "passed": false,
+      "score": 0.0,
+      "scores": {
+        "banned": {
+          "passed": false,
+          "score": 0.0,
+          "notes": [
+            "banned phrase: 'your best move'"
+          ]
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "BAN-10",
+      "kind": "banned",
+      "category": "banned",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        }
+      },
+      "elapsed_ms": 0
+    },
+    {
+      "id": "SRCH-WRIT-RES",
+      "kind": "search",
+      "category": "Constitutional",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2317
+    },
+    {
+      "id": "SRCH-LIM-3",
+      "kind": "search",
+      "category": "Limitation",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1780
+    },
+    {
+      "id": "SRCH-LIM-137",
+      "kind": "search",
+      "category": "Limitation",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 67
+    },
+    {
+      "id": "SRCH-EVID-1",
+      "kind": "search",
+      "category": "Evidence",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2337
+    },
+    {
+      "id": "SRCH-EVID-2",
+      "kind": "search",
+      "category": "Evidence",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 255
+    },
+    {
+      "id": "SRCH-COMP-2",
+      "kind": "search",
+      "category": "Companies",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2325
+    },
+    {
+      "id": "SRCH-COMP-3",
+      "kind": "search",
+      "category": "Companies",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 83
+    },
+    {
+      "id": "SRCH-FEMA-1",
+      "kind": "search",
+      "category": "FEMA",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 642
+    },
+    {
+      "id": "SRCH-PMLA-1",
+      "kind": "search",
+      "category": "PMLA",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "4/4 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1674
+    },
+    {
+      "id": "SRCH-COFEP-1",
+      "kind": "search",
+      "category": "COFEPOSA",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 864
+    },
+    {
+      "id": "SRCH-FAMILY-1",
+      "kind": "search",
+      "category": "Family",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 803
+    },
+    {
+      "id": "SRCH-FAMILY-2",
+      "kind": "search",
+      "category": "Family",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 601
+    },
+    {
+      "id": "SRCH-FAMILY-3",
+      "kind": "search",
+      "category": "Family",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2131
+    },
+    {
+      "id": "SRCH-NCLAT-1",
+      "kind": "search",
+      "category": "NCLAT",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 590
+    },
+    {
+      "id": "SRCH-NCDRC-1",
+      "kind": "search",
+      "category": "Consumer",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1674
+    },
+    {
+      "id": "SRCH-DRAT-1",
+      "kind": "search",
+      "category": "DRT",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1022
+    },
+    {
+      "id": "SRCH-CYBER-66A",
+      "kind": "search",
+      "category": "IT Act",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 672
+    },
+    {
+      "id": "SRCH-RTI-1",
+      "kind": "search",
+      "category": "RTI",
+      "passed": false,
+      "score": 0.833,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": false,
+          "score": 0.5,
+          "notes": [
+            "unresolved citation: 'Ramchandra versus PIO'"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2481
+    },
+    {
+      "id": "SRCH-PAT-1",
+      "kind": "search",
+      "category": "Patent",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 32
+    },
+    {
+      "id": "SRCH-TM-1",
+      "kind": "search",
+      "category": "Trademark",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 999
+    },
+    {
+      "id": "SRCH-COPYRIGHT-1",
+      "kind": "search",
+      "category": "Copyright",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 706
+    },
+    {
+      "id": "SRCH-TAX-1",
+      "kind": "search",
+      "category": "Tax",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 550
+    },
+    {
+      "id": "SRCH-TAX-2",
+      "kind": "search",
+      "category": "Tax",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 777
+    },
+    {
+      "id": "SRCH-CRIM-CONSPIRACY",
+      "kind": "search",
+      "category": "Criminal",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2120
+    },
+    {
+      "id": "SRCH-CRIM-498A",
+      "kind": "search",
+      "category": "Criminal",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 2186
+    },
+    {
+      "id": "SRCH-CRIM-NDPS",
+      "kind": "search",
+      "category": "NDPS",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "3/3 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1265
+    },
+    {
+      "id": "SRCH-CONTEMPT-1",
+      "kind": "search",
+      "category": "Contempt",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 6246
+    },
+    {
+      "id": "SRCH-PUBLIC-1",
+      "kind": "search",
+      "category": "Public Interest",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 506
+    },
+    {
+      "id": "SRCH-WILDLIFE-1",
+      "kind": "search",
+      "category": "Environment",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 532
+    },
+    {
+      "id": "SRCH-ENV-1",
+      "kind": "search",
+      "category": "Environment",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 671
+    },
+    {
+      "id": "SRCH-ELECTORAL-1",
+      "kind": "search",
+      "category": "Electoral",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 1463
+    },
+    {
+      "id": "SRCH-HEALTH-1",
+      "kind": "search",
+      "category": "Health",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no citation produced; not required"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 604
+    },
+    {
+      "id": "SRCH-EDUCATION-1",
+      "kind": "search",
+      "category": "Education",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "1/1 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 593
+    },
+    {
+      "id": "SRCH-RESERVATION-1",
+      "kind": "search",
+      "category": "Reservation",
+      "passed": true,
+      "score": 1.0,
+      "scores": {
+        "banned": {
+          "passed": true,
+          "score": 1.0,
+          "notes": []
+        },
+        "citation": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "2/2 citations resolved"
+          ]
+        },
+        "statute": {
+          "passed": true,
+          "score": 1.0,
+          "notes": [
+            "no statute expectation set"
+          ]
+        }
+      },
+      "elapsed_ms": 135
+    }
+  ]
+}

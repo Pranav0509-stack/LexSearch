@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en-IN">
+<head>
+  <meta charset="UTF-8">
+  <title>Sanhita</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    :root {
+      --bg: #faf7f2; --bg-elev: #ffffff;
+      --ink: #1a1814; --ink-soft: #4a4540;
+      --line: #e9e1d3; --line-strong: #d8cdb8;
+      --accent: #6b4f1d;
+    }
+    * { box-sizing: border-box; font-family: -apple-system, "Segoe UI", system-ui, sans-serif; }
+    body { margin: 0; padding: 14px; background: var(--bg); color: var(--ink); font-size: 13px; }
+    h1 { font-family: 'Playfair Display', Georgia, serif; font-size: 18px; margin: 0 0 4px; letter-spacing: -0.2px; }
+    p.lead { font-size: 11.5px; color: var(--ink-soft); margin: 0 0 14px; line-height: 1.5; }
+    .tabs { display: flex; border-bottom: 1px solid var(--line); margin: -2px 0 12px; gap: 2px; }
+    .tab { flex: 1; padding: 7px 6px; font-size: 11px; background: none; border: none; border-bottom: 2px solid transparent; color: var(--ink-soft); cursor: pointer; font-weight: 500; }
+    .tab.active { color: var(--ink); border-bottom-color: var(--accent); }
+    .pane { display: none; }
+    .pane.active { display: block; }
+    label { font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-soft); font-weight: 600; display: block; margin: 8px 0 3px; }
+    input, select, textarea {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--line); border-radius: 5px;
+      background: white; font-size: 12px; color: var(--ink);
+    }
+    input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+    button.primary {
+      width: 100%; padding: 8px 12px; background: var(--ink); color: white;
+      border: none; border-radius: 6px; font-size: 12px; font-weight: 600;
+      cursor: pointer; margin-top: 10px;
+    }
+    button.primary:hover  { background: #000; }
+    button.primary:disabled { background: var(--line-strong); color: var(--ink-soft); cursor: not-allowed; }
+    button.secondary {
+      padding: 5px 10px; background: white; color: var(--ink); border: 1px solid var(--line);
+      border-radius: 5px; font-size: 11px; cursor: pointer;
+    }
+    button.secondary:hover { border-color: var(--accent); }
+    .row { display: flex; gap: 6px; }
+    .row > * { flex: 1; }
+    .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+    .chip { padding: 3px 8px; font-size: 10.5px; background: white; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; }
+    .chip:hover { border-color: var(--accent); }
+    .result { margin-top: 10px; padding: 10px; background: white; border: 1px solid var(--line); border-radius: 6px; font-size: 11.5px; line-height: 1.5; max-height: 320px; overflow-y: auto; }
+    .result .item { padding: 7px 0; border-bottom: 1px solid var(--line); }
+    .result .item:last-child { border-bottom: 0; }
+    .result .title { font-weight: 600; font-size: 12px; color: var(--ink); margin-bottom: 3px; }
+    .result .meta { font-size: 10.5px; color: var(--ink-soft); }
+    .result .snip { font-size: 11px; color: var(--ink); margin-top: 4px; font-style: italic; line-height: 1.45; }
+    .finding { padding: 7px; margin: 6px 0; border-left: 3px solid var(--accent); background: white; border-radius: 0 4px 4px 0; }
+    .finding .sev { display: inline-block; padding: 1px 6px; font-size: 9px; text-transform: uppercase; border-radius: 3px; margin-right: 5px; }
+    .finding .sev.high  { background: #fde2e2; color: #8b1c1c; }
+    .finding .sev.warn  { background: #fef0c3; color: #845c00; }
+    .finding .sev.info  { background: #dceaff; color: #1c4f8b; }
+    .finding .rule { font-family: ui-monospace, monospace; font-size: 10px; color: var(--accent); }
+    .footer { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 10.5px; color: var(--ink-soft); }
+    .footer a { color: var(--accent); text-decoration: none; }
+    .err { background: #fde2e2; color: #8b1c1c; padding: 6px 8px; border-radius: 4px; font-size: 11px; margin: 6px 0; }
+    .ok  { background: #dff7e1; color: #1f6336; padding: 6px 8px; border-radius: 4px; font-size: 11px; margin: 6px 0; }
+    .spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 6px; vertical-align: -2px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h1>Sanhita</h1>
+  <p class="lead">Indian-law drafter, case-law search, compliance, and quick edits — running inside Word.</p>
+
+  <div class="tabs">
+    <button class="tab active" data-pane="draft">Draft</button>
+    <button class="tab" data-pane="search">Search</button>
+    <button class="tab" data-pane="comply">Compliance</button>
+    <button class="tab" data-pane="edit">Quick edit</button>
+  </div>
+
+  <!-- ── DRAFT ────────────────────────────────────────────── -->
+  <div class="pane active" id="pane-draft">
+    <label>Template</label>
+    <select id="template-select"><option>Loading…</option></select>
+    <div id="template-meta" style="font-size:10.5px;color:var(--ink-soft);margin-top:3px;"></div>
+    <div id="slot-form" style="margin-top:8px;"></div>
+    <button class="primary" id="btn-draft" disabled>Generate &amp; insert</button>
+    <div id="draft-out"></div>
+  </div>
+
+  <!-- ── SEARCH ──────────────────────────────────────────── -->
+  <div class="pane" id="pane-search">
+    <label>Query</label>
+    <input id="search-q" placeholder="e.g. section 138 cheque dishonour"/>
+    <div class="chips">
+      <button class="chip" data-q="section 138 cheque dishonour">§138 NI</button>
+      <button class="chip" data-q="anticipatory bail section 438">Anti-bail §438</button>
+      <button class="chip" data-q="quashing 482 bhajan lal">Quashing §482</button>
+      <button class="chip" data-q="section 34 set aside arbitral award">Sec.34 A&amp;C</button>
+      <button class="chip" data-q="motor accident compensation multiplier">Motor MV</button>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      <select id="search-mode">
+        <option value="hybrid">Hybrid (BM25 + semantic)</option>
+        <option value="keyword">Keyword</option>
+        <option value="semantic">Semantic</option>
+      </select>
+      <button class="primary" id="btn-search" style="margin-top:0;flex:0 0 auto;width:auto;padding:6px 14px;">Search</button>
+    </div>
+    <div id="search-out"></div>
+  </div>
+
+  <!-- ── COMPLIANCE ──────────────────────────────────────── -->
+  <div class="pane" id="pane-comply">
+    <p class="lead" style="margin-bottom:8px;">Runs DPDP · RBI/FEMA · SEBI · IBC §14 · GST · IT Act §43A · POSH · Stamp Duty plug-ins against the document's current body.</p>
+    <label>Doc type (optional)</label>
+    <select id="comply-doctype">
+      <option value="">— infer —</option>
+      <option value="nda_mutual">NDA</option>
+      <option value="msa">MSA</option>
+      <option value="employment_agreement">Employment</option>
+      <option value="lease_commercial">Lease</option>
+      <option value="sale_deed">Sale Deed</option>
+      <option value="term_sheet">Term Sheet</option>
+      <option value="term_loan">Loan</option>
+    </select>
+    <button class="primary" id="btn-comply">Check current document</button>
+    <div id="comply-out"></div>
+  </div>
+
+  <!-- ── QUICK EDIT ──────────────────────────────────────── -->
+  <div class="pane" id="pane-edit">
+    <p class="lead" style="margin-bottom:8px;">Select text in the document, then click an action. Sanhita preserves statute citations exactly &mdash; AI never invents references.</p>
+    <div class="row">
+      <button class="primary" id="btn-polish"  style="margin-top:0;">Polish</button>
+      <button class="primary" id="btn-shorten" style="margin-top:0;">Shorten</button>
+      <button class="primary" id="btn-cite"    style="margin-top:0;">Cite</button>
+    </div>
+    <div id="edit-out"></div>
+  </div>
+
+  <div class="footer">
+    Backend: <span id="backend-url">http://localhost:8080</span> ·
+    <a href="https://sanhita.ai/word" target="_blank">Docs</a>
+  </div>
+
+  <script src="taskpane.js"></script>
+</body>
+</html>
