@@ -2082,6 +2082,7 @@ class WorkflowValidateBody(BaseModel):
     context: str = ""
     expected_format: str = "free"   # "free" | "table" | "json" | "bullets" | "ranked"
     node_kind: str = "ai"           # which node produced the output
+    sources_used: int = 0           # number of [E*] grounding sources passed to the LLM
 
 
 @app.post("/api/workflows/validate")
@@ -2170,6 +2171,22 @@ def api_workflow_validate(
         if num_lines < 3:
             reasons.append(f"expected ≥3 ranked items, got {num_lines}")
     # else format == "free" — no format gate
+
+    # ── Gate: cite_resolves — if the LLM emitted [E1] [E2] markers, verify
+    # each marker number is within the count of grounding sources we
+    # actually passed to it. Catches the "[E7] used but only 3 sources
+    # provided" hallucination.
+    if body.sources_used > 0:
+        cite_markers = [int(m.group(1)) for m in re.finditer(r"\[E(\d+)\]", out)]
+        if cite_markers:
+            bad_markers = [n for n in cite_markers if n < 1 or n > body.sources_used]
+            gates["cite_resolves"] = not bad_markers
+            if bad_markers:
+                reasons.append(f"citation markers out of range (sources={body.sources_used}): {sorted(set(bad_markers))}")
+        else:
+            # Sources were provided but the LLM ignored them → ungrounded
+            gates["cite_resolves"] = False
+            reasons.append(f"{body.sources_used} grounding sources provided but no [E*] markers in output")
 
     # ── Gate 5: grounding in context (heuristic — at least one substantive
     # noun phrase from the output must appear in the input context).
