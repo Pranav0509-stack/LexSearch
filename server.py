@@ -2776,6 +2776,15 @@ def api_brief_chat_v2(
             "score":    float(ev.get("score") or 0.0),
         })
 
+    # Server-side post-process: annotate every IPC / CrPC / IEA section
+    # reference with its BNS / BNSS / BSA equivalent. Belt-and-braces with
+    # the synthesizer's system-prompt rule — guarantees both numbers appear
+    # even if the LLM forgets.
+    try:
+        from legal_code_mapping import annotate_text  # type: ignore
+        answer_md = annotate_text(answer_md)
+    except ImportError:
+        pass
     response = {
         "answer_markdown": answer_md,
         "citations": citations,

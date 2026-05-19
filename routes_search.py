@@ -112,11 +112,21 @@ def smart_search(req: SmartSearchRequest):
                     judge = ", ".join(str(x) for x in arr if x)
             except Exception:
                 pass
+        snippet = (getattr(r, "snippet", None)
+                   or (getattr(r, "summary", "") or "")[:280])
+        # Annotate IPC / CrPC / IEA section refs with their BNS / BNSS / BSA
+        # equivalents so the lawyer immediately sees both numbers.
+        try:
+            from legal_code_mapping import annotate_text   # type: ignore
+            snippet = annotate_text(snippet) if snippet else snippet
+            title_annotated = annotate_text(title) if title else title
+        except ImportError:
+            title_annotated = title
         return {
             "doc_id":       getattr(r, "doc_id", None),
             "case_id":      getattr(r, "doc_id", None),  # alias for legacy frontend
             "source_table": getattr(r, "source_table", None),
-            "title":        title or "(untitled)",
+            "title":        title_annotated or "(untitled)",
             "petitioner":   pet or None,
             "respondent":   res or None,
             "court":        getattr(r, "court", None),
@@ -127,8 +137,7 @@ def smart_search(req: SmartSearchRequest):
             "verdict":      getattr(r, "verdict", None),
             "doc_type":     getattr(r, "doc_type", None),
             "acts_cited":   getattr(r, "acts_cited", None),
-            "snippet":      (getattr(r, "snippet", None)
-                              or (getattr(r, "summary", "") or "")[:280]),
+            "snippet":      snippet,
             "summary":      getattr(r, "summary", None),
             "score":        round(float(getattr(r, "score", 0.0)), 4),
             "bm25_score":   round(float(getattr(r, "bm25_score", 0.0)), 4),

@@ -417,6 +417,16 @@ GROUNDING RULES (these are non-negotiable — lawyers will not trust your output
    - Indian-law landmark cases (Kesavananda Bharati, Maneka Gandhi, Vishaka, Puttaswamy, Sanjay Chandra, Niranjan Shankar Golikari, Hakam Singh) may be cited without [E*] markers but only when directly relevant.
 2. If no GROUNDING SOURCES block is provided, restrict yourself strictly to the input CONTEXT — paraphrase, summarise, extract, classify, but DO NOT introduce facts the context does not contain.
 
+NEW LAW LABELLING RULE (mandatory from 1 July 2024):
+- IPC 1860 has been replaced by Bharatiya Nyaya Sanhita 2023 (BNS).
+- CrPC 1973 has been replaced by Bharatiya Nagarik Suraksha Sanhita 2023 (BNSS).
+- Indian Evidence Act 1872 has been replaced by Bharatiya Sakshya Adhiniyam 2023 (BSA).
+Whenever you cite an old-code section, ALSO state the new-code equivalent
+in parentheses — e.g. "Section 420 IPC (BNS §318(4))", "Section 439 CrPC
+(BNSS §483)", "Section 65B Indian Evidence Act (BSA §63)". This is non-
+negotiable because FIRs filed on or after 1 July 2024 are under the new
+codes — lawyers reading our output must immediately see both numbers.
+
 STYLE RULES:
 3. Use formal legal English appropriate for Indian courts.
 4. Follow Indian court formatting conventions (cause-title for petitions, "Re:" lines for notices, sworn-affidavit endings, etc.).
@@ -493,7 +503,15 @@ Task: {instruction}"""
     try:
         resp = router.generate(_EDITOR_SYSTEM, prompt, temperature=0.25,
                                max_tokens=1500, prefer=prefer)
-        return resp.text
+        # Server-side BNS/BNSS/BSA labelling — even if the LLM forgets the
+        # rule in its system prompt, every IPC / CrPC / IEA section ref in
+        # the output gets the new-code equivalent appended in parentheses.
+        # See legal_code_mapping.py for the source-of-truth table.
+        try:
+            from legal_code_mapping import annotate_text  # type: ignore
+            return annotate_text(resp.text)
+        except ImportError:
+            return resp.text
     except Exception as e:
         logger.error("ai_write_section failed: %s", e)
         return ""

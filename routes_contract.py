@@ -412,6 +412,17 @@ def compliance_endpoint(req: ComplianceRequest):
     if not body:
         raise HTTPException(400, "body_md or draft_id required")
     findings = compliance_run(body, {"doc_type": doc_type or ""})
+    # Annotate every finding + remediation message with BNS/BNSS/BSA labels
+    # so lawyers see the post-2024 code numbers wherever IPC/CrPC/IEA appears.
+    try:
+        from legal_code_mapping import annotate_text   # type: ignore
+        for f in findings:
+            if hasattr(f, "finding") and f.finding:
+                f.finding = annotate_text(f.finding)
+            if hasattr(f, "remediation") and f.remediation:
+                f.remediation = annotate_text(f.remediation)
+    except ImportError:
+        pass
     # Persist if linked to a draft
     if req.draft_id:
         with _conn() as c:
